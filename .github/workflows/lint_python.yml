@@ -14,7 +14,7 @@ jobs:
       - run: bandit --recursive --skip B105,B108,B303,B311 .
       - run: black --check --diff . || true
       - run: codespell --ignore-words-list="hass" --skip="./.git"
-      - run: flake8 . --count --ignore=B001,E241,E265,E302,E722,E731,F403,F405,F841,W504
+      - run: flake8 . --count --ignore=B001,E241,E265,E302,E722,E731,F403,F405,F841,W503,W504
                       --max-complexity=21 --max-line-length=184 --show-source --statistics
       - run: isort --check-only --profile black . || true
       - run: pip install -r requirements.txt || pip install --editable . || true
