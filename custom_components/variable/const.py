@@ -1,5 +1,6 @@
 from homeassistant.const import Platform
 
+PLAFORM_NAME = "Variables+History"
 DOMAIN = "variable"
 
 PLATFORMS: list[str] = [Platform.SENSOR, Platform.BINARY_SENSOR]
@@ -15,6 +16,7 @@ CONF_ENTITY_PLATFORM = "entity_platform"
 CONF_FORCE_UPDATE = "force_update"
 CONF_RESTORE = "restore"
 CONF_VALUE = "value"
+CONF_VALUE_TYPE = "value_type"
 CONF_VARIABLE_ID = "variable_id"
 CONF_YAML_VARIABLE = "yaml_variable"
 
