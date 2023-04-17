@@ -259,11 +259,7 @@ class Variable(RestoreSensor):
             f"({self._attr_name}) [async_update_variable] Replace Attributes: {replace_attributes}"
         )
 
-        if (
-            not replace_attributes
-            and hasattr(self, "_attr_extra_state_attributes")
-            and self._attr_extra_state_attributes is not None
-        ):
+        if not replace_attributes and self._attr_extra_state_attributes is not None:
             updated_attributes = copy.deepcopy(self._attr_extra_state_attributes)
 
         if attributes is not None:
