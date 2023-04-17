@@ -15,7 +15,8 @@
           "icon": "Icon",
           "device_class": "Device Class",
           "restore": "Restore on Restart",
-          "force_update": "Force Update"
+          "force_update": "Force Update",
+          "exclude_from_recorder": "Exclude from Recorder"
         },
         "description": "Create a new Sensor Variable"
       },
@@ -39,7 +40,8 @@
           "attributes": "Initial Attributes",
           "device_class": "Device Class",
           "restore": "Restore on Restart",
-          "force_update": "Force Update"
+          "force_update": "Force Update",
+          "exclude_from_recorder": "Exclude from Recorder"
         },
         "description": "Create a new Binary Sensor Variable"
       }
@@ -57,7 +59,8 @@
         "data": {
           "device_class": "Device Class",
           "restore": "Restore on Restart",
-          "force_update": "Force Update"
+          "force_update": "Force Update",
+          "exclude_from_recorder": "Exclude from Recorder"
         },
         "description": "Update existing Variable Sensor"
       },
@@ -78,10 +81,15 @@
           "attributes": "Attributes (typically only useful if Restore on Restart is False)",
           "device_class": "Device Class",
           "restore": "Restore on Restart",
-          "force_update": "Force Update"
+          "force_update": "Force Update",
+          "exclude_from_recorder": "Exclude from Recorder"
         },
         "description": "Update existing Variable Binary Sensor"
       }
+    },
+    "error": {
+      "invalid_value_type": "The value entered is not compatible with the selected device_class",
+      "unknown": "[%key:common::config_flow::error::unknown%]"
     },
     "abort": {
       "yaml_variable": "Cannot change options here for Variables created by YAML.\n\nTo use the User Interface to manage this Variable, you will need to:\n1. Remove it from YAML\n2. Delete the imported Variable entity from Home Assistant\n3. Restart Home Assistant\n4. Manually recreate it in Home Assistant, Integrations, +Add Integration.",

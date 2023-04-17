@@ -22,12 +22,14 @@ import voluptuous as vol
 from .const import (
     CONF_ATTRIBUTES,
     CONF_ENTITY_PLATFORM,
+    CONF_EXCLUDE_FROM_RECORDER,
     CONF_FORCE_UPDATE,
     CONF_RESTORE,
     CONF_VALUE,
     CONF_VALUE_TYPE,
     CONF_VARIABLE_ID,
     CONF_YAML_VARIABLE,
+    DEFAULT_EXCLUDE_FROM_RECORDER,
     DEFAULT_FORCE_UPDATE,
     DEFAULT_ICON,
     DEFAULT_RESTORE,
@@ -84,6 +86,9 @@ ADD_SENSOR_SCHEMA = vol.Schema(
         vol.Optional(
             CONF_FORCE_UPDATE, default=DEFAULT_FORCE_UPDATE
         ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
+        vol.Optional(
+            CONF_EXCLUDE_FROM_RECORDER, default=DEFAULT_EXCLUDE_FROM_RECORDER
+        ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
     }
 )
 
@@ -120,6 +125,9 @@ ADD_BINARY_SENSOR_SCHEMA = vol.Schema(
         vol.Optional(
             CONF_FORCE_UPDATE, default=DEFAULT_FORCE_UPDATE
         ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
+        vol.Optional(
+            CONF_EXCLUDE_FROM_RECORDER, default=DEFAULT_EXCLUDE_FROM_RECORDER
+        ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
     }
 )
 
@@ -151,16 +159,11 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input=None, errors=None, yaml_variable=False
     ):
         if user_input is not None:
-
+            user_input.update({CONF_ENTITY_PLATFORM: Platform.SENSOR})
             try:
-                user_input.update({CONF_ENTITY_PLATFORM: Platform.SENSOR})
-                user_input.update({CONF_YAML_VARIABLE: yaml_variable})
-                info = await validate_sensor_input(self.hass, user_input)
-                _LOGGER.debug(f"[New Sensor Variable] info: {info}")
-                _LOGGER.debug(f"[New Sensor Variable] user_input: {user_input}")
-                return self.async_create_entry(
-                    title=info.get("title", ""), data=user_input
-                )
+                _LOGGER.debug(f"[New Sensor Page 1] page_1_input: {user_input}")
+                self.add_sensor_input = user_input
+                return await self.async_step_sensor_page_2()
             except Exception as err:
                 _LOGGER.exception(
                     f"[config_flow async_step_add_sensor] Unexpected exception: {err}"
@@ -461,6 +464,12 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
                     CONF_FORCE_UPDATE,
                     default=self.config_entry.data.get(
                         CONF_FORCE_UPDATE, DEFAULT_FORCE_UPDATE
+                    ),
+                ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
+                vol.Optional(
+                    CONF_EXCLUDE_FROM_RECORDER,
+                    default=self.config_entry.data.get(
+                        CONF_EXCLUDE_FROM_RECORDER, DEFAULT_EXCLUDE_FROM_RECORDER
                     ),
                 ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
             }
@@ -798,6 +807,12 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
                     CONF_FORCE_UPDATE,
                     default=self.config_entry.data.get(
                         CONF_FORCE_UPDATE, DEFAULT_FORCE_UPDATE
+                    ),
+                ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
+                vol.Optional(
+                    CONF_EXCLUDE_FROM_RECORDER,
+                    default=self.config_entry.data.get(
+                        CONF_EXCLUDE_FROM_RECORDER, DEFAULT_EXCLUDE_FROM_RECORDER
                     ),
                 ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
             }

@@ -15,7 +15,8 @@
           "icon": "Icon",
           "device_class": "Device Class",
           "restore": "Restore on Restart",
-          "force_update": "Force Update"
+          "force_update": "Force Update",
+          "exclude_from_recorder": "Exclude from Recorder"
         },
         "description": "Create a new Sensor Variable\nSee [Configuration Options]({component_config_url}) on GitHub for details"
       },
@@ -39,7 +40,8 @@
           "attributes": "Initial Attributes",
           "device_class": "Device Class",
           "restore": "Restore on Restart",
-          "force_update": "Force Update"
+          "force_update": "Force Update",
+          "exclude_from_recorder": "Exclude from Recorder"
         },
         "description": "Create a new Binary Sensor Variable\nSee [Configuration Options]({component_config_url}) on GitHub for details"
       }
@@ -57,7 +59,8 @@
         "data": {
           "device_class": "Device Class",
           "restore": "Restore on Restart",
-          "force_update": "Force Update"
+          "force_update": "Force Update",
+          "exclude_from_recorder": "Exclude from Recorder"
         },
         "description": "**Updating Sensor:&nbsp;{disp_name}**\nSee [Configuration Options]({component_config_url}) on GitHub for details"
       },
@@ -78,10 +81,15 @@
           "attributes": "Attributes (typically only useful if Restore on Restart is False)",
           "device_class": "Device Class",
           "restore": "Restore on Restart",
-          "force_update": "Force Update"
+          "force_update": "Force Update",
+          "exclude_from_recorder": "Exclude from Recorder"
         },
         "description": "**Updating Binary Sensor:&nbsp;{disp_name}**\nSee [Configuration Options]({component_config_url}) on GitHub for details"
       }
+    },
+    "error": {
+      "invalid_value_type": "The value entered is not compatible with the selected device_class: {device_class}. Expected {value_type}.",
+      "unknown": "[%key:common::config_flow::error::unknown%]"
     },
     "abort": {
       "yaml_variable": "Cannot change options here for Variables created by YAML.\n\nTo use the User Interface to manage this Variable, you will need to:\n1. Remove it from YAML\n2. Delete the imported Variable entity from Home Assistant\n3. Restart Home Assistant\n4. Manually recreate it in Home Assistant, Integrations, +Add Integration.",
