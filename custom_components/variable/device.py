@@ -1,4 +1,6 @@
 import logging
+from collections.abc import Mapping
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -9,6 +11,7 @@ from homeassistant.const import (
     ATTR_MODEL_ID,
     ATTR_SERIAL_NUMBER,
     ATTR_SW_VERSION,
+    CONF_DEVICE_ID,
     CONF_NAME,
 )
 from homeassistant.core import HomeAssistant
@@ -80,7 +83,9 @@ async def create_device(hass: HomeAssistant, entry: ConfigEntry):
         hass.config_entries.async_schedule_reload(entity.config_entry_id)
 
 
-async def update_device(hass: HomeAssistant, entry: ConfigEntry, user_input) -> bool:
+async def update_device(
+    hass: HomeAssistant, entry: ConfigEntry, user_input: Mapping[str, Any]
+) -> bool:
     # _LOGGER.debug(f"({entry.title}) [update_device] entry: {entry}")
     # _LOGGER.debug(f"({entry.title}) [update_device] user_input: {user_input}")
     device_registry = dr.async_get(hass)
@@ -126,3 +131,63 @@ async def remove_device(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.config_entries.async_schedule_reload(entity.config_entry_id)
 
     return True
+
+
+async def update_device_associations(
+    hass: HomeAssistant, device: dr.DeviceInfo, new_entities: list
+):
+    device_registry = dr.async_get(hass)
+    entity_registry = er.async_get(hass)
+    new_entries = []
+    for entity_id in new_entities:
+        entry = entity_registry.async_get(entity_id)
+        new_entries.append(entry.config_entry_id)
+    _LOGGER.debug(f"[update_device_associations] new_entries: {new_entries}")
+    existing_entries = list(device.config_entries)
+    _LOGGER.debug(f"[update_device_associations] existing_entries: {existing_entries}")
+    try:
+        existing_entries.remove(device.primary_config_entry)
+    except ValueError:
+        pass
+    for entry in existing_entries.copy():
+        if entry in new_entries:
+            try:
+                new_entries.remove(entry)
+                existing_entries.remove(entry)
+            except ValueError:
+                pass
+    entries_to_remove = existing_entries
+    entries_to_add = new_entries
+    _LOGGER.debug(f"[update_device_associations] entries_to_add: {entries_to_add}")
+    _LOGGER.debug(
+        f"[update_device_associations] entries_to_remove: {entries_to_remove}"
+    )
+    for entry_id in entries_to_add:
+        device_registry.async_update_device(
+            device_id=device.id, add_config_entry_id=entry_id
+        )
+        entry = hass.config_entries.async_get_entry(entry_id)
+        entry_data = dict(entry.data)
+        entry_data.update({CONF_DEVICE_ID: device.id})
+        hass.config_entries.async_update_entry(
+            entry=entry,
+            data=entry_data,
+            options={},
+        )
+        await hass.config_entries.async_reload(entry_id)
+    for entry_id in entries_to_remove:
+        device_registry.async_update_device(
+            device_id=device.id, remove_config_entry_id=entry_id
+        )
+        entry = hass.config_entries.async_get_entry(entry_id)
+        entry_data = dict(entry.data)
+        entry_data.update({CONF_DEVICE_ID: None})
+        hass.config_entries.async_update_entry(
+            entry=entry,
+            data=entry_data,
+            options={},
+        )
+        await hass.config_entries.async_reload(entry_id)
+
+    updated_device = device_registry.async_get(device_id=device.id)
+    _LOGGER.debug(f"[update_device_associations] updated_device: {updated_device}")

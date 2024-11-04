@@ -97,6 +97,7 @@
           "change_sensor_value": "Change Value and Attributes",
           "change_binary_sensor_value": "Change Value and Attributes",
           "change_device_tracker_value": "Change Value and Attributes",
+          "change_device_value": "Change Associated Entities",
           "sensor_options": "Change Options",
           "binary_sensor_options": "Change Options",
           "device_tracker_options": "Change Options",
@@ -200,6 +201,13 @@
           "sw_version": "Software Version"
         },
         "description": "**Updating Device:&nbsp;{disp_name}**\nSee [Configuration Options]({component_config_url}) on GitHub for details"
+      },
+      "change_device_value": {
+        "title": "Variables+History - Device",
+        "data": {
+          "entities": "Entities to Associate with Device"
+        },
+        "description": "**Updating Device:&nbsp;{disp_name}**"
       }
     },
     "abort": {

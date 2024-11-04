@@ -26,6 +26,7 @@ from homeassistant.const import (
     CONF_DEVICE,
     CONF_DEVICE_CLASS,
     CONF_DEVICE_ID,
+    CONF_ENTITIES,
     CONF_ENTITY_ID,
     CONF_ICON,
     CONF_NAME,
@@ -36,8 +37,18 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers import entity_registry, selector
+from homeassistant.helpers import (
+    config_validation as cv,
+)
+from homeassistant.helpers import (
+    device_registry as dr,
+)
+from homeassistant.helpers import (
+    entity_registry as er,
+)
+from homeassistant.helpers import (
+    selector,
+)
 from iso4217 import Currency
 
 from .const import (
@@ -68,7 +79,7 @@ from .const import (
     SERVICE_UPDATE_DEVICE_TRACKER,
     SERVICE_UPDATE_SENSOR,
 )
-from .device import update_device
+from .device import update_device, update_device_associations
 from .helpers import value_to_type
 
 _LOGGER = logging.getLogger(__name__)
@@ -659,7 +670,8 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
             _LOGGER.debug("[YAML] No Options for YAML Created Variables")
             return self.async_abort(reason="yaml_variable")
 
-        if self.config_entry.data.get(CONF_ENTITY_PLATFORM) in PLATFORMS:
+        platforms_w_device: list = PLATFORMS + [CONF_DEVICE]
+        if self.config_entry.data.get(CONF_ENTITY_PLATFORM) in platforms_w_device:
             change_value = (
                 "change_" + self.config_entry.data.get(CONF_ENTITY_PLATFORM) + "_value"
             )
@@ -670,16 +682,16 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
                 step_id="init",
                 menu_options=[change_value, change_options],
             )
-        elif self.config_entry.data.get(CONF_ENTITY_PLATFORM) == CONF_DEVICE:
-            return await self.async_step_device_options()
+        # elif self.config_entry.data.get(CONF_ENTITY_PLATFORM) == CONF_DEVICE:
+        #     return await self.async_step_device_options()
         return False
 
     async def async_step_change_sensor_value(
         self, user_input=None, errors=None
     ) -> FlowResult:
         errors = {} if errors is None else errors
-        ent = entity_registry.async_entries_for_config_entry(
-            entity_registry.async_get(self.hass), self.config_entry.entry_id
+        ent = er.async_entries_for_config_entry(
+            er.async_get(self.hass), self.config_entry.entry_id
         )
         if len(ent) > 0:
             entity_id = ent[0].entity_id
@@ -863,8 +875,8 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
         self, user_input=None, errors=None
     ) -> FlowResult:
         errors = {} if errors is None else errors
-        ent = entity_registry.async_entries_for_config_entry(
-            entity_registry.async_get(self.hass), self.config_entry.entry_id
+        ent = er.async_entries_for_config_entry(
+            er.async_get(self.hass), self.config_entry.entry_id
         )
         if len(ent) > 0:
             entity_id = ent[0].entity_id
@@ -961,8 +973,8 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
         self, user_input=None, errors=None
     ) -> FlowResult:
         errors = {} if errors is None else errors
-        ent = entity_registry.async_entries_for_config_entry(
-            entity_registry.async_get(self.hass), self.config_entry.entry_id
+        ent = er.async_entries_for_config_entry(
+            er.async_get(self.hass), self.config_entry.entry_id
         )
         if len(ent) > 0:
             entity_id = ent[0].entity_id
@@ -1899,6 +1911,45 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
             },
         )
 
+    def build_change_device_value(self, device):
+        _LOGGER.debug(f"[build_change_device_value] device: {device}")
+        default_entities = []
+        if hasattr(device, "config_entries"):
+            for entry_id in device.config_entries:
+                for entity in er.async_entries_for_config_entry(
+                    er.async_get(self.hass), entry_id
+                ):
+                    default_entities.append(entity.entity_id)
+        sorted_default_entities = sorted(set(default_entities))
+        _LOGGER.debug(
+            f"[build_change_device_value] default entities: {sorted_default_entities}"
+        )
+        all_config_entry_ids = self.hass.config_entries.async_entry_ids()
+        include_entities = []
+        for entry_id in all_config_entry_ids:
+            for entity in er.async_entries_for_config_entry(
+                er.async_get(self.hass), entry_id
+            ):
+                if entity.device_id is None:
+                    include_entities.append(entity.entity_id)
+        include_entities = include_entities + default_entities
+        sorted_include_entities = sorted(set(include_entities))
+        _LOGGER.debug(
+            f"[build_change_device_value] include entities: {sorted_include_entities}"
+        )
+        CHANGE_VARIABLE_VALUE_SCHEMA = vol.Schema(
+            {
+                vol.Optional(
+                    CONF_ENTITIES, default=default_entities
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        include_entities=include_entities, multiple=True
+                    ),
+                ),
+            }
+        )
+        return CHANGE_VARIABLE_VALUE_SCHEMA
+
     async def async_step_device_options(
         self, user_input=None, errors=None
     ) -> FlowResult:
@@ -1927,7 +1978,9 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
                     options={},
                 )
                 # await self.hass.config_entries.async_reload(self.config_entry.entry_id)
-                await update_device(self.hass, self.config_entry, user_input)
+                await update_device(
+                    hass=self.hass, entry=self.config_entry, user_input=user_input
+                )
                 return self.async_create_entry(title="", data=user_input)
 
         DEVICE_OPTIONS_SCHEMA = vol.Schema({})
@@ -1963,6 +2016,41 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
             errors=errors,
             description_placeholders={
                 "component_config_url": COMPONENT_CONFIG_URL,
+                "disp_name": self.config_entry.data.get(CONF_NAME),
+            },
+        )
+
+    async def async_step_change_device_value(
+        self, user_input=None, errors=None
+    ) -> FlowResult:
+        errors = {} if errors is None else errors
+        device_registry = dr.async_get(self.hass)
+        devices = dr.async_entries_for_config_entry(
+            registry=device_registry, config_entry_id=self.config_entry.entry_id
+        )
+        if len(devices) > 0:
+            device = devices[0]
+        else:
+            _LOGGER.error("Unable to load Device")
+            return self.async_abort()
+
+        _LOGGER.debug(f"[Change Device Value] device: {device}")
+        if user_input is not None:
+            _LOGGER.debug(f"[Change Device Value] user_input: {user_input}")
+            await update_device_associations(
+                hass=self.hass,
+                device=device,
+                new_entities=user_input.get(CONF_ENTITIES, []),
+            )
+            return self.async_abort(reason="value_changed")
+
+        CHANGE_DEVICE_VALUE_SCHEMA = self.build_change_device_value(device)
+
+        return self.async_show_form(
+            step_id="change_device_value",
+            data_schema=CHANGE_DEVICE_VALUE_SCHEMA,
+            errors=errors,
+            description_placeholders={
                 "disp_name": self.config_entry.data.get(CONF_NAME),
             },
         )
