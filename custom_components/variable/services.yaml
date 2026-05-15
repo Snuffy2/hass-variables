@@ -143,6 +143,46 @@ update_device_tracker:
       selector:
         boolean:
 
+increment_sensor:
+  name: Increment Sensor Variable
+  description: Increment a Sensor Variable value by a specified amount.
+  target:
+    entity:
+      integration: variable
+      domain: sensor
+  fields:
+    value_delta:
+      name: Increment Value
+      description: Amount to increment by (default 1) (optional)
+      example: 1
+      default: 1
+      selector:
+        number:
+          min: -1000000
+          max: 1000000
+          step: "any"
+          mode: box
+
+decrement_sensor:
+  name: Decrement Sensor Variable
+  description: Decrement a Sensor Variable value by a specified amount.
+  target:
+    entity:
+      integration: variable
+      domain: sensor
+  fields:
+    value_delta:
+      name: Decrement Value
+      description: Amount to decrement by (default 1) (optional)
+      example: 1
+      default: 1
+      selector:
+        number:
+          min: -1000000
+          max: 1000000
+          step: "any"
+          mode: box
+
 toggle_binary_sensor:
   name: Toggle Binary Sensor Variable
   description: Toggle a Binary Sensor Variable value and optionally Update its attributes.

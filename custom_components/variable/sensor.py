@@ -40,6 +40,7 @@ from .const import (
     ATTR_REPLACE_ATTRIBUTES,
     ATTR_SUGGESTED_UNIT_OF_MEASUREMENT,
     ATTR_VALUE,
+    ATTR_VALUE_DELTA,
     CONF_ATTRIBUTES,
     CONF_EXCLUDE_FROM_RECORDER,
     CONF_FORCE_UPDATE,
@@ -55,6 +56,8 @@ from .const import (
     DEFAULT_REPLACE_ATTRIBUTES,
     DEFAULT_RESTORE,
     DOMAIN,
+    SERVICE_INCREMENT_SENSOR,
+    SERVICE_DECREMENT_SENSOR,
 )
 from .helpers import merge_attribute_dict, value_to_type
 
@@ -109,6 +112,22 @@ async def async_setup_entry(
             ): cv.boolean,
         },
         "async_update_variable",
+    )
+
+    platform.async_register_entity_service(
+        SERVICE_INCREMENT_SENSOR,
+        {
+            vol.Optional(ATTR_VALUE_DELTA, default=1): vol.Any(int, float),
+        },
+        "async_increment_variable",
+    )
+
+    platform.async_register_entity_service(
+        SERVICE_DECREMENT_SENSOR,
+        {
+            vol.Optional(ATTR_VALUE_DELTA, default=1): vol.Any(int, float),
+        },
+        "async_decrement_variable",
     )
 
     config = hass.data.get(DOMAIN, {}).get(config_entry.entry_id, {})
@@ -453,6 +472,106 @@ class Variable(RestoreSensor):
             f"({self._attr_name}) [updated] attributes: {getattr(self, '_attr_extra_state_attributes', {})}"
         )
         self.async_write_ha_state()
+
+    async def async_increment_variable(self, **kwargs) -> None:
+        """Increment Sensor Variable value."""
+
+        value_delta = kwargs.get(ATTR_VALUE_DELTA, 1)
+        _LOGGER.debug(
+            f"({self._attr_name}) [async_increment_variable] Incrementing by: {value_delta}"
+        )
+
+        # Only allow increment for numeric types
+        if self._value_type not in ["number", None]:
+            _LOGGER.error(
+                f"({self._attr_name}) Cannot increment non-numeric variable. Current type: {self._value_type}"
+            )
+            raise ValueError(
+                f"Cannot increment non-numeric variable. Current type: {self._value_type}"
+            )
+
+        current_value = self._attr_native_value
+        if current_value is None:
+            current_value = 0
+
+        try:
+            # Convert current value to numeric if it's a string
+            if isinstance(current_value, str):
+                try:
+                    current_value = float(current_value)
+                except (ValueError, TypeError):
+                    _LOGGER.error(
+                        f"({self._attr_name}) Cannot convert current value to number: {current_value}"
+                    )
+                    raise ValueError(f"Cannot convert current value to number: {current_value}")
+
+            new_value = current_value + value_delta
+
+            # Convert back to the appropriate type
+            if self._value_type == "number" or self._value_type is None:
+                # Keep as is if it's int or float
+                if isinstance(new_value, float) and new_value.is_integer():
+                    new_value = int(new_value)
+
+            _LOGGER.debug(
+                f"({self._attr_name}) [async_increment_variable] New Value: {new_value}"
+            )
+            self._attr_native_value = new_value
+            self.async_write_ha_state()
+
+        except ValueError as err:
+            _LOGGER.error(f"({self._attr_name}) Increment error: {err}")
+            raise
+
+    async def async_decrement_variable(self, **kwargs) -> None:
+        """Decrement Sensor Variable value."""
+
+        value_delta = kwargs.get(ATTR_VALUE_DELTA, 1)
+        _LOGGER.debug(
+            f"({self._attr_name}) [async_decrement_variable] Decrementing by: {value_delta}"
+        )
+
+        # Only allow decrement for numeric types
+        if self._value_type not in ["number", None]:
+            _LOGGER.error(
+                f"({self._attr_name}) Cannot decrement non-numeric variable. Current type: {self._value_type}"
+            )
+            raise ValueError(
+                f"Cannot decrement non-numeric variable. Current type: {self._value_type}"
+            )
+
+        current_value = self._attr_native_value
+        if current_value is None:
+            current_value = 0
+
+        try:
+            # Convert current value to numeric if it's a string
+            if isinstance(current_value, str):
+                try:
+                    current_value = float(current_value)
+                except (ValueError, TypeError):
+                    _LOGGER.error(
+                        f"({self._attr_name}) Cannot convert current value to number: {current_value}"
+                    )
+                    raise ValueError(f"Cannot convert current value to number: {current_value}")
+
+            new_value = current_value - value_delta
+
+            # Convert back to the appropriate type
+            if self._value_type == "number" or self._value_type is None:
+                # Keep as is if it's int or float
+                if isinstance(new_value, float) and new_value.is_integer():
+                    new_value = int(new_value)
+
+            _LOGGER.debug(
+                f"({self._attr_name}) [async_decrement_variable] New Value: {new_value}"
+            )
+            self._attr_native_value = new_value
+            self.async_write_ha_state()
+
+        except ValueError as err:
+            _LOGGER.error(f"({self._attr_name}) Decrement error: {err}")
+            raise
 
 
 class VariableNoRecorder(Variable):

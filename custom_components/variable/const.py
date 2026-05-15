@@ -42,3 +42,7 @@ ATTR_VARIABLE = "variable"
 SERVICE_UPDATE_SENSOR = "update_sensor"
 SERVICE_UPDATE_BINARY_SENSOR = "update_binary_sensor"
 SERVICE_UPDATE_DEVICE_TRACKER = "update_device_tracker"
+SERVICE_INCREMENT_SENSOR = "increment_sensor"
+SERVICE_DECREMENT_SENSOR = "decrement_sensor"
+
+ATTR_VALUE_DELTA = "value_delta"
