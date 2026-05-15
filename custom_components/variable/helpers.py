@@ -44,15 +44,11 @@ def _parse_attribute_path(path: str) -> list:
 
 
 def looks_like_attribute_path(path: str) -> bool:
+    # Only treat bracket notation as nested paths (e.g., "test[a]")
+    # Treat dot notation as literal attribute names for backward compatibility (e.g., "test.a" stays as-is)
     if "[" in path:
         return True
-    if "." not in path:
-        return False
-    try:
-        tokens = _parse_attribute_path(path)
-    except ValueError:
-        return False
-    return len(tokens) > 1
+    return False
 
 
 def set_nested_attribute(target: MutableMapping, path: str, value) -> None:
