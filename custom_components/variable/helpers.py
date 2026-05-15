@@ -136,6 +136,11 @@ def value_to_type(init_val, dest_type):  # noqa: C901
         _LOGGER.debug(f"[value_to_type] return value: {init_val}, returning None")
         return None
 
+    # Convert Wrapper types and other non-native types to strings
+    # This handles HA 2026.3.4+ template engine's Wrapper type from | tojson
+    if not isinstance(init_val, (str, int, float, datetime.date, datetime.datetime)):
+        init_val = str(init_val)
+
     # _LOGGER.debug(f"[value_to_type] initial value: {init_val}, initial type: {type(init_val)}, dest type: {dest_type}")
     if isinstance(init_val, str):
         # _LOGGER.debug("[value_to_type] Processing as string")
