@@ -35,6 +35,7 @@ from .const import (
     ATTR_VARIABLE,
     CONF_ATTRIBUTES,
     CONF_ENTITY_PLATFORM,
+    CONF_EXCLUDE_FROM_RECORDER,
     CONF_FORCE_UPDATE,
     CONF_RESTORE,
     CONF_VALUE,
@@ -74,6 +75,28 @@ SERVICE_SET_ENTITY_LEGACY_SCHEMA = vol.Schema(
         ): cv.boolean,
     }
 )
+
+
+async def _async_exclude_entity_from_recorder(hass: HomeAssistant, entity_id: str) -> None:
+    """Exclude an entity from recorder by updating recorder's internal config."""
+    try:
+        # Get current recorder config
+        recorder_config = hass.config.get("recorder", {})
+        exclude_entities = list(recorder_config.get("exclude_entities", []))
+
+        # Add entity if not already in list
+        if entity_id not in exclude_entities:
+            exclude_entities.append(entity_id)
+
+            # Try to update recorder's internal state if recorder is loaded
+            if "recorder" in hass.data:
+                recorder = hass.data.get("recorder", {})
+                if isinstance(recorder, dict):
+                    recorder["exclude_entities"] = exclude_entities
+
+            _LOGGER.debug(f"Entity excluded from recorder: {entity_id}")
+    except Exception as err:
+        _LOGGER.debug(f"Error excluding entity from recorder: {err}")
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType):
@@ -251,6 +274,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             yaml_data = copy.deepcopy(dict(entry.data))
             yaml_data.pop(CONF_YAML_PRESENT, None)
             hass.config_entries.async_update_entry(entry, data=yaml_data, options={})
+
+    # Listen for config entry updates (e.g., toggling exclude from recorder)
+    async def _async_on_entry_update(hass: HomeAssistant, entry: ConfigEntry) -> None:
+        """Handle config entry update."""
+        _LOGGER.debug(f"Config entry updated: {entry.data.get(CONF_VARIABLE_ID)}")
+        # Reload entry to recreate entities with new settings
+        await hass.config_entries.async_reload(entry.entry_id)
+
+    # Register update listener
+    entry.async_on_unload(
+        entry.add_update_listener(_async_on_entry_update)
+    )
+
     async_remove_stale_devices_links_keep_current_device(
         hass,
         entry.entry_id,

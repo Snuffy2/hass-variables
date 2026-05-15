@@ -60,6 +60,7 @@ from .const import (
     SERVICE_DECREMENT_SENSOR,
 )
 from .helpers import merge_attribute_dict, value_to_type
+from . import _async_exclude_entity_from_recorder
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -576,3 +577,12 @@ class Variable(RestoreSensor):
 
 class VariableNoRecorder(Variable):
     _unrecorded_attributes = frozenset({MATCH_ALL})
+
+    async def async_added_to_hass(self) -> None:
+        """Run when entity is added to Home Assistant."""
+        await super().async_added_to_hass()
+
+        # Exclude from recorder automatically
+        await _async_exclude_entity_from_recorder(self.hass, self.entity_id)
+
+        _LOGGER.debug(f"({self._attr_name}) Excluded from recorder: {self.entity_id}")
