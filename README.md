@@ -203,6 +203,24 @@ Used to toggle the state or update attributes of a Binary Sensor Variable. If th
 | `New Attributes`     | `attributes`                            | `No`     |         | What to update the attributes to                                                                    |
 | `Replace Attributes` | `replace_attributes`                    | `No`     | `False` | Replace or merge current attributes (`False` = merge)                                               |
 
+### `variable.increment_sensor`
+
+Used to increment the value of a Sensor Variable by a specified amount (works with numeric variables only).
+
+| Name               | Key            | Required | Default | Description                                                                                            |
+|--------------------|----------------|----------|---------|--------------------------------------------------------------------------------------------------------|
+| `Targets`          | `target:`<br />&nbsp;&nbsp;`entity_id:` | `Yes`    |         | The entity_ids of one or more sensor variables to increment (ex. `sensor.test_counter`)               |
+| `Increment Value`  | `value_delta`  | `No`     | `1`     | Amount to increment by (supports positive or negative values)                                          |
+
+### `variable.decrement_sensor`
+
+Used to decrement the value of a Sensor Variable by a specified amount (works with numeric variables only).
+
+| Name               | Key            | Required | Default | Description                                                                                            |
+|--------------------|----------------|----------|---------|--------------------------------------------------------------------------------------------------------|
+| `Targets`          | `target:`<br />&nbsp;&nbsp;`entity_id:` | `Yes`    |         | The entity_ids of one or more sensor variables to decrement (ex. `sensor.test_counter`)               |
+| `Decrement Value`  | `value_delta`  | `No`     | `1`     | Amount to decrement by (supports positive or negative values)                                          |
+
 <details>
 <summary><h2>Legacy Services</h2></summary>
 
@@ -264,6 +282,22 @@ action:
         country: USA
     target:
       entity_id: binary_sensor.test_binary_var
+```
+```yaml
+action:
+  - service: variable.increment_sensor
+    data:
+      value_delta: 1
+    target:
+      entity_id: sensor.test_counter
+```
+```yaml
+action:
+  - service: variable.decrement_sensor
+    data:
+      value_delta: 5
+    target:
+      entity_id: sensor.test_counter
 ```
 
 ## Example timer automation
