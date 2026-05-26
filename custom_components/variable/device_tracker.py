@@ -10,8 +10,6 @@ from homeassistant.components.device_tracker.const import (
     ATTR_SOURCE_TYPE,
     SourceType,
 )
-
-ATTR_IN_ZONES = "in_zones"
 from homeassistant.components.device_tracker.legacy import PLATFORM_SCHEMA
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -59,6 +57,8 @@ from .helpers import merge_attribute_dict
 from . import _async_exclude_entity_from_recorder
 
 _LOGGER = logging.getLogger(__name__)
+
+ATTR_IN_ZONES = "in_zones"
 
 PLATFORM = Platform.DEVICE_TRACKER
 ENTITY_ID_FORMAT = PLATFORM + ".{}"
