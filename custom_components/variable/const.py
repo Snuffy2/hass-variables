@@ -31,6 +31,7 @@ CONF_UPDATED = "config_updated"
 CONF_CLEAR_DEVICE_ID = "clear_device_id"
 
 ATTR_ATTRIBUTES = "attributes"
+ATTR_DELETE_IN_ZONES = "delete_in_zones"
 ATTR_DELETE_LOCATION_NAME = "delete_location_name"
 ATTR_ENTITY = "entity"
 ATTR_NATIVE_UNIT_OF_MEASUREMENT = "native_unit_of_measurement"

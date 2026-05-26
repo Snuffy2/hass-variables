@@ -10,6 +10,8 @@ from homeassistant.components.device_tracker.const import (
     ATTR_SOURCE_TYPE,
     SourceType,
 )
+
+ATTR_IN_ZONES = "in_zones"
 from homeassistant.components.device_tracker.legacy import PLATFORM_SCHEMA
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -39,6 +41,7 @@ import voluptuous as vol
 
 from .const import (
     ATTR_ATTRIBUTES,
+    ATTR_DELETE_IN_ZONES,
     ATTR_DELETE_LOCATION_NAME,
     ATTR_REPLACE_ATTRIBUTES,
     CONF_ATTRIBUTES,
@@ -70,6 +73,7 @@ VARIABLE_ATTR_SETTINGS = {
     ATTR_LATITUDE: "_attr_latitude",
     ATTR_LONGITUDE: "_attr_longitude",
     ATTR_BATTERY_LEVEL: "_attr_battery_level",
+    ATTR_IN_ZONES: "_attr_in_zones",
     ATTR_LOCATION_NAME: "_attr_location_name",
     ATTR_GPS_ACCURACY: "_attr_gps_accuracy",
 }
@@ -89,6 +93,8 @@ async def async_setup_entry(
         {
             vol.Optional(ATTR_LATITUDE): cv.latitude,
             vol.Optional(ATTR_LONGITUDE): cv.longitude,
+            vol.Optional(ATTR_IN_ZONES): vol.All(cv.ensure_list, [cv.string]),
+            vol.Optional(ATTR_DELETE_IN_ZONES): cv.boolean,
             vol.Optional(ATTR_LOCATION_NAME): cv.string,
             vol.Optional(ATTR_DELETE_LOCATION_NAME): cv.boolean,
             vol.Optional(ATTR_GPS_ACCURACY): cv.positive_int,
@@ -178,6 +184,7 @@ class Variable(RestoreEntity, TrackerEntity):
         self._attr_latitude = config.get(ATTR_LATITUDE)
         self._attr_longitude = config.get(ATTR_LONGITUDE)
         self._attr_battery_level = config.get(ATTR_BATTERY_LEVEL)
+        self._attr_in_zones = config.get(ATTR_IN_ZONES)
         self._attr_location_name = config.get(ATTR_LOCATION_NAME)
         self._attr_gps_accuracy = config.get(ATTR_GPS_ACCURACY)
 
@@ -332,6 +339,13 @@ class Variable(RestoreEntity, TrackerEntity):
             self._attr_latitude = kwargs.get(ATTR_LATITUDE)
         if ATTR_LONGITUDE in kwargs:
             self._attr_longitude = kwargs.get(ATTR_LONGITUDE)
+        if ATTR_IN_ZONES in kwargs:
+            self._attr_in_zones = kwargs.get(ATTR_IN_ZONES)
+        if (
+            ATTR_DELETE_IN_ZONES in kwargs
+            and kwargs.get(ATTR_DELETE_IN_ZONES) is True
+        ):
+            self._attr_in_zones = None
         if ATTR_LOCATION_NAME in kwargs:
             self._attr_location_name = kwargs.get(ATTR_LOCATION_NAME)
         if ATTR_BATTERY_LEVEL in kwargs:
