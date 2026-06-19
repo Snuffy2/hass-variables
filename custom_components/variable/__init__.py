@@ -261,30 +261,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up from a config entry."""
 
     # _LOGGER.debug(f"[init async_setup_entry] entry: {entry.data}")
-    if entry.data.get(CONF_YAML_VARIABLE, False) is True:
-        if entry.data.get(CONF_YAML_PRESENT, False) is False:
-            _LOGGER.warning(
-                f"[YAML] YAML Entry no longer exists, deleting entry in HA: {entry.data.get(CONF_VARIABLE_ID)}"
+    if entry.data.get(CONF_YAML_PRESENT) is True:
+        yaml_data = copy.deepcopy(dict(entry.data))
+        yaml_data.pop(CONF_YAML_PRESENT, None)
+        hass.config_entries.async_update_entry(entry, data=yaml_data, options={})
+
+    # UI-driven option changes only; YAML entries are managed via _async_process_yaml.
+    if not entry.data.get(CONF_YAML_VARIABLE, False):
+        async def _async_on_entry_update(
+            hass: HomeAssistant, entry: ConfigEntry
+        ) -> None:
+            """Handle config entry update."""
+            _LOGGER.debug(
+                f"Config entry updated: {entry.data.get(CONF_VARIABLE_ID)}"
             )
-            # _LOGGER.debug(f"[YAML] entry_id: {entry.entry_id}")
-            hass.async_create_task(hass.config_entries.async_remove(entry.entry_id))
-            return False
-        else:
-            yaml_data = copy.deepcopy(dict(entry.data))
-            yaml_data.pop(CONF_YAML_PRESENT, None)
-            hass.config_entries.async_update_entry(entry, data=yaml_data, options={})
+            await hass.config_entries.async_reload(entry.entry_id)
 
-    # Listen for config entry updates (e.g., toggling exclude from recorder)
-    async def _async_on_entry_update(hass: HomeAssistant, entry: ConfigEntry) -> None:
-        """Handle config entry update."""
-        _LOGGER.debug(f"Config entry updated: {entry.data.get(CONF_VARIABLE_ID)}")
-        # Reload entry to recreate entities with new settings
-        await hass.config_entries.async_reload(entry.entry_id)
-
-    # Register update listener
-    entry.async_on_unload(
-        entry.add_update_listener(_async_on_entry_update)
-    )
+        entry.async_on_unload(
+            entry.add_update_listener(_async_on_entry_update)
+        )
 
     async_remove_stale_devices_links_keep_current_device(
         hass,
