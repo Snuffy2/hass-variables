@@ -1,13 +1,20 @@
-"""End-to-end tests for Variable device orchestration and lifecycle behavior."""
+"""Tests for Variable device orchestration and lifecycle behavior."""
+
+from unittest.mock import Mock
 
 from homeassistant.components.device_tracker.const import ATTR_LOCATION_NAME
 from homeassistant.const import (
     ATTR_BATTERY_LEVEL,
     ATTR_CONFIGURATION_URL,
     ATTR_GPS_ACCURACY,
+    ATTR_HW_VERSION,
     ATTR_LATITUDE,
     ATTR_LONGITUDE,
     ATTR_MANUFACTURER,
+    ATTR_MODEL,
+    ATTR_MODEL_ID,
+    ATTR_SERIAL_NUMBER,
+    ATTR_SW_VERSION,
     CONF_DEVICE,
     CONF_DEVICE_CLASS,
     CONF_DEVICE_ID,
@@ -17,6 +24,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+import pytest
 
 from custom_components.variable.const import (
     CONF_ATTRIBUTES,
@@ -31,7 +39,220 @@ from custom_components.variable.const import (
     CONF_YAML_VARIABLE,
     DOMAIN,
 )
+from custom_components.variable.device import create_device, remove_device, update_device
 from tests.types import ConfigEntryFactory
+
+
+async def test_create_device_reloads_only_linked_variable_entities(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reload linked Variable entities while ignoring YAML and other platforms.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config_entry_factory: Factory that creates registered Variable entries.
+        monkeypatch: Pytest fixture used to observe scheduled entry reloads.
+    """
+    device_entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: CONF_DEVICE,
+            CONF_NAME: "Reload Hub",
+            CONF_YAML_VARIABLE: False,
+        }
+    )
+    assert await hass.config_entries.async_setup(device_entry.entry_id)
+    await hass.async_block_till_done()
+    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, device_entry.entry_id)})
+    assert device is not None
+
+    linked_entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.SENSOR,
+            CONF_VARIABLE_ID: "linked_reload_sensor",
+            CONF_NAME: "Linked Reload Sensor",
+            CONF_VALUE: 1,
+            CONF_VALUE_TYPE: "number",
+            CONF_DEVICE_ID: device.id,
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+        }
+    )
+    yaml_entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.SENSOR,
+            CONF_VARIABLE_ID: "yaml_reload_sensor",
+            CONF_NAME: "YAML Reload Sensor",
+            CONF_VALUE: 2,
+            CONF_VALUE_TYPE: "number",
+            CONF_YAML_VARIABLE: True,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+        }
+    )
+    for entry in (linked_entry, yaml_entry):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    er.async_get(hass).async_get_or_create(
+        "sensor",
+        "other_platform",
+        "other-platform-linked-device",
+        config_entry=linked_entry,
+        device_id=device.id,
+        suggested_object_id="other_platform_linked_device",
+    )
+    schedule_reload = Mock()
+    monkeypatch.setattr(hass.config_entries, "async_schedule_reload", schedule_reload)
+
+    await create_device(hass, device_entry)
+
+    scheduled_entry_ids = {call.args[0] for call in schedule_reload.call_args_list}
+    assert scheduled_entry_ids == {linked_entry.entry_id}
+
+
+async def test_update_device_changes_all_registry_metadata(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Update every supported device metadata field in the registry.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config_entry_factory: Factory that creates the device config entry.
+    """
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: CONF_DEVICE,
+            CONF_NAME: "Metadata Hub",
+            CONF_YAML_VARIABLE: False,
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    metadata = {
+        ATTR_MANUFACTURER: "Variables Inc.",
+        ATTR_MODEL: "Virtual Hub",
+        ATTR_MODEL_ID: "VH-2",
+        ATTR_SW_VERSION: "2.0",
+        ATTR_HW_VERSION: "B",
+        ATTR_SERIAL_NUMBER: "SERIAL-2",
+        ATTR_CONFIGURATION_URL: "https://example.com/metadata",
+    }
+
+    assert await update_device(hass, entry, metadata)
+
+    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    assert device is not None
+    assert device.manufacturer == metadata[ATTR_MANUFACTURER]
+    assert device.model == metadata[ATTR_MODEL]
+    assert device.model_id == metadata[ATTR_MODEL_ID]
+    assert device.sw_version == metadata[ATTR_SW_VERSION]
+    assert device.hw_version == metadata[ATTR_HW_VERSION]
+    assert device.serial_number == metadata[ATTR_SERIAL_NUMBER]
+    assert str(device.configuration_url) == metadata[ATTR_CONFIGURATION_URL]
+
+
+async def test_update_device_returns_false_when_registry_device_is_missing(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Report that metadata cannot be updated without a registry device.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config_entry_factory: Factory that creates the unconfigured entry.
+    """
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: CONF_DEVICE,
+            CONF_NAME: "Missing Hub",
+            CONF_YAML_VARIABLE: False,
+        }
+    )
+
+    assert not await update_device(hass, entry, {ATTR_MODEL: "Unapplied"})
+
+
+async def test_remove_device_reloads_only_attached_variable_entities(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Remove a registry device and reload only attached Variable entities.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config_entry_factory: Factory that creates registered Variable entries.
+        monkeypatch: Pytest fixture used to observe scheduled entry reloads.
+    """
+    device_entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: CONF_DEVICE,
+            CONF_NAME: "Removal Hub",
+            CONF_YAML_VARIABLE: False,
+        }
+    )
+    assert await hass.config_entries.async_setup(device_entry.entry_id)
+    await hass.async_block_till_done()
+    device_registry = dr.async_get(hass)
+    device = device_registry.async_get_device(identifiers={(DOMAIN, device_entry.entry_id)})
+    assert device is not None
+
+    linked_entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.SENSOR,
+            CONF_VARIABLE_ID: "removal_sensor",
+            CONF_NAME: "Removal Sensor",
+            CONF_VALUE: 1,
+            CONF_VALUE_TYPE: "number",
+            CONF_DEVICE_ID: device.id,
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+        }
+    )
+    assert await hass.config_entries.async_setup(linked_entry.entry_id)
+    await hass.async_block_till_done()
+    er.async_get(hass).async_get_or_create(
+        "sensor",
+        "other_platform",
+        "other-platform-removal-device",
+        config_entry=linked_entry,
+        device_id=device.id,
+        suggested_object_id="other_platform_removal_device",
+    )
+    schedule_reload = Mock()
+    monkeypatch.setattr(hass.config_entries, "async_schedule_reload", schedule_reload)
+
+    assert await remove_device(hass, device_entry)
+
+    assert device_registry.async_get_device(identifiers={(DOMAIN, device_entry.entry_id)}) is None
+    scheduled_entry_ids = {call.args[0] for call in schedule_reload.call_args_list}
+    assert scheduled_entry_ids == {linked_entry.entry_id}
+
+
+async def test_remove_device_succeeds_when_registry_device_is_missing(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Treat removal of an already absent registry device as successful.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config_entry_factory: Factory that creates the unconfigured entry.
+    """
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: CONF_DEVICE,
+            CONF_NAME: "Already Removed Hub",
+            CONF_YAML_VARIABLE: False,
+        }
+    )
+
+    assert await remove_device(hass, entry)
 
 
 async def test_setup_device_entry_creates_registry_device(
