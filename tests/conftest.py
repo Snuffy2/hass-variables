@@ -39,6 +39,7 @@ def config_entry_factory(hass: HomeAssistant) -> ConfigEntryFactory:
     """Return a factory that adds a Variable config entry to Home Assistant."""
 
     def _create(data: Mapping[str, Any]) -> ConfigEntry:
+        """Create and register a Variable config entry from the supplied data."""
         entry = MockConfigEntry(
             domain=DOMAIN,
             title=str(data.get(CONF_VARIABLE_ID, data.get("name", "Variable"))),
