@@ -1,0 +1,272 @@
+"""Integration tests for Variable sensor restore and service behavior."""
+
+from collections.abc import Callable, Mapping
+from typing import Any
+
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import ATTR_FRIENDLY_NAME, CONF_DEVICE, CONF_DEVICE_ID, CONF_NAME, Platform
+from homeassistant.core import HomeAssistant, State
+from homeassistant.helpers import device_registry as dr
+import pytest
+from pytest_homeassistant_custom_component.common import mock_restore_cache_with_extra_data
+
+from custom_components.variable.const import (
+    ATTR_ATTRIBUTES,
+    ATTR_REPLACE_ATTRIBUTES,
+    ATTR_VALUE_DELTA,
+    CONF_ATTRIBUTES,
+    CONF_ENTITY_PLATFORM,
+    CONF_FORCE_UPDATE,
+    CONF_RESTORE,
+    CONF_VALUE,
+    CONF_VARIABLE_ID,
+    CONF_YAML_VARIABLE,
+    DOMAIN,
+    SERVICE_DECREMENT_SENSOR,
+    SERVICE_INCREMENT_SENSOR,
+    SERVICE_UPDATE_SENSOR,
+)
+
+ConfigEntryFactory = Callable[[Mapping[str, Any]], ConfigEntry]
+
+
+async def test_sensor_restore_cache_is_applied_during_config_entry_setup(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Restore a sensor's public state and custom attributes on startup.
+
+    Args:
+        hass: Home Assistant test instance.
+        config_entry_factory: Factory for test configuration entries.
+    """
+    entity_id = "sensor.restored_sensor"
+    restored_state = "42.5"
+    restored_attributes = {"source": "sensor-cache"}
+    cached_state = State(entity_id, restored_state, restored_attributes)
+    mock_restore_cache_with_extra_data(
+        hass,
+        [
+            (
+                cached_state,
+                {
+                    "native_value": restored_state,
+                    "native_unit_of_measurement": None,
+                },
+            )
+        ],
+    )
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.SENSOR,
+            CONF_VARIABLE_ID: "restored_sensor",
+            CONF_VALUE: 1,
+            "value_type": "number",
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: True,
+            CONF_FORCE_UPDATE: False,
+            CONF_ATTRIBUTES: {"source": "config"},
+        }
+    )
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.state == restored_state
+    assert state.attributes["source"] == restored_attributes["source"]
+
+
+async def test_device_linked_sensor_name_is_not_prefixed_again_after_reload(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Keep a device-linked sensor's friendly name stable across reload.
+
+    Args:
+        hass: Home Assistant test instance.
+        config_entry_factory: Factory for test configuration entries.
+    """
+    entity_id = "sensor.linked_temperature"
+    restored_state = "23"
+    entity_name = "Linked Temperature"
+    device_entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: CONF_DEVICE,
+            CONF_NAME: "Virtual Hub",
+            CONF_YAML_VARIABLE: False,
+        }
+    )
+    assert await hass.config_entries.async_setup(device_entry.entry_id)
+    await hass.async_block_till_done()
+    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, device_entry.entry_id)})
+    assert device is not None
+
+    friendly_name = f"Virtual Hub {entity_name}"
+    cached_state = State(
+        entity_id,
+        restored_state,
+        {
+            ATTR_FRIENDLY_NAME: friendly_name,
+            "source": "restore-cache",
+        },
+    )
+    mock_restore_cache_with_extra_data(
+        hass,
+        [
+            (
+                cached_state,
+                {
+                    "native_value": restored_state,
+                    "native_unit_of_measurement": None,
+                },
+            )
+        ],
+    )
+    entity_entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.SENSOR,
+            CONF_VARIABLE_ID: "linked_temperature",
+            CONF_NAME: entity_name,
+            CONF_DEVICE_ID: device.id,
+            CONF_VALUE: 0,
+            "value_type": "number",
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: True,
+            CONF_FORCE_UPDATE: False,
+        }
+    )
+
+    assert await hass.config_entries.async_setup(entity_entry.entry_id)
+    await hass.async_block_till_done()
+    initial = hass.states.get(entity_id)
+    assert initial is not None
+    assert initial.attributes[ATTR_FRIENDLY_NAME] == friendly_name
+
+    assert await hass.config_entries.async_reload(entity_entry.entry_id)
+    await hass.async_block_till_done()
+    reloaded = hass.states.get(entity_id)
+    assert reloaded is not None
+    assert reloaded.attributes[ATTR_FRIENDLY_NAME] == friendly_name
+
+
+async def test_sensor_increment_and_decrement_services(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Apply explicit and default deltas through registered sensor services.
+
+    Args:
+        hass: Home Assistant test instance.
+        config_entry_factory: Factory for test configuration entries.
+    """
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.SENSOR,
+            CONF_VARIABLE_ID: "service_counter",
+            CONF_VALUE: 10,
+            "value_type": "number",
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_INCREMENT_SENSOR,
+        {"entity_id": ["sensor.service_counter"], ATTR_VALUE_DELTA: 2.5},
+        blocking=True,
+    )
+    incremented = hass.states.get("sensor.service_counter")
+    assert incremented is not None
+    assert incremented.state == "12.5"
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_DECREMENT_SENSOR,
+        {"entity_id": ["sensor.service_counter"]},
+        blocking=True,
+    )
+    decremented = hass.states.get("sensor.service_counter")
+    assert decremented is not None
+    assert decremented.state == "11.5"
+
+
+@pytest.mark.parametrize(
+    "service",
+    [SERVICE_INCREMENT_SENSOR, SERVICE_DECREMENT_SENSOR],
+)
+async def test_numeric_services_reject_string_sensor(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+    service: str,
+) -> None:
+    """Reject numeric services for string sensors without changing their state.
+
+    Args:
+        hass: Home Assistant test instance.
+        config_entry_factory: Factory for test configuration entries.
+        service: Numeric service expected to reject the string sensor.
+    """
+    entity_id = "sensor.string_value"
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.SENSOR,
+            CONF_VARIABLE_ID: "string_value",
+            CONF_VALUE: "unchanged",
+            "value_type": "string",
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    with pytest.raises(ValueError, match="Cannot .* non-numeric variable"):
+        await hass.services.async_call(
+            DOMAIN,
+            service,
+            {"entity_id": [entity_id]},
+            blocking=True,
+        )
+
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.state == "unchanged"
+
+
+async def test_sensor_entity_service_updates_state_and_attributes(
+    hass: HomeAssistant,
+    sensor_entry: ConfigEntry,
+) -> None:
+    """Mutate a loaded sensor through Home Assistant's registered entity service.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        sensor_entry: Loaded sensor config entry to update.
+    """
+    assert await hass.config_entries.async_setup(sensor_entry.entry_id)
+    await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_UPDATE_SENSOR,
+        {
+            "entity_id": ["sensor.office_temperature"],
+            CONF_VALUE: 19,
+            ATTR_ATTRIBUTES: {"service_marker": True},
+            ATTR_REPLACE_ATTRIBUTES: True,
+        },
+        blocking=True,
+    )
+
+    state = hass.states.get("sensor.office_temperature")
+    assert state is not None
+    assert state.state == "19"
+    assert state.attributes["service_marker"] is True
+    assert "source" not in state.attributes

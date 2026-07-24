@@ -1,12 +1,15 @@
 """Integration tests for the Variable config flow."""
 
+from collections.abc import Callable, Mapping
 import datetime
 from typing import Any
 
 from homeassistant import config_entries
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+from homeassistant.components.device_tracker.const import ATTR_LOCATION_NAME
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.components.sensor.const import CONF_STATE_CLASS
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_BATTERY_LEVEL,
     ATTR_CONFIGURATION_URL,
@@ -14,6 +17,7 @@ from homeassistant.const import (
     ATTR_LATITUDE,
     ATTR_LONGITUDE,
     ATTR_MANUFACTURER,
+    ATTR_MODEL,
     CONF_DEVICE,
     CONF_DEVICE_CLASS,
     CONF_ICON,
@@ -24,6 +28,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType, InvalidData
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.setup import async_setup_component
 import pytest
 
 from custom_components.variable.const import (
@@ -39,6 +44,8 @@ from custom_components.variable.const import (
     CONF_YAML_VARIABLE,
     DOMAIN,
 )
+
+ConfigEntryFactory = Callable[[Mapping[str, Any]], ConfigEntry]
 
 
 async def _start_sensor_flow(
@@ -549,3 +556,435 @@ async def test_device_flow_rejects_invalid_configuration_url(hass: HomeAssistant
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "add_device"
     assert result["errors"] == {"base": "invalid_url"}
+
+
+async def test_yaml_entry_aborts_options_flow(hass: HomeAssistant) -> None:
+    """Reject options for a variable managed through YAML.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+    """
+    assert await async_setup_component(
+        hass,
+        DOMAIN,
+        {DOMAIN: {"yaml_managed": {CONF_VALUE: "managed"}}},
+    )
+    await hass.async_block_till_done()
+    entry = next(
+        entry
+        for entry in hass.config_entries.async_entries(DOMAIN)
+        if entry.data.get(CONF_VARIABLE_ID) == "yaml_managed"
+    )
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "yaml_variable"
+
+
+async def test_options_flow_changes_loaded_sensor_value(
+    hass: HomeAssistant,
+    sensor_entry: ConfigEntry,
+) -> None:
+    """Change a live entity through the options workflow and its entity service.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        sensor_entry: Loaded sensor config entry to update.
+    """
+    assert await hass.config_entries.async_setup(sensor_entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(sensor_entry.entry_id)
+    assert result["type"] is FlowResultType.MENU
+    assert result["menu_options"] == ["change_sensor_value", "sensor_options"]
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={"next_step_id": "change_sensor_value"},
+    )
+    assert result["type"] is FlowResultType.FORM
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={CONF_VALUE: "24.25", "attributes": {"source": "options"}},
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "value_changed"
+    state = hass.states.get("sensor.office_temperature")
+    assert state is not None
+    assert state.state == "24.25"
+    assert state.attributes["source"] == "options"
+
+
+async def test_sensor_options_flow_updates_entry_and_live_entity(
+    hass: HomeAssistant,
+    sensor_entry: ConfigEntry,
+) -> None:
+    """Persist both sensor option pages and reload the live entity.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        sensor_entry: Loaded sensor config entry to update.
+    """
+    assert await hass.config_entries.async_setup(sensor_entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(sensor_entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={"next_step_id": "sensor_options"},
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "sensor_options"
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            "device_class": "None",
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: True,
+            CONF_EXCLUDE_FROM_RECORDER: True,
+        },
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "sensor_options_page_2"
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            CONF_VALUE: "26.5",
+            CONF_ATTRIBUTES: {"source": "sensor-options"},
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert sensor_entry.data[CONF_VALUE] == "26.5"
+    assert sensor_entry.data[CONF_FORCE_UPDATE] is True
+    assert sensor_entry.data[CONF_EXCLUDE_FROM_RECORDER] is True
+    assert sensor_entry.data[CONF_ATTRIBUTES] == {"source": "sensor-options"}
+    state = hass.states.get("sensor.office_temperature")
+    assert state is not None
+    assert state.state == "26.5"
+    assert state.attributes["source"] == "sensor-options"
+
+
+async def test_binary_sensor_options_update_entry_and_live_entity(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Persist binary sensor options and reload its state and attributes.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config_entry_factory: Factory that creates the binary-sensor config entry.
+    """
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.BINARY_SENSOR,
+            CONF_VARIABLE_ID: "configured_binary",
+            CONF_NAME: "Configured Binary",
+            CONF_VALUE: "true",
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={"next_step_id": "binary_sensor_options"},
+    )
+    assert result["type"] is FlowResultType.FORM
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            CONF_VALUE: "false",
+            CONF_ATTRIBUTES: {"source": "binary-options-form"},
+            "device_class": "door",
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: True,
+            CONF_EXCLUDE_FROM_RECORDER: False,
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.data[CONF_VALUE] == "false"
+    assert entry.data["device_class"] == "door"
+    assert entry.data[CONF_ATTRIBUTES] == {"source": "binary-options-form"}
+    assert entry.data[CONF_RESTORE] is False
+    assert entry.data[CONF_FORCE_UPDATE] is True
+    assert entry.data[CONF_EXCLUDE_FROM_RECORDER] is False
+    state = hass.states.get("binary_sensor.configured_binary")
+    assert state is not None
+    assert state.state == "off"
+    assert state.attributes["source"] == "binary-options-form"
+
+
+async def test_device_tracker_options_update_entry_and_live_entity(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Persist tracker options and reload its coordinates and attributes.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config_entry_factory: Factory that creates the device-tracker config entry.
+    """
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.DEVICE_TRACKER,
+            CONF_VARIABLE_ID: "configured_tracker",
+            CONF_NAME: "Configured Tracker",
+            CONF_YAML_VARIABLE: False,
+            ATTR_LATITUDE: 40.0,
+            ATTR_LONGITUDE: -75.0,
+            ATTR_GPS_ACCURACY: 10,
+            ATTR_BATTERY_LEVEL: 80,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={"next_step_id": "device_tracker_options"},
+    )
+    assert result["type"] is FlowResultType.FORM
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            ATTR_LATITUDE: 41.25,
+            ATTR_LONGITUDE: -74.75,
+            ATTR_LOCATION_NAME: "Studio",
+            ATTR_GPS_ACCURACY: 4,
+            ATTR_BATTERY_LEVEL: 65,
+            CONF_ATTRIBUTES: {"source": "tracker-options-form"},
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: True,
+            CONF_EXCLUDE_FROM_RECORDER: False,
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.data[ATTR_LATITUDE] == 41.25
+    assert entry.data[ATTR_LONGITUDE] == -74.75
+    assert entry.data[ATTR_LOCATION_NAME] == "Studio"
+    assert entry.data[CONF_ATTRIBUTES] == {"source": "tracker-options-form"}
+    assert entry.data[CONF_RESTORE] is False
+    assert entry.data[CONF_FORCE_UPDATE] is True
+    assert entry.data[CONF_EXCLUDE_FROM_RECORDER] is False
+    state = hass.states.get("device_tracker.configured_tracker")
+    assert state is not None
+    assert state.state == "Studio"
+    assert state.attributes[ATTR_LATITUDE] == 41.25
+    assert state.attributes[ATTR_LONGITUDE] == -74.75
+    assert state.attributes[ATTR_GPS_ACCURACY] == 4
+    assert state.attributes[ATTR_BATTERY_LEVEL] == 65
+    assert state.attributes["source"] == "tracker-options-form"
+
+
+async def test_binary_sensor_options_flow_changes_live_entity(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Change binary state and attributes through the options workflow.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config_entry_factory: Factory that creates the binary-sensor config entry.
+    """
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.BINARY_SENSOR,
+            CONF_VARIABLE_ID: "options_binary",
+            CONF_NAME: "Options Binary",
+            CONF_VALUE: "true",
+            CONF_YAML_VARIABLE: False,
+            "restore": False,
+            "force_update": False,
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={"next_step_id": "change_binary_sensor_value"},
+    )
+    assert result["type"] is FlowResultType.FORM
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={CONF_VALUE: "false", "attributes": {"source": "binary-options"}},
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "value_changed"
+    state = hass.states.get("binary_sensor.options_binary")
+    assert state is not None
+    assert state.state == "off"
+    assert state.attributes["source"] == "binary-options"
+
+
+async def test_device_tracker_options_flow_changes_live_entity(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Change tracker coordinates and metadata through the options workflow.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config_entry_factory: Factory that creates the device-tracker config entry.
+    """
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.DEVICE_TRACKER,
+            CONF_VARIABLE_ID: "options_tracker",
+            CONF_NAME: "Options Tracker",
+            CONF_YAML_VARIABLE: False,
+            ATTR_LATITUDE: 40.0,
+            ATTR_LONGITUDE: -75.0,
+            ATTR_GPS_ACCURACY: 10,
+            ATTR_BATTERY_LEVEL: 80,
+            "restore": False,
+            "force_update": False,
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={"next_step_id": "change_device_tracker_value"},
+    )
+    assert result["type"] is FlowResultType.FORM
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            ATTR_LATITUDE: 41.5,
+            ATTR_LONGITUDE: -74.5,
+            ATTR_GPS_ACCURACY: 6,
+            ATTR_BATTERY_LEVEL: 72,
+            "attributes": {"source": "tracker-options"},
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "value_changed"
+    state = hass.states.get("device_tracker.options_tracker")
+    assert state is not None
+    assert state.attributes[ATTR_LATITUDE] == 41.5
+    assert state.attributes[ATTR_LONGITUDE] == -74.5
+    assert state.attributes[ATTR_GPS_ACCURACY] == 6
+    assert state.attributes[ATTR_BATTERY_LEVEL] == 72
+    assert state.attributes["source"] == "tracker-options"
+
+
+async def test_device_options_flow_updates_registry_metadata(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Persist device options and update the existing registry record.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config_entry_factory: Factory that creates the device config entry.
+    """
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: CONF_DEVICE,
+            CONF_NAME: "Options Hub",
+            CONF_YAML_VARIABLE: False,
+            ATTR_MANUFACTURER: "Original",
+            ATTR_MODEL: "Original Model",
+            ATTR_CONFIGURATION_URL: "https://example.com/original",
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "device_options"
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            ATTR_MANUFACTURER: "Updated",
+            ATTR_MODEL: "Updated Model",
+            ATTR_CONFIGURATION_URL: "https://example.com/updated",
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.data[ATTR_MANUFACTURER] == "Updated"
+    assert entry.data[ATTR_MODEL] == "Updated Model"
+    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    assert device is not None
+    assert device.manufacturer == "Updated"
+    assert device.model == "Updated Model"
+    assert str(device.configuration_url) == "https://example.com/updated"
+
+
+async def test_device_options_invalid_url_preserves_entry_and_registry(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Keep device data unchanged when its options URL is invalid.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config_entry_factory: Factory that creates the device config entry.
+    """
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: CONF_DEVICE,
+            CONF_NAME: "Preserved Hub",
+            CONF_YAML_VARIABLE: False,
+            ATTR_MANUFACTURER: "Original",
+            ATTR_MODEL: "Original Model",
+            ATTR_CONFIGURATION_URL: "https://example.com/original",
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    registry = dr.async_get(hass)
+    original_device = registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    assert original_device is not None
+    original_data = dict(entry.data)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] is FlowResultType.FORM
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            ATTR_MANUFACTURER: "Should Not Persist",
+            ATTR_MODEL: "Should Not Persist",
+            ATTR_CONFIGURATION_URL: "not a URL",
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "device_options"
+    assert result["errors"] == {"base": "invalid_url"}
+    assert dict(entry.data) == original_data
+    current_device = registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    assert current_device is not None
+    assert current_device.id == original_device.id
+    assert current_device.manufacturer == "Original"
+    assert current_device.model == "Original Model"
+    assert str(current_device.configuration_url) == "https://example.com/original"

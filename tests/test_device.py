@@ -1,4 +1,4 @@
-"""End-to-end tests for Variable device association lifecycle behavior."""
+"""End-to-end tests for Variable device orchestration and lifecycle behavior."""
 
 from collections.abc import Callable, Mapping
 from typing import Any
@@ -7,10 +7,12 @@ from homeassistant.components.device_tracker.const import ATTR_LOCATION_NAME
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_BATTERY_LEVEL,
+    ATTR_CONFIGURATION_URL,
     ATTR_GPS_ACCURACY,
     ATTR_LATITUDE,
     ATTR_LONGITUDE,
     ATTR_MANUFACTURER,
+    CONF_DEVICE,
     CONF_DEVICE_CLASS,
     CONF_DEVICE_ID,
     CONF_NAME,
@@ -35,6 +37,36 @@ from custom_components.variable.const import (
 )
 
 ConfigEntryFactory = Callable[[Mapping[str, Any]], ConfigEntry]
+
+
+async def test_setup_device_entry_creates_registry_device(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Load a device config entry and register its metadata.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config_entry_factory: Factory that creates the device config entry.
+    """
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: CONF_DEVICE,
+            CONF_NAME: "Virtual Hub",
+            CONF_YAML_VARIABLE: False,
+            ATTR_MANUFACTURER: "Variables",
+            ATTR_CONFIGURATION_URL: "https://example.com/device",
+        }
+    )
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    assert device is not None
+    assert device.name == "Virtual Hub"
+    assert device.manufacturer == "Variables"
+    assert str(device.configuration_url) == "https://example.com/device"
 
 
 async def test_clearing_variable_device_links_preserves_entities_when_device_removed(
