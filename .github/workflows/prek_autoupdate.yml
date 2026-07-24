@@ -1,0 +1,19 @@
+name: prek Autoupdate
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  prek-autoupdate:
+    uses: Snuffy2/prek-autoupdate/.github/workflows/prek_autoupdate.yml@v1
+    permissions:
+      contents: write
+      pull-requests: write
+    with:
+      update-day: "6"
