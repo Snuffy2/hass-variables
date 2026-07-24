@@ -71,7 +71,7 @@ ConfigEntryFactory = Callable[[Mapping[str, Any]], ConfigEntry]
             },
             "device_tracker.workflow_tracker",
             "not_home",
-            {"latitude": 40.0, "longitude": -75.0},
+            {"latitude": 40.0, "longitude": -75.0, "marker": "tracker"},
         ),
     ],
 )
@@ -84,11 +84,15 @@ async def test_setup_entry_creates_platform_entity(
     expected_attributes: dict[str, Any],
 ) -> None:
     """Load a config entry and expose its entity through Home Assistant state."""
-    data[CONF_YAML_VARIABLE] = False
-    data["restore"] = False
-    data["force_update"] = False
-    data["attributes"] = {"marker": expected_attributes.get("marker", "tracker")}
-    entry = config_entry_factory(data)
+    marker = expected_attributes["marker"]
+    entry_data = {
+        **data,
+        CONF_YAML_VARIABLE: False,
+        "restore": False,
+        "force_update": False,
+        "attributes": {"marker": marker},
+    }
+    entry = config_entry_factory(entry_data)
 
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()

@@ -117,7 +117,6 @@ async def test_sensor_flow_rejects_incompatible_value(hass: HomeAssistant) -> No
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": config_entries.SOURCE_USER},
-        data=None,
     )
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], user_input={"next_step_id": "add_sensor"}
