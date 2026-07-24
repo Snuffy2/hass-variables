@@ -3,7 +3,7 @@ import copy
 import logging
 from typing import cast, final
 
-from homeassistant.components.device_tracker.config_entry import TrackerEntity
+from homeassistant.components.device_tracker import TrackerEntity
 from homeassistant.components.device_tracker.const import (
     ATTR_LOCATION_NAME,
     ATTR_SOURCE_TYPE,
@@ -72,7 +72,7 @@ VARIABLE_ATTR_SETTINGS = {
     ATTR_LONGITUDE: "_attr_longitude",
     ATTR_BATTERY_LEVEL: "_attr_battery_level",
     ATTR_IN_ZONES: "_attr_in_zones",
-    ATTR_LOCATION_NAME: "_attr_location_name",
+    ATTR_LOCATION_NAME: "_location_name",
     ATTR_GPS_ACCURACY: "_attr_gps_accuracy",
 }
 
@@ -172,7 +172,7 @@ class Variable(RestoreEntity, TrackerEntity):
         self._attr_longitude = config.get(ATTR_LONGITUDE)
         self._attr_battery_level = config.get(ATTR_BATTERY_LEVEL)
         self._attr_in_zones = config.get(ATTR_IN_ZONES)
-        self._attr_location_name = config.get(ATTR_LOCATION_NAME)
+        self._location_name = config.get(ATTR_LOCATION_NAME)
         self._attr_gps_accuracy = config.get(ATTR_GPS_ACCURACY)
 
     async def async_added_to_hass(self):
@@ -320,13 +320,16 @@ class Variable(RestoreEntity, TrackerEntity):
         if ATTR_DELETE_IN_ZONES in kwargs and kwargs.get(ATTR_DELETE_IN_ZONES) is True:
             self._attr_in_zones = None
         if ATTR_LOCATION_NAME in kwargs:
-            self._attr_location_name = kwargs.get(ATTR_LOCATION_NAME)
+            self._location_name = kwargs.get(ATTR_LOCATION_NAME)
         if ATTR_BATTERY_LEVEL in kwargs:
             self._attr_battery_level = kwargs.get(ATTR_BATTERY_LEVEL)
         if ATTR_GPS_ACCURACY in kwargs:
             self._attr_gps_accuracy = kwargs.get(ATTR_GPS_ACCURACY)
-        if ATTR_DELETE_LOCATION_NAME in kwargs and kwargs.get(ATTR_DELETE_LOCATION_NAME) is True:
-            self._attr_location_name = None
+        if (
+            ATTR_DELETE_LOCATION_NAME in kwargs
+            and kwargs.get(ATTR_DELETE_LOCATION_NAME) is True
+        ):
+            self._location_name = None
         try:
             self.async_write_ha_state()
         except Exception as err:
@@ -367,11 +370,6 @@ class Variable(RestoreEntity, TrackerEntity):
         """
         return self._attr_gps_accuracy if self._attr_gps_accuracy is not None else 0
 
-    @property
-    def location_name(self) -> str | None:  # type: ignore[override]
-        """Return a location name for the current location of the device."""
-        return self._attr_location_name
-
     @final
     @property
     def state_attributes(self) -> dict[str, StateType]:  # type: ignore[override]
@@ -396,8 +394,8 @@ class Variable(RestoreEntity, TrackerEntity):
             attr[ATTR_GPS_ACCURACY] = self._attr_gps_accuracy
         if self._attr_battery_level is not None:
             attr[ATTR_BATTERY_LEVEL] = self._attr_battery_level
-        if self._attr_location_name is not None:
-            attr[ATTR_LOCATION_NAME] = self._attr_location_name
+        if self._location_name is not None:
+            attr[ATTR_LOCATION_NAME] = self._location_name
         return attr
 
 
