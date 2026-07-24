@@ -60,22 +60,16 @@ async def create_device(hass: HomeAssistant, entry: ConfigEntry) -> None:
             domain_reload_entities.append(entity)
     reload_entities = device_entities + domain_reload_entities
     if len(reload_entities) > 0:
-        _LOGGER.debug(
-            f"({device.name}) [create_device] Reloading {len(reload_entities)} entities"
-        )
+        _LOGGER.debug(f"({device.name}) [create_device] Reloading {len(reload_entities)} entities")
     else:
-        _LOGGER.debug(
-            f"({device.name}) [create_device] Reloading all Variable entities"
-        )
+        _LOGGER.debug(f"({device.name}) [create_device] Reloading all Variable entities")
         reload_entities = domain_entities
 
     for entity in reload_entities:
         # May actually want to do this for all entities, will see
         if entity.platform != DOMAIN:
             continue
-        _LOGGER.debug(
-            f"({device.name}) [create_device] Reloading entity_id: {entity.entity_id}"
-        )
+        _LOGGER.debug(f"({device.name}) [create_device] Reloading entity_id: {entity.entity_id}")
         if entity.config_entry_id:
             hass.config_entries.async_schedule_reload(entity.config_entry_id)
 
@@ -100,9 +94,7 @@ async def update_device(hass: HomeAssistant, entry: ConfigEntry, user_input) -> 
         serial_number=user_input.get(ATTR_SERIAL_NUMBER),
         configuration_url=user_input.get(ATTR_CONFIGURATION_URL),
     )
-    _LOGGER.debug(
-        f"({getattr(device, 'name', '')}) [update_device] updated device: {device}"
-    )
+    _LOGGER.debug(f"({getattr(device, 'name', '')}) [update_device] updated device: {device}")
     return True
 
 
@@ -126,9 +118,7 @@ async def remove_device(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # May actually want to do this for all entities, will see
         if entity.platform != DOMAIN:
             continue
-        _LOGGER.debug(
-            f"({device.name}) [remove_device] Reloading entity_id: {entity.entity_id}"
-        )
+        _LOGGER.debug(f"({device.name}) [remove_device] Reloading entity_id: {entity.entity_id}")
         if entity.config_entry_id:
             hass.config_entries.async_schedule_reload(entity.config_entry_id)
 

@@ -19,9 +19,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers.device import (
-    async_remove_stale_devices_links_keep_current_device,
-)
+from homeassistant.helpers.device import async_remove_stale_devices_links_keep_current_device
 import homeassistant.helpers.entity_registry as er
 from homeassistant.helpers.reload import async_integration_yaml_config
 from homeassistant.helpers.typing import ConfigType
@@ -58,9 +56,7 @@ SERVICE_SET_VARIABLE_LEGACY_SCHEMA = vol.Schema(
         vol.Required(ATTR_VARIABLE): cv.string,
         vol.Optional(ATTR_VALUE): cv.match_all,
         vol.Optional(ATTR_ATTRIBUTES): dict,
-        vol.Optional(
-            ATTR_REPLACE_ATTRIBUTES, default=DEFAULT_REPLACE_ATTRIBUTES
-        ): cv.boolean,
+        vol.Optional(ATTR_REPLACE_ATTRIBUTES, default=DEFAULT_REPLACE_ATTRIBUTES): cv.boolean,
     }
 )
 
@@ -69,9 +65,7 @@ SERVICE_SET_ENTITY_LEGACY_SCHEMA = vol.Schema(
         vol.Required(ATTR_ENTITY): cv.string,
         vol.Optional(ATTR_VALUE): cv.match_all,
         vol.Optional(ATTR_ATTRIBUTES): dict,
-        vol.Optional(
-            ATTR_REPLACE_ATTRIBUTES, default=DEFAULT_REPLACE_ATTRIBUTES
-        ): cv.boolean,
+        vol.Optional(ATTR_REPLACE_ATTRIBUTES, default=DEFAULT_REPLACE_ATTRIBUTES): cv.boolean,
     }
 )
 
@@ -116,9 +110,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType):
         # _LOGGER.debug(f"[async_set_entity_legacy_service] call data: {call.data}")
         entity = call.data.get(ATTR_ENTITY)
         if not entity or not isinstance(entity, str):
-            _LOGGER.error(
-                "set_entity legacy service called without valid 'entity' string"
-            )
+            _LOGGER.error("set_entity legacy service called without valid 'entity' string")
             return
         await _async_set_legacy_service(call, entity)
 
@@ -134,9 +126,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType):
             update_sensor_data.update({ATTR_VALUE: call.data.get(ATTR_VALUE)})
         if call.data.get(ATTR_ATTRIBUTES):
             update_sensor_data.update({ATTR_ATTRIBUTES: call.data.get(ATTR_ATTRIBUTES)})
-        _LOGGER.debug(
-            f"[async_set_legacy_service] update_sensor_data: {update_sensor_data}"
-        )
+        _LOGGER.debug(f"[async_set_legacy_service] update_sensor_data: {update_sensor_data}")
         await hass.services.async_call(
             DOMAIN, SERVICE_UPDATE_SENSOR, service_data=update_sensor_data
         )
@@ -226,16 +216,12 @@ async def _async_process_yaml(hass: HomeAssistant, config: ConfigType) -> bool:
                         var_fields.setdefault(m, entry.data[m])
                     var_fields.update({CONF_YAML_PRESENT: True})
                     # _LOGGER.debug(f"[YAML] Updated var_fields: {var_fields}")
-                    hass.config_entries.async_update_entry(
-                        entry, data=var_fields, options={}
-                    )
+                    hass.config_entries.async_update_entry(entry, data=var_fields, options={})
 
                     hass.async_create_task(hass.config_entries.async_reload(entry_id))
 
                 else:
-                    _LOGGER.error(
-                        f"[YAML] Update Error. Could not find entry_id for: {var}"
-                    )
+                    _LOGGER.error(f"[YAML] Update Error. Could not find entry_id for: {var}")
 
     # Remove any config entries that were originally created from YAML imports
     # but are no longer present in the current YAML configuration.
@@ -248,9 +234,7 @@ async def _async_process_yaml(hass: HomeAssistant, config: ConfigType) -> bool:
                     _LOGGER.warning(
                         f"[YAML] YAML Entry no longer exists in configuration, deleting entry: {var_id}"
                     )
-                    hass.async_create_task(
-                        hass.config_entries.async_remove(entry.entry_id)
-                    )
+                    hass.async_create_task(hass.config_entries.async_remove(entry.entry_id))
     except Exception:
         _LOGGER.exception("Error while cleaning up removed YAML variable entries")
 
@@ -268,18 +252,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # UI-driven option changes only; YAML entries are managed via _async_process_yaml.
     if not entry.data.get(CONF_YAML_VARIABLE, False):
-        async def _async_on_entry_update(
-            hass: HomeAssistant, entry: ConfigEntry
-        ) -> None:
+
+        async def _async_on_entry_update(hass: HomeAssistant, entry: ConfigEntry) -> None:
             """Handle config entry update."""
-            _LOGGER.debug(
-                f"Config entry updated: {entry.data.get(CONF_VARIABLE_ID)}"
-            )
+            _LOGGER.debug(f"Config entry updated: {entry.data.get(CONF_VARIABLE_ID)}")
             await hass.config_entries.async_reload(entry.entry_id)
 
-        entry.async_on_unload(
-            entry.add_update_listener(_async_on_entry_update)
-        )
+        entry.async_on_unload(entry.add_update_listener(_async_on_entry_update))
 
     async_remove_stale_devices_links_keep_current_device(
         hass,

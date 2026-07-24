@@ -1,18 +1,15 @@
 from __future__ import annotations
 
 import datetime
+from enum import Enum
 import logging
 import re
-from enum import Enum
 from typing import Any
 
-import voluptuous as vol
 from awesomeversion import AwesomeVersion
 from homeassistant import config_entries
-import homeassistant.util.dt as dt_util
 from homeassistant.components import binary_sensor, sensor
 from homeassistant.components.device_tracker.const import ATTR_LOCATION_NAME
-from homeassistant.const import __version__ as HAVERSION
 from homeassistant.const import (
     ATTR_BATTERY_LEVEL,
     ATTR_CONFIGURATION_URL,
@@ -35,10 +32,12 @@ from homeassistant.const import (
     STATE_OFF,
     STATE_ON,
     Platform,
+    __version__ as HAVERSION,
 )
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers import entity_registry, selector
+from homeassistant.helpers import config_validation as cv, entity_registry, selector
+import homeassistant.util.dt as dt_util
+import voluptuous as vol
 
 try:
     # iso4217 is an optional dependency; import if available
@@ -112,9 +111,7 @@ COMPONENT_CONFIG_URL = "https://github.com/Wibias/hass-variables"
 # https://developers.home-assistant.io/docs/config_entries_config_flow_handler/#translations
 
 SENSOR_DEVICE_CLASS_SELECT_LIST = []
-SENSOR_DEVICE_CLASS_SELECT_LIST.append(
-    selector.SelectOptionDict(label="None", value="None")
-)
+SENSOR_DEVICE_CLASS_SELECT_LIST.append(selector.SelectOptionDict(label="None", value="None"))
 for el in sensor.SensorDeviceClass:
     if el != sensor.SensorDeviceClass.ENUM:
         SENSOR_DEVICE_CLASS_SELECT_LIST.append(
@@ -122,9 +119,7 @@ for el in sensor.SensorDeviceClass:
         )
 
 BINARY_SENSOR_DEVICE_CLASS_SELECT_LIST = []
-BINARY_SENSOR_DEVICE_CLASS_SELECT_LIST.append(
-    selector.SelectOptionDict(label="None", value="None")
-)
+BINARY_SENSOR_DEVICE_CLASS_SELECT_LIST.append(selector.SelectOptionDict(label="None", value="None"))
 for el in binary_sensor.BinarySensorDeviceClass:
     BINARY_SENSOR_DEVICE_CLASS_SELECT_LIST.append(
         selector.SelectOptionDict(label=str(el.name), value=str(el.value))
@@ -145,15 +140,13 @@ ADD_SENSOR_SCHEMA = vol.Schema(
                 mode=selector.SelectSelectorMode.DROPDOWN,
             )
         ),
-        vol.Optional(CONF_DEVICE_ID): selector.DeviceSelector(
-            selector.DeviceSelectorConfig()
-        ),
+        vol.Optional(CONF_DEVICE_ID): selector.DeviceSelector(selector.DeviceSelectorConfig()),
         vol.Optional(CONF_RESTORE, default=DEFAULT_RESTORE): selector.BooleanSelector(
             selector.BooleanSelectorConfig()
         ),
-        vol.Optional(
-            CONF_FORCE_UPDATE, default=DEFAULT_FORCE_UPDATE
-        ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
+        vol.Optional(CONF_FORCE_UPDATE, default=DEFAULT_FORCE_UPDATE): selector.BooleanSelector(
+            selector.BooleanSelectorConfig()
+        ),
         vol.Optional(
             CONF_EXCLUDE_FROM_RECORDER, default=DEFAULT_EXCLUDE_FROM_RECORDER
         ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
@@ -176,9 +169,7 @@ ADD_BINARY_SENSOR_SCHEMA = vol.Schema(
                 mode=selector.SelectSelectorMode.LIST,
             )
         ),
-        vol.Optional(CONF_ATTRIBUTES): selector.ObjectSelector(
-            selector.ObjectSelectorConfig()
-        ),
+        vol.Optional(CONF_ATTRIBUTES): selector.ObjectSelector(selector.ObjectSelectorConfig()),
         vol.Optional(CONF_DEVICE_CLASS): selector.SelectSelector(
             selector.SelectSelectorConfig(
                 options=BINARY_SENSOR_DEVICE_CLASS_SELECT_LIST,
@@ -187,15 +178,13 @@ ADD_BINARY_SENSOR_SCHEMA = vol.Schema(
                 mode=selector.SelectSelectorMode.DROPDOWN,
             )
         ),
-        vol.Optional(CONF_DEVICE_ID): selector.DeviceSelector(
-            selector.DeviceSelectorConfig()
-        ),
+        vol.Optional(CONF_DEVICE_ID): selector.DeviceSelector(selector.DeviceSelectorConfig()),
         vol.Optional(CONF_RESTORE, default=DEFAULT_RESTORE): selector.BooleanSelector(
             selector.BooleanSelectorConfig()
         ),
-        vol.Optional(
-            CONF_FORCE_UPDATE, default=DEFAULT_FORCE_UPDATE
-        ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
+        vol.Optional(CONF_FORCE_UPDATE, default=DEFAULT_FORCE_UPDATE): selector.BooleanSelector(
+            selector.BooleanSelectorConfig()
+        ),
         vol.Optional(
             CONF_EXCLUDE_FROM_RECORDER, default=DEFAULT_EXCLUDE_FROM_RECORDER
         ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
@@ -246,18 +235,14 @@ ADD_DEVICE_TRACKER_SCHEMA = vol.Schema(
                 mode=selector.NumberSelectorMode.BOX,
             )
         ),
-        vol.Optional(CONF_ATTRIBUTES): selector.ObjectSelector(
-            selector.ObjectSelectorConfig()
-        ),
-        vol.Optional(CONF_DEVICE_ID): selector.DeviceSelector(
-            selector.DeviceSelectorConfig()
-        ),
+        vol.Optional(CONF_ATTRIBUTES): selector.ObjectSelector(selector.ObjectSelectorConfig()),
+        vol.Optional(CONF_DEVICE_ID): selector.DeviceSelector(selector.DeviceSelectorConfig()),
         vol.Optional(CONF_RESTORE, default=DEFAULT_RESTORE): selector.BooleanSelector(
             selector.BooleanSelectorConfig()
         ),
-        vol.Optional(
-            CONF_FORCE_UPDATE, default=DEFAULT_FORCE_UPDATE
-        ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
+        vol.Optional(CONF_FORCE_UPDATE, default=DEFAULT_FORCE_UPDATE): selector.BooleanSelector(
+            selector.BooleanSelectorConfig()
+        ),
         vol.Optional(
             CONF_EXCLUDE_FROM_RECORDER, default=DEFAULT_EXCLUDE_FROM_RECORDER
         ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
@@ -300,7 +285,10 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ign
         )
 
     async def async_step_add_sensor(
-        self, user_input: dict | None = None, errors: dict | None = None, yaml_variable: bool = False
+        self,
+        user_input: dict | None = None,
+        errors: dict | None = None,
+        yaml_variable: bool = False,
     ) -> Any:
         errors = {} if errors is None else errors
         if user_input is not None:
@@ -322,12 +310,11 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ign
             },
         )
 
-    async def async_step_sensor_page_2(self, user_input: dict | None = None, errors: dict | None = None) -> Any:
+    async def async_step_sensor_page_2(
+        self, user_input: dict | None = None, errors: dict | None = None
+    ) -> Any:
         errors = {} if errors is None else errors
-        if (
-            user_input is not None
-            or self.add_sensor_input.get(CONF_YAML_VARIABLE) is True
-        ):
+        if user_input is not None or self.add_sensor_input.get(CONF_YAML_VARIABLE) is True:
             _LOGGER.debug(f"[New Sensor Page 2] page_1_input: {self.add_sensor_input}")
             _LOGGER.debug(f"[New Sensor Page 2] page_2_input: {user_input}")
 
@@ -345,14 +332,10 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ign
             ):
                 if (
                     user_input.get(CONF_TZOFFSET) is not None
-                    and re.match(
-                        r"^[+-]?\d\d\:?\d\d\s*$", str(user_input.get(CONF_TZOFFSET))
-                    )
+                    and re.match(r"^[+-]?\d\d\:?\d\d\s*$", str(user_input.get(CONF_TZOFFSET)))
                     is not None
                 ):
-                    val = str(user_input.get(CONF_VALUE)) + str(
-                        user_input.get(CONF_TZOFFSET)
-                    )
+                    val = str(user_input.get(CONF_VALUE)) + str(user_input.get(CONF_TZOFFSET))
                 else:
                     val = str(user_input.get(CONF_VALUE)) + "+0000"
             else:
@@ -382,9 +365,7 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ign
                             user_input.pop(k, None)
                 _LOGGER.debug(f"[New Sensor Page 2] Final user_input: {user_input}")
                 info = await validate_sensor_input(self.hass, user_input)
-                return self.async_create_entry(
-                    title=info.get("title", ""), data=user_input
-                )
+                return self.async_create_entry(title=info.get("title", ""), data=user_input)
 
         SENSOR_PAGE_2_SCHEMA = self.build_add_sensor_page_2()
 
@@ -400,19 +381,14 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ign
             data_schema=SENSOR_PAGE_2_SCHEMA,
             errors=errors,
             description_placeholders={
-                "device_class": str(
-                    self.add_sensor_input.get(CONF_DEVICE_CLASS, "None")
-                ),
+                "device_class": str(self.add_sensor_input.get(CONF_DEVICE_CLASS, "None")),
                 "disp_name": str(disp_name),
                 "value_type": str(self.add_sensor_input.get(CONF_VALUE_TYPE, "None")),
             },
         )
 
     def yaml_import_get_value_type(self):
-        if (
-            self.add_sensor_input.get(CONF_ATTRIBUTES, {}).get(CONF_DEVICE_CLASS)
-            is None
-        ):
+        if self.add_sensor_input.get(CONF_ATTRIBUTES, {}).get(CONF_DEVICE_CLASS) is None:
             return None
         elif self.add_sensor_input.get(CONF_ATTRIBUTES, {}).get(CONF_DEVICE_CLASS) in [
             sensor.SensorDeviceClass.DATE
@@ -432,13 +408,9 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ign
 
     def build_add_sensor_page_2(self):
         SENSOR_STATE_CLASS_SELECT_LIST = []
-        SENSOR_STATE_CLASS_SELECT_LIST.append(
-            selector.SelectOptionDict(label="None", value="None")
-        )
+        SENSOR_STATE_CLASS_SELECT_LIST.append(selector.SelectOptionDict(label="None", value="None"))
         SENSOR_UNITS_SELECT_LIST = []
-        SENSOR_UNITS_SELECT_LIST.append(
-            selector.SelectOptionDict(label="None", value="None")
-        )
+        SENSOR_UNITS_SELECT_LIST.append(selector.SelectOptionDict(label="None", value="None"))
 
         SENSOR_PAGE_2_SCHEMA = vol.Schema({})
         if (
@@ -460,17 +432,12 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ign
             if normalized_device_class is None:
                 classes = []
             else:
-                classes = sensor.DEVICE_CLASS_STATE_CLASSES.get(
-                    normalized_device_class, []
-                )
+                classes = sensor.DEVICE_CLASS_STATE_CLASSES.get(normalized_device_class, [])
             for el in classes:
                 SENSOR_STATE_CLASS_SELECT_LIST.append(
                     selector.SelectOptionDict(label=str(el.name), value=str(el.value))
                 )
-            if (
-                self.add_sensor_input.get(CONF_DEVICE_CLASS)
-                == sensor.SensorDeviceClass.MONETARY
-            ):
+            if self.add_sensor_input.get(CONF_DEVICE_CLASS) == sensor.SensorDeviceClass.MONETARY:
                 if Currency is not None:
                     for el in Currency:
                         if el.code not in ["XTS", "XXX"]:
@@ -488,15 +455,9 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ign
                         SENSOR_UNITS_SELECT_LIST.append(
                             selector.SelectOptionDict(label=str(el), value=str(el))
                         )
-            if self.add_sensor_input.get(CONF_DEVICE_CLASS) in [
-                sensor.SensorDeviceClass.DATE
-            ]:
+            if self.add_sensor_input.get(CONF_DEVICE_CLASS) in [sensor.SensorDeviceClass.DATE]:
                 SENSOR_PAGE_2_SCHEMA = SENSOR_PAGE_2_SCHEMA.extend(
-                    {
-                        vol.Optional(CONF_VALUE): selector.DateSelector(
-                            selector.DateSelectorConfig()
-                        )
-                    }
+                    {vol.Optional(CONF_VALUE): selector.DateSelector(selector.DateSelectorConfig())}
                 )
                 value_type = "date"
             elif self.add_sensor_input.get(CONF_DEVICE_CLASS) in [
@@ -522,11 +483,7 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ign
                 value_type = "datetime"
             else:
                 SENSOR_PAGE_2_SCHEMA = SENSOR_PAGE_2_SCHEMA.extend(
-                    {
-                        vol.Optional(CONF_VALUE): selector.TextSelector(
-                            selector.TextSelectorConfig()
-                        )
-                    }
+                    {vol.Optional(CONF_VALUE): selector.TextSelector(selector.TextSelectorConfig())}
                 )
                 value_type = "number"
         else:
@@ -536,11 +493,7 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ign
                 )
 
             SENSOR_PAGE_2_SCHEMA = SENSOR_PAGE_2_SCHEMA.extend(
-                {
-                    vol.Optional(CONF_VALUE): selector.TextSelector(
-                        selector.TextSelectorConfig()
-                    )
-                }
+                {vol.Optional(CONF_VALUE): selector.TextSelector(selector.TextSelectorConfig())}
             )
             value_type = "string"
 
@@ -583,7 +536,10 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ign
         return SENSOR_PAGE_2_SCHEMA
 
     async def async_step_add_binary_sensor(
-        self, user_input: dict | None = None, errors: dict | None = None, yaml_variable: bool = False
+        self,
+        user_input: dict | None = None,
+        errors: dict | None = None,
+        yaml_variable: bool = False,
     ) -> Any:
         errors = {} if errors is None else errors
         if user_input is not None:
@@ -594,9 +550,7 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ign
                     user_input.update({CONF_YAML_PRESENT: True})
                 info = await validate_sensor_input(self.hass, user_input)
                 _LOGGER.debug(f"[New Binary Sensor] updated user_input: {user_input}")
-                return self.async_create_entry(
-                    title=info.get("title", ""), data=user_input
-                )
+                return self.async_create_entry(title=info.get("title", ""), data=user_input)
             except Exception as err:
                 _LOGGER.exception(
                     f"[config_flow async_step_add_binary_sensor] Unexpected exception: {err}"
@@ -614,7 +568,10 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ign
         )
 
     async def async_step_add_device_tracker(
-        self, user_input: dict | None = None, errors: dict | None = None, yaml_variable: bool = False
+        self,
+        user_input: dict | None = None,
+        errors: dict | None = None,
+        yaml_variable: bool = False,
     ) -> Any:
         errors = {} if errors is None else errors
         if user_input is not None:
@@ -625,9 +582,7 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ign
                     user_input.update({CONF_YAML_PRESENT: True})
                 info = await validate_sensor_input(self.hass, user_input)
                 _LOGGER.debug(f"[New Device Tracker] updated user_input: {user_input}")
-                return self.async_create_entry(
-                    title=info.get("title", ""), data=user_input
-                )
+                return self.async_create_entry(title=info.get("title", ""), data=user_input)
             except Exception as err:
                 _LOGGER.exception(
                     f"[config_flow async_step_add_device_tracker] Unexpected exception: {err}"
@@ -645,7 +600,10 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ign
         )
 
     async def async_step_add_device(
-        self, user_input: dict | None = None, errors: dict | None = None, yaml_variable: bool = False
+        self,
+        user_input: dict | None = None,
+        errors: dict | None = None,
+        yaml_variable: bool = False,
     ) -> Any:
         errors = {} if errors is None else errors
         if user_input is not None:
@@ -659,15 +617,11 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ign
                     cv.url(user_input.get(ATTR_CONFIGURATION_URL))
                 info = await validate_sensor_input(self.hass, user_input)
                 _LOGGER.debug(f"[New Device] updated user_input: {user_input}")
-                return self.async_create_entry(
-                    title=info.get("title", ""), data=user_input
-                )
+                return self.async_create_entry(title=info.get("title", ""), data=user_input)
             except vol.Invalid:
                 errors["base"] = "invalid_url"
             except Exception as e:
-                _LOGGER.exception(
-                    f"Unexpected exception. {e.__class__.__qualname__}: {e}"
-                )
+                _LOGGER.exception(f"Unexpected exception. {e.__class__.__qualname__}: {e}")
                 errors["base"] = "unknown"
 
         # If there is no user input or there were errors, show the form again, including any errors that were found with the input.
@@ -685,9 +639,7 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ign
         """Import a config entry from configuration.yaml."""
 
         # _LOGGER.debug(f"[async_step_import] import_config: {import_config}")
-        return await self.async_step_add_sensor(
-            user_input=import_config, yaml_variable=True
-        )
+        return await self.async_step_add_sensor(user_input=import_config, yaml_variable=True)
 
     @staticmethod
     @callback
@@ -735,7 +687,9 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
             return await self.async_step_device_options()
         return False
 
-    async def async_step_change_sensor_value(self, user_input: dict | None = None, errors: dict | None = None) -> Any:
+    async def async_step_change_sensor_value(
+        self, user_input: dict | None = None, errors: dict | None = None
+    ) -> Any:
         # user_input can be None; normalize to an empty dict for safe .get()/.update()
         user_input = user_input or {}
         errors = {} if errors is None else errors
@@ -760,14 +714,10 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
             ):
                 if (
                     user_input.get(CONF_TZOFFSET) is not None
-                    and re.match(
-                        r"^[+-]?\d\d\:?\d\d\s*$", str(user_input.get(CONF_TZOFFSET))
-                    )
+                    and re.match(r"^[+-]?\d\d\:?\d\d\s*$", str(user_input.get(CONF_TZOFFSET)))
                     is not None
                 ):
-                    val = str(user_input.get(CONF_VALUE)) + str(
-                        user_input.get(CONF_TZOFFSET)
-                    )
+                    val = str(user_input.get(CONF_VALUE)) + str(user_input.get(CONF_TZOFFSET))
                 else:
                     val = str(user_input.get(CONF_VALUE)) + "+0000"
             else:
@@ -789,12 +739,8 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
                     ATTR_REPLACE_ATTRIBUTES: True,
                 }
                 update_variable.update({ATTR_VALUE: val})
-                update_variable.update(
-                    {ATTR_ATTRIBUTES: user_input.get(ATTR_ATTRIBUTES)}
-                )
-                _LOGGER.debug(
-                    f"[Change Sensor Value] update_variable: {update_variable}"
-                )
+                update_variable.update({ATTR_ATTRIBUTES: user_input.get(ATTR_ATTRIBUTES)})
+                _LOGGER.debug(f"[Change Sensor Value] update_variable: {update_variable}")
                 await self.hass.services.async_call(
                     DOMAIN, SERVICE_UPDATE_SENSOR, service_data=update_variable
                 )
@@ -818,9 +764,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
 
     def build_change_sensor_value(self, state):
         CHANGE_VARIABLE_VALUE_SCHEMA = vol.Schema({})
-        if self.config_entry.data.get(CONF_DEVICE_CLASS) in [
-            sensor.SensorDeviceClass.DATE
-        ]:
+        if self.config_entry.data.get(CONF_DEVICE_CLASS) in [sensor.SensorDeviceClass.DATE]:
             if state.state:
                 CHANGE_VARIABLE_VALUE_SCHEMA = CHANGE_VARIABLE_VALUE_SCHEMA.extend(
                     {
@@ -839,13 +783,9 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
                     }
                 )
 
-        elif self.config_entry.data.get(CONF_DEVICE_CLASS) in [
-            sensor.SensorDeviceClass.TIMESTAMP
-        ]:
+        elif self.config_entry.data.get(CONF_DEVICE_CLASS) in [sensor.SensorDeviceClass.TIMESTAMP]:
             if state.state:
-                dt = value_to_type(
-                    state.state, self.config_entry.data.get(CONF_VALUE_TYPE)
-                )
+                dt = value_to_type(state.state, self.config_entry.data.get(CONF_VALUE_TYPE))
                 if dt is not None and isinstance(dt, datetime.datetime):
                     tz_offset = dt.strftime("%z")
                     if tz_offset is None:
@@ -922,7 +862,9 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
             )
         return CHANGE_VARIABLE_VALUE_SCHEMA
 
-    async def async_step_change_binary_sensor_value(self, user_input: dict | None = None, errors: dict | None = None) -> Any:
+    async def async_step_change_binary_sensor_value(
+        self, user_input: dict | None = None, errors: dict | None = None
+    ) -> Any:
         user_input = user_input or {}
         errors = {} if errors is None else errors
         ent = entity_registry.async_entries_for_config_entry(
@@ -946,12 +888,8 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
                     ATTR_REPLACE_ATTRIBUTES: True,
                 }
                 update_variable.update({ATTR_VALUE: user_input.get(CONF_VALUE)})
-                update_variable.update(
-                    {ATTR_ATTRIBUTES: user_input.get(ATTR_ATTRIBUTES)}
-                )
-                _LOGGER.debug(
-                    f"[Change Binary Sensor Value] update_variable: {update_variable}"
-                )
+                update_variable.update({ATTR_ATTRIBUTES: user_input.get(ATTR_ATTRIBUTES)})
+                _LOGGER.debug(f"[Change Binary Sensor Value] update_variable: {update_variable}")
                 await self.hass.services.async_call(
                     DOMAIN, SERVICE_UPDATE_BINARY_SENSOR, service_data=update_variable
                 )
@@ -1045,47 +983,27 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
                     ATTR_REPLACE_ATTRIBUTES: True,
                 }
                 if user_input.get(ATTR_LATITUDE):
-                    update_variable.update(
-                        {ATTR_LATITUDE: user_input.get(ATTR_LATITUDE)}
-                    )
+                    update_variable.update({ATTR_LATITUDE: user_input.get(ATTR_LATITUDE)})
                 if user_input.get(ATTR_LONGITUDE):
-                    update_variable.update(
-                        {ATTR_LONGITUDE: user_input.get(ATTR_LONGITUDE)}
-                    )
+                    update_variable.update({ATTR_LONGITUDE: user_input.get(ATTR_LONGITUDE)})
                 if user_input.get(ATTR_LOCATION_NAME):
-                    update_variable.update(
-                        {ATTR_LOCATION_NAME: user_input.get(ATTR_LOCATION_NAME)}
-                    )
+                    update_variable.update({ATTR_LOCATION_NAME: user_input.get(ATTR_LOCATION_NAME)})
                 if user_input.get(ATTR_DELETE_LOCATION_NAME):
                     update_variable.update(
-                        {
-                            ATTR_DELETE_LOCATION_NAME: user_input.get(
-                                ATTR_DELETE_LOCATION_NAME
-                            )
-                        }
+                        {ATTR_DELETE_LOCATION_NAME: user_input.get(ATTR_DELETE_LOCATION_NAME)}
                     )
                 if user_input.get(ATTR_GPS_ACCURACY):
-                    update_variable.update(
-                        {ATTR_GPS_ACCURACY: user_input.get(ATTR_GPS_ACCURACY)}
-                    )
+                    update_variable.update({ATTR_GPS_ACCURACY: user_input.get(ATTR_GPS_ACCURACY)})
                 if user_input.get(ATTR_BATTERY_LEVEL):
-                    update_variable.update(
-                        {ATTR_BATTERY_LEVEL: user_input.get(ATTR_BATTERY_LEVEL)}
-                    )
-                update_variable.update(
-                    {ATTR_ATTRIBUTES: user_input.get(ATTR_ATTRIBUTES)}
-                )
-                _LOGGER.debug(
-                    f"[Change Device Tracker Value] update_variable: {update_variable}"
-                )
+                    update_variable.update({ATTR_BATTERY_LEVEL: user_input.get(ATTR_BATTERY_LEVEL)})
+                update_variable.update({ATTR_ATTRIBUTES: user_input.get(ATTR_ATTRIBUTES)})
+                _LOGGER.debug(f"[Change Device Tracker Value] update_variable: {update_variable}")
                 await self.hass.services.async_call(
                     DOMAIN, SERVICE_UPDATE_DEVICE_TRACKER, service_data=update_variable
                 )
                 return self.async_abort(reason="value_changed")
 
-        CHANGE_DEVICE_TRACKER_VALUE_SCHEMA = self.build_change_device_tracker_value(
-            state
-        )
+        CHANGE_DEVICE_TRACKER_VALUE_SCHEMA = self.build_change_device_tracker_value(state)
 
         if self.config_entry.data.get(CONF_NAME) is None or self.config_entry.data.get(
             CONF_NAME
@@ -1226,9 +1144,9 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
         if attr:
             CHANGE_VARIABLE_VALUE_SCHEMA = CHANGE_VARIABLE_VALUE_SCHEMA.extend(
                 {
-                    vol.Optional(
-                        CONF_ATTRIBUTES, default=attr
-                    ): selector.ObjectSelector(selector.ObjectSelectorConfig())
+                    vol.Optional(CONF_ATTRIBUTES, default=attr): selector.ObjectSelector(
+                        selector.ObjectSelectorConfig()
+                    )
                 }
             )
         else:
@@ -1313,9 +1231,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
                 ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
                 vol.Optional(
                     CONF_FORCE_UPDATE,
-                    default=self.config_entry.data.get(
-                        CONF_FORCE_UPDATE, DEFAULT_FORCE_UPDATE
-                    ),
+                    default=self.config_entry.data.get(CONF_FORCE_UPDATE, DEFAULT_FORCE_UPDATE),
                 ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
                 vol.Optional(
                     CONF_EXCLUDE_FROM_RECORDER,
@@ -1339,9 +1255,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
             ):
                 if (
                     user_input.get(CONF_TZOFFSET) is not None
-                    and re.match(
-                        r"^[+-]?\d\d\:?\d\d\s*$", user_input.get(CONF_TZOFFSET)
-                    )
+                    and re.match(r"^[+-]?\d\d\:?\d\d\s*$", user_input.get(CONF_TZOFFSET))
                     is not None
                 ):
                     val = user_input.get(CONF_VALUE) + user_input.get(CONF_TZOFFSET)
@@ -1361,10 +1275,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
                 user_input[CONF_VALUE] = newval
 
             if not errors:
-                if (
-                    self.sensor_options_page_1 is not None
-                    and self.sensor_options_page_1
-                ):
+                if self.sensor_options_page_1 is not None and self.sensor_options_page_1:
                     user_input.update(self.sensor_options_page_1)
                 for m in dict(self.config_entry.data).keys():
                     user_input.setdefault(m, self.config_entry.data[m])
@@ -1401,12 +1312,8 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
             errors=errors,
             description_placeholders={
                 "disp_name": str(disp_name),
-                "value_type": str(
-                    self.sensor_options_page_1.get(CONF_VALUE_TYPE, "None")
-                ),
-                "device_class": str(
-                    self.sensor_options_page_1.get(CONF_DEVICE_CLASS, "None")
-                ),
+                "value_type": str(self.sensor_options_page_1.get(CONF_VALUE_TYPE, "None")),
+                "device_class": str(self.sensor_options_page_1.get(CONF_DEVICE_CLASS, "None")),
             },
         )
 
@@ -1429,13 +1336,9 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
 
     def build_sensor_options_page_2(self):
         SENSOR_STATE_CLASS_SELECT_LIST = []
-        SENSOR_STATE_CLASS_SELECT_LIST.append(
-            selector.SelectOptionDict(label="None", value="None")
-        )
+        SENSOR_STATE_CLASS_SELECT_LIST.append(selector.SelectOptionDict(label="None", value="None"))
         SENSOR_UNITS_SELECT_LIST = []
-        SENSOR_UNITS_SELECT_LIST.append(
-            selector.SelectOptionDict(label="None", value="None")
-        )
+        SENSOR_UNITS_SELECT_LIST.append(selector.SelectOptionDict(label="None", value="None"))
         _LOGGER.debug(
             f"[build_sensor_options_page_2] device_class: {self.sensor_options_page_1.get(CONF_DEVICE_CLASS)} ({type(self.sensor_options_page_1.get(CONF_DEVICE_CLASS))})"
         )
@@ -1463,9 +1366,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
             ):
                 units = _get_currency_units()
             else:
-                units = _get_device_class_units(
-                    self.sensor_options_page_1.get(CONF_DEVICE_CLASS)
-                )
+                units = _get_device_class_units(self.sensor_options_page_1.get(CONF_DEVICE_CLASS))
 
             for el in units:
                 if el is not None and el != "None":
@@ -1473,9 +1374,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
                         selector.SelectOptionDict(label=str(el), value=str(el))
                     )
 
-            if self.sensor_options_page_1.get(CONF_DEVICE_CLASS) in [
-                sensor.SensorDeviceClass.DATE
-            ]:
+            if self.sensor_options_page_1.get(CONF_DEVICE_CLASS) in [sensor.SensorDeviceClass.DATE]:
                 value_type = "date"
                 if val_default:
                     SENSOR_OPTIONS_PAGE_2_SCHEMA = SENSOR_OPTIONS_PAGE_2_SCHEMA.extend(
@@ -1517,9 +1416,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
                             vol.Optional(
                                 CONF_VALUE,
                                 default=ts_val,
-                            ): selector.DateTimeSelector(
-                                selector.DateTimeSelectorConfig()
-                            ),
+                            ): selector.DateTimeSelector(selector.DateTimeSelectorConfig()),
                             vol.Optional(
                                 CONF_TZOFFSET,
                                 default=tz_offset,
@@ -1537,9 +1434,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
                         {
                             vol.Optional(
                                 CONF_VALUE,
-                            ): selector.DateTimeSelector(
-                                selector.DateTimeSelectorConfig()
-                            ),
+                            ): selector.DateTimeSelector(selector.DateTimeSelectorConfig()),
                             vol.Optional(
                                 CONF_TZOFFSET,
                                 default=DEFAULT_TZOFFSET,
@@ -1735,9 +1630,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
                 ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
                 vol.Optional(
                     CONF_FORCE_UPDATE,
-                    default=self.config_entry.data.get(
-                        CONF_FORCE_UPDATE, DEFAULT_FORCE_UPDATE
-                    ),
+                    default=self.config_entry.data.get(CONF_FORCE_UPDATE, DEFAULT_FORCE_UPDATE),
                 ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
                 vol.Optional(
                     CONF_EXCLUDE_FROM_RECORDER,
@@ -1928,9 +1821,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
                 ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
                 vol.Optional(
                     CONF_FORCE_UPDATE,
-                    default=self.config_entry.data.get(
-                        CONF_FORCE_UPDATE, DEFAULT_FORCE_UPDATE
-                    ),
+                    default=self.config_entry.data.get(CONF_FORCE_UPDATE, DEFAULT_FORCE_UPDATE),
                 ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
                 vol.Optional(
                     CONF_EXCLUDE_FROM_RECORDER,
@@ -1973,9 +1864,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
             except vol.Invalid:
                 errors["base"] = "invalid_url"
             except Exception as e:
-                _LOGGER.exception(
-                    f"Unexpected exception. {e.__class__.__qualname__}: {e}"
-                )
+                _LOGGER.exception(f"Unexpected exception. {e.__class__.__qualname__}: {e}")
                 errors["base"] = "unknown"
             else:
                 self.hass.config_entries.async_update_entry(
@@ -2000,19 +1889,13 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
         for option in options:
             if self.config_entry.data.get(option, None):
                 DEVICE_OPTIONS_SCHEMA = DEVICE_OPTIONS_SCHEMA.extend(
-                    {
-                        vol.Optional(
-                            option, default=self.config_entry.data.get(option)
-                        ): cv.string
-                    }
+                    {vol.Optional(option, default=self.config_entry.data.get(option)): cv.string}
                 )
             else:
                 DEVICE_OPTIONS_SCHEMA = DEVICE_OPTIONS_SCHEMA.extend(
                     {vol.Optional(option): cv.string}
                 )
-        _LOGGER.debug(
-            f"[Device Options] self.config_entry.data: {self.config_entry.data}"
-        )
+        _LOGGER.debug(f"[Device Options] self.config_entry.data: {self.config_entry.data}")
         return self.async_show_form(
             step_id="device_options",
             data_schema=DEVICE_OPTIONS_SCHEMA,
