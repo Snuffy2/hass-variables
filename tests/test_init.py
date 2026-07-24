@@ -2,7 +2,9 @@
 
 from collections.abc import Callable, Mapping
 from typing import Any
+from unittest.mock import AsyncMock, patch
 
+from homeassistant.components.device_tracker.const import ATTR_LOCATION_NAME
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_BATTERY_LEVEL,
@@ -14,26 +16,118 @@ from homeassistant.const import (
     ATTR_MODEL,
     CONF_DEVICE,
     CONF_NAME,
+    SERVICE_RELOAD,
     STATE_ON,
     Platform,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.setup import async_setup_component
 import pytest
 
 from custom_components.variable.const import (
     ATTR_ATTRIBUTES,
     ATTR_REPLACE_ATTRIBUTES,
+    CONF_ATTRIBUTES,
     CONF_ENTITY_PLATFORM,
+    CONF_EXCLUDE_FROM_RECORDER,
+    CONF_FORCE_UPDATE,
+    CONF_RESTORE,
     CONF_VALUE,
     CONF_VARIABLE_ID,
+    CONF_YAML_PRESENT,
     CONF_YAML_VARIABLE,
     DOMAIN,
     SERVICE_UPDATE_SENSOR,
 )
 
 ConfigEntryFactory = Callable[[Mapping[str, Any]], ConfigEntry]
+
+
+async def test_yaml_setup_and_reload_manage_config_entries(
+    hass: HomeAssistant,
+) -> None:
+    """Create, update, and remove YAML variables through Home Assistant APIs."""
+    initial_config = {
+        DOMAIN: {
+            "yaml_temperature": {
+                CONF_VALUE: 20,
+                "attributes": {"source": "initial"},
+            },
+            "yaml_removed": {
+                CONF_VALUE: "present",
+            },
+        }
+    }
+
+    assert await async_setup_component(hass, DOMAIN, initial_config)
+    await hass.async_block_till_done()
+
+    entries = {
+        entry.data[CONF_VARIABLE_ID]: entry for entry in hass.config_entries.async_entries(DOMAIN)
+    }
+    temperature_entry = entries["yaml_temperature"]
+    removed_entry = entries["yaml_removed"]
+    assert temperature_entry.data[CONF_YAML_VARIABLE] is True
+    assert temperature_entry.data[CONF_ENTITY_PLATFORM] == Platform.SENSOR
+    initial_state = hass.states.get("sensor.yaml_temperature")
+    assert initial_state is not None
+    assert initial_state.state == "20"
+    assert initial_state.attributes["source"] == "initial"
+    removed_state = hass.states.get("sensor.yaml_removed")
+    assert removed_state is not None
+    removed_registry_entry = er.async_get(hass).async_get("sensor.yaml_removed")
+    assert removed_registry_entry is not None
+    assert removed_registry_entry.config_entry_id == removed_entry.entry_id
+
+    reloaded_config = {
+        DOMAIN: {
+            "yaml_temperature": {
+                CONF_VALUE: 24,
+                "attributes": {"source": "reload"},
+            }
+        }
+    }
+    with patch(
+        "custom_components.variable.async_integration_yaml_config",
+        new=AsyncMock(return_value=reloaded_config),
+    ):
+        await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
+        await hass.async_block_till_done()
+
+    current_entry = hass.config_entries.async_get_entry(temperature_entry.entry_id)
+    assert current_entry is not None
+    assert current_entry.data[CONF_VALUE] == 24
+    assert current_entry.data[CONF_YAML_VARIABLE] is True
+    assert CONF_YAML_PRESENT not in current_entry.data
+    reloaded_state = hass.states.get("sensor.yaml_temperature")
+    assert reloaded_state is not None
+    assert reloaded_state.state == "24"
+    assert reloaded_state.attributes["source"] == "reload"
+    assert hass.config_entries.async_get_entry(removed_entry.entry_id) is None
+    assert hass.states.get("sensor.yaml_removed") is None
+    assert er.async_get(hass).async_get("sensor.yaml_removed") is None
+
+
+async def test_yaml_entry_aborts_options_flow(hass: HomeAssistant) -> None:
+    """Reject options for a variable managed through YAML."""
+    assert await async_setup_component(
+        hass,
+        DOMAIN,
+        {DOMAIN: {"yaml_managed": {CONF_VALUE: "managed"}}},
+    )
+    await hass.async_block_till_done()
+    entry = next(
+        entry
+        for entry in hass.config_entries.async_entries(DOMAIN)
+        if entry.data.get(CONF_VARIABLE_ID) == "yaml_managed"
+    )
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "yaml_variable"
 
 
 @pytest.mark.parametrize(
@@ -182,6 +276,165 @@ async def test_options_flow_changes_loaded_sensor_value(
     assert state is not None
     assert state.state == "24.25"
     assert state.attributes["source"] == "options"
+
+
+async def test_sensor_options_flow_updates_entry_and_live_entity(
+    hass: HomeAssistant,
+    sensor_entry: ConfigEntry,
+) -> None:
+    """Persist both sensor option pages and reload the live entity."""
+    assert await hass.config_entries.async_setup(sensor_entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(sensor_entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={"next_step_id": "sensor_options"},
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "sensor_options"
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            "device_class": "None",
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: True,
+            CONF_EXCLUDE_FROM_RECORDER: True,
+        },
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "sensor_options_page_2"
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            CONF_VALUE: "26.5",
+            CONF_ATTRIBUTES: {"source": "sensor-options"},
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert sensor_entry.data[CONF_VALUE] == "26.5"
+    assert sensor_entry.data[CONF_FORCE_UPDATE] is True
+    assert sensor_entry.data[CONF_EXCLUDE_FROM_RECORDER] is True
+    assert sensor_entry.data[CONF_ATTRIBUTES] == {"source": "sensor-options"}
+    state = hass.states.get("sensor.office_temperature")
+    assert state is not None
+    assert state.state == "26.5"
+    assert state.attributes["source"] == "sensor-options"
+
+
+async def test_binary_sensor_options_update_entry_and_live_entity(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Persist binary sensor options and reload its state and attributes."""
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.BINARY_SENSOR,
+            CONF_VARIABLE_ID: "configured_binary",
+            CONF_NAME: "Configured Binary",
+            CONF_VALUE: "true",
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={"next_step_id": "binary_sensor_options"},
+    )
+    assert result["type"] is FlowResultType.FORM
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            CONF_VALUE: "false",
+            CONF_ATTRIBUTES: {"source": "binary-options-form"},
+            "device_class": "door",
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: True,
+            CONF_EXCLUDE_FROM_RECORDER: False,
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.data[CONF_VALUE] == "false"
+    assert entry.data["device_class"] == "door"
+    assert entry.data[CONF_ATTRIBUTES] == {"source": "binary-options-form"}
+    assert entry.data[CONF_RESTORE] is False
+    assert entry.data[CONF_FORCE_UPDATE] is True
+    assert entry.data[CONF_EXCLUDE_FROM_RECORDER] is False
+    state = hass.states.get("binary_sensor.configured_binary")
+    assert state is not None
+    assert state.state == "off"
+    assert state.attributes["source"] == "binary-options-form"
+
+
+async def test_device_tracker_options_update_entry_and_live_entity(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Persist tracker options and reload its coordinates and attributes."""
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.DEVICE_TRACKER,
+            CONF_VARIABLE_ID: "configured_tracker",
+            CONF_NAME: "Configured Tracker",
+            CONF_YAML_VARIABLE: False,
+            ATTR_LATITUDE: 40.0,
+            ATTR_LONGITUDE: -75.0,
+            ATTR_GPS_ACCURACY: 10,
+            ATTR_BATTERY_LEVEL: 80,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={"next_step_id": "device_tracker_options"},
+    )
+    assert result["type"] is FlowResultType.FORM
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            ATTR_LATITUDE: 41.25,
+            ATTR_LONGITUDE: -74.75,
+            ATTR_LOCATION_NAME: "Studio",
+            ATTR_GPS_ACCURACY: 4,
+            ATTR_BATTERY_LEVEL: 65,
+            CONF_ATTRIBUTES: {"source": "tracker-options-form"},
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: True,
+            CONF_EXCLUDE_FROM_RECORDER: False,
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.data[ATTR_LATITUDE] == 41.25
+    assert entry.data[ATTR_LONGITUDE] == -74.75
+    assert entry.data[ATTR_LOCATION_NAME] == "Studio"
+    assert entry.data[CONF_ATTRIBUTES] == {"source": "tracker-options-form"}
+    assert entry.data[CONF_RESTORE] is False
+    assert entry.data[CONF_FORCE_UPDATE] is True
+    assert entry.data[CONF_EXCLUDE_FROM_RECORDER] is False
+    state = hass.states.get("device_tracker.configured_tracker")
+    assert state is not None
+    assert state.state == "Studio"
+    assert state.attributes[ATTR_LATITUDE] == 41.25
+    assert state.attributes[ATTR_LONGITUDE] == -74.75
+    assert state.attributes[ATTR_GPS_ACCURACY] == 4
+    assert state.attributes[ATTR_BATTERY_LEVEL] == 65
+    assert state.attributes["source"] == "tracker-options-form"
 
 
 async def test_sensor_entity_service_updates_state_and_attributes(
@@ -340,3 +593,49 @@ async def test_device_options_flow_updates_registry_metadata(
     assert device.manufacturer == "Updated"
     assert device.model == "Updated Model"
     assert str(device.configuration_url) == "https://example.com/updated"
+
+
+async def test_device_options_invalid_url_preserves_entry_and_registry(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Keep device data unchanged when its options URL is invalid."""
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: CONF_DEVICE,
+            CONF_NAME: "Preserved Hub",
+            CONF_YAML_VARIABLE: False,
+            ATTR_MANUFACTURER: "Original",
+            ATTR_MODEL: "Original Model",
+            ATTR_CONFIGURATION_URL: "https://example.com/original",
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    registry = dr.async_get(hass)
+    original_device = registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    assert original_device is not None
+    original_data = dict(entry.data)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] is FlowResultType.FORM
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            ATTR_MANUFACTURER: "Should Not Persist",
+            ATTR_MODEL: "Should Not Persist",
+            ATTR_CONFIGURATION_URL: "not a URL",
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "device_options"
+    assert result["errors"] == {"base": "invalid_url"}
+    assert dict(entry.data) == original_data
+    current_device = registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    assert current_device is not None
+    assert current_device.id == original_device.id
+    assert current_device.manufacturer == "Original"
+    assert current_device.model == "Original Model"
+    assert str(current_device.configuration_url) == "https://example.com/original"
