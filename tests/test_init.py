@@ -195,7 +195,7 @@ async def test_sensor_entity_service_updates_state_and_attributes(
         {
             "entity_id": ["sensor.office_temperature"],
             CONF_VALUE: 19,
-            ATTR_ATTRIBUTES: {"source": "service"},
+            ATTR_ATTRIBUTES: {"service_marker": True},
             ATTR_REPLACE_ATTRIBUTES: True,
         },
         blocking=True,
@@ -204,7 +204,8 @@ async def test_sensor_entity_service_updates_state_and_attributes(
     state = hass.states.get("sensor.office_temperature")
     assert state is not None
     assert state.state == "19"
-    assert state.attributes["source"] == "service"
+    assert state.attributes["service_marker"] is True
+    assert "source" not in state.attributes
 
 
 async def test_binary_sensor_options_flow_changes_live_entity(
