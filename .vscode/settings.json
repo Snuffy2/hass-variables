@@ -1,5 +1,4 @@
 {
-    "python.formatting.provider": "black",
     "editor.formatOnPaste": true,
     "editor.formatOnSave": true,
     "files.trimTrailingWhitespace": true,
