@@ -1,6 +1,5 @@
 """End-to-end setup orchestration tests for the Variable integration."""
 
-from collections.abc import Callable, Mapping
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
@@ -27,8 +26,7 @@ from custom_components.variable.const import (
     CONF_YAML_VARIABLE,
     DOMAIN,
 )
-
-ConfigEntryFactory = Callable[[Mapping[str, Any]], ConfigEntry]
+from tests.types import ConfigEntryFactory
 
 
 async def test_yaml_setup_and_reload_manage_config_entries(

@@ -1,8 +1,5 @@
 """Integration tests for Variable sensor restore and service behavior."""
 
-from collections.abc import Callable, Mapping
-from typing import Any
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_FRIENDLY_NAME, CONF_DEVICE, CONF_DEVICE_ID, CONF_NAME, Platform
 from homeassistant.core import HomeAssistant, State
@@ -26,8 +23,7 @@ from custom_components.variable.const import (
     SERVICE_INCREMENT_SENSOR,
     SERVICE_UPDATE_SENSOR,
 )
-
-ConfigEntryFactory = Callable[[Mapping[str, Any]], ConfigEntry]
+from tests.types import ConfigEntryFactory
 
 
 async def test_sensor_restore_cache_is_applied_during_config_entry_setup(
@@ -227,7 +223,7 @@ async def test_numeric_services_reject_string_sensor(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    with pytest.raises(ValueError, match="Cannot .* non-numeric variable"):
+    with pytest.raises(ValueError, match=r"Cannot .* non-numeric variable"):
         await hass.services.async_call(
             DOMAIN,
             service,

@@ -1,10 +1,6 @@
 """Integration tests for Variable device-tracker restore and services."""
 
-from collections.abc import Callable, Mapping
-from typing import Any
-
 from homeassistant.components.device_tracker.const import ATTR_LOCATION_NAME
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_BATTERY_LEVEL,
     ATTR_FRIENDLY_NAME,
@@ -14,6 +10,7 @@ from homeassistant.const import (
     CONF_DEVICE,
     CONF_DEVICE_ID,
     CONF_NAME,
+    STATE_NOT_HOME,
     STATE_UNKNOWN,
     Platform,
 )
@@ -35,8 +32,7 @@ from custom_components.variable.const import (
     DOMAIN,
     SERVICE_UPDATE_DEVICE_TRACKER,
 )
-
-ConfigEntryFactory = Callable[[Mapping[str, Any]], ConfigEntry]
+from tests.types import ConfigEntryFactory
 
 
 async def test_device_tracker_restore_cache_is_applied_during_config_entry_setup(
@@ -206,7 +202,7 @@ async def test_device_tracker_update_and_delete_services(
     deleted = hass.states.get(entity_id)
     assert deleted is not None
     assert ATTR_LOCATION_NAME not in deleted.attributes
-    assert deleted.state != "Workshop"
+    assert deleted.state == STATE_NOT_HOME
 
 
 async def test_device_tracker_in_zones_service_and_delete(

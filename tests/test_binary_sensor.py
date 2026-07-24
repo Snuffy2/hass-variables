@@ -1,9 +1,5 @@
 """Integration tests for Variable binary-sensor restore and services."""
 
-from collections.abc import Callable, Mapping
-from typing import Any
-
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_FRIENDLY_NAME,
     CONF_DEVICE,
@@ -29,8 +25,7 @@ from custom_components.variable.const import (
     CONF_YAML_VARIABLE,
     DOMAIN,
 )
-
-ConfigEntryFactory = Callable[[Mapping[str, Any]], ConfigEntry]
+from tests.types import ConfigEntryFactory
 
 
 async def test_binary_sensor_restore_cache_is_applied_during_config_entry_setup(
@@ -131,11 +126,11 @@ async def test_device_linked_binary_sensor_name_is_not_prefixed_again_after_relo
 
 
 @pytest.mark.parametrize(
-    ("initial_value", "expected_state"),
+    ("initial_value", "expected_state", "variable_suffix"),
     [
-        pytest.param("true", STATE_OFF, id="on-to-off"),
-        pytest.param("false", STATE_ON, id="off-to-on"),
-        pytest.param(None, STATE_UNKNOWN, id="unknown-remains-unknown"),
+        pytest.param("true", STATE_OFF, "on_to_off", id="on-to-off"),
+        pytest.param("false", STATE_ON, "off_to_on", id="off-to-on"),
+        pytest.param(None, STATE_UNKNOWN, "unknown", id="unknown-remains-unknown"),
     ],
 )
 async def test_binary_sensor_toggle_service(
@@ -143,6 +138,7 @@ async def test_binary_sensor_toggle_service(
     config_entry_factory: ConfigEntryFactory,
     initial_value: str | None,
     expected_state: str,
+    variable_suffix: str,
 ) -> None:
     """Toggle known binary states while preserving the public unknown state.
 
@@ -151,18 +147,19 @@ async def test_binary_sensor_toggle_service(
         config_entry_factory: Factory for test configuration entries.
         initial_value: Initial variable value provided to the binary sensor.
         expected_state: Expected public state after toggling.
+        variable_suffix: Stable suffix for the test variable and entity IDs.
     """
     entry = config_entry_factory(
         {
             CONF_ENTITY_PLATFORM: Platform.BINARY_SENSOR,
-            CONF_VARIABLE_ID: f"toggle_{expected_state}",
+            CONF_VARIABLE_ID: f"toggle_{variable_suffix}",
             CONF_VALUE: initial_value,
             CONF_YAML_VARIABLE: False,
             CONF_RESTORE: False,
             CONF_FORCE_UPDATE: False,
         }
     )
-    entity_id = f"binary_sensor.toggle_{expected_state}"
+    entity_id = f"binary_sensor.toggle_{variable_suffix}"
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 

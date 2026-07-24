@@ -1,24 +1,28 @@
 """Shared pytest fixtures for the Variable integration."""
 
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
+from homeassistant.const import CONF_NAME, Platform
 from homeassistant.core import HomeAssistant
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 import custom_components
 from custom_components.variable.const import (
+    CONF_ATTRIBUTES,
     CONF_ENTITY_PLATFORM,
+    CONF_FORCE_UPDATE,
+    CONF_RESTORE,
+    CONF_VALUE,
+    CONF_VALUE_TYPE,
     CONF_VARIABLE_ID,
     CONF_YAML_VARIABLE,
     DOMAIN,
 )
-
-ConfigEntryFactory = Callable[[Mapping[str, Any]], ConfigEntry]
+from tests.types import ConfigEntryFactory
 
 
 @pytest.fixture(autouse=True)
@@ -63,7 +67,7 @@ def config_entry_factory(hass: HomeAssistant) -> ConfigEntryFactory:
         """
         entry = MockConfigEntry(
             domain=DOMAIN,
-            title=str(data.get(CONF_VARIABLE_ID, data.get("name", "Variable"))),
+            title=str(data.get(CONF_VARIABLE_ID, data.get(CONF_NAME, "Variable"))),
             data=dict(data),
         )
         entry.add_to_hass(hass)
@@ -87,11 +91,11 @@ def sensor_entry(config_entry_factory: ConfigEntryFactory) -> ConfigEntry:
             CONF_ENTITY_PLATFORM: Platform.SENSOR,
             CONF_VARIABLE_ID: "office_temperature",
             CONF_YAML_VARIABLE: False,
-            "name": "Office Temperature",
-            "restore": False,
-            "force_update": False,
-            "value": 21.5,
-            "value_type": "number",
-            "attributes": {"source": "test"},
+            CONF_NAME: "Office Temperature",
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+            CONF_VALUE: 21.5,
+            CONF_VALUE_TYPE: "number",
+            CONF_ATTRIBUTES: {"source": "test"},
         }
     )

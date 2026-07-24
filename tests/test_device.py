@@ -1,10 +1,6 @@
 """End-to-end tests for Variable device orchestration and lifecycle behavior."""
 
-from collections.abc import Callable, Mapping
-from typing import Any
-
 from homeassistant.components.device_tracker.const import ATTR_LOCATION_NAME
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_BATTERY_LEVEL,
     ATTR_CONFIGURATION_URL,
@@ -35,8 +31,7 @@ from custom_components.variable.const import (
     CONF_YAML_VARIABLE,
     DOMAIN,
 )
-
-ConfigEntryFactory = Callable[[Mapping[str, Any]], ConfigEntry]
+from tests.types import ConfigEntryFactory
 
 
 async def test_setup_device_entry_creates_registry_device(

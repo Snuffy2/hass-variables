@@ -1,6 +1,5 @@
 """Integration tests for the Variable config flow."""
 
-from collections.abc import Callable, Mapping
 import datetime
 from typing import Any
 
@@ -44,8 +43,7 @@ from custom_components.variable.const import (
     CONF_YAML_VARIABLE,
     DOMAIN,
 )
-
-ConfigEntryFactory = Callable[[Mapping[str, Any]], ConfigEntry]
+from tests.types import ConfigEntryFactory
 
 
 async def _start_sensor_flow(
@@ -104,19 +102,9 @@ async def test_sensor_flow_creates_typed_entry(hass: HomeAssistant) -> None:
     Args:
         hass: Home Assistant instance that owns the flow.
     """
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN,
-        context={"source": config_entries.SOURCE_USER},
-    )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], user_input={"next_step_id": "add_sensor"}
-    )
-    assert result["type"] is FlowResultType.FORM
-    assert result["step_id"] == "add_sensor"
-
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"],
-        user_input={
+    result = await _start_sensor_flow(
+        hass,
+        {
             CONF_VARIABLE_ID: "outside_temperature",
             CONF_NAME: "Outside Temperature",
             CONF_ICON: "mdi:thermometer",
