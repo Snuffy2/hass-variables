@@ -102,7 +102,16 @@ async def test_restore_cache_is_applied_during_config_entry_setup(
     restored_state: str,
     restored_attributes: dict[str, Any],
 ) -> None:
-    """Restore each platform's public state and custom attributes on startup."""
+    """Restore each platform's public state and custom attributes on startup.
+
+    Args:
+        hass: Home Assistant test instance.
+        config_entry_factory: Factory for test configuration entries.
+        entry_data: Platform-specific variable configuration.
+        entity_id: Expected restored entity identifier.
+        restored_state: Cached state to restore.
+        restored_attributes: Cached attributes to restore.
+    """
     cached_state = State(entity_id, restored_state, restored_attributes)
     if entry_data[CONF_ENTITY_PLATFORM] is Platform.SENSOR:
         mock_restore_cache_with_extra_data(
@@ -175,7 +184,16 @@ async def test_device_linked_name_is_not_prefixed_again_after_reload(
     restored_state: str,
     platform_data: dict[str, Any],
 ) -> None:
-    """Keep each device-linked platform's friendly name stable across reload."""
+    """Keep each device-linked platform's friendly name stable across reload.
+
+    Args:
+        hass: Home Assistant test instance.
+        config_entry_factory: Factory for test configuration entries.
+        platform: Platform under test.
+        entity_id: Entity identifier associated with the platform.
+        restored_state: Cached state to restore.
+        platform_data: Platform-specific variable configuration.
+    """
     device_entry = config_entry_factory(
         {
             CONF_ENTITY_PLATFORM: CONF_DEVICE,
@@ -247,7 +265,12 @@ async def test_sensor_increment_and_decrement_services(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,
 ) -> None:
-    """Apply explicit and default deltas through registered sensor services."""
+    """Apply explicit and default deltas through registered sensor services.
+
+    Args:
+        hass: Home Assistant test instance.
+        config_entry_factory: Factory for test configuration entries.
+    """
     entry = config_entry_factory(
         {
             CONF_ENTITY_PLATFORM: Platform.SENSOR,
@@ -292,7 +315,13 @@ async def test_numeric_services_reject_string_sensor(
     config_entry_factory: ConfigEntryFactory,
     service: str,
 ) -> None:
-    """Reject numeric services for string sensors without changing their state."""
+    """Reject numeric services for string sensors without changing their state.
+
+    Args:
+        hass: Home Assistant test instance.
+        config_entry_factory: Factory for test configuration entries.
+        service: Numeric service expected to reject the string sensor.
+    """
     entity_id = "sensor.string_value"
     entry = config_entry_factory(
         {
@@ -335,7 +364,14 @@ async def test_binary_sensor_toggle_service(
     initial_value: str | None,
     expected_state: str,
 ) -> None:
-    """Toggle known binary states while preserving the public unknown state."""
+    """Toggle known binary states while preserving the public unknown state.
+
+    Args:
+        hass: Home Assistant test instance.
+        config_entry_factory: Factory for test configuration entries.
+        initial_value: Initial variable value provided to the binary sensor.
+        expected_state: Expected public state after toggling.
+    """
     entry = config_entry_factory(
         {
             CONF_ENTITY_PLATFORM: Platform.BINARY_SENSOR,
@@ -366,7 +402,12 @@ async def test_device_tracker_update_and_delete_services(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,
 ) -> None:
-    """Update tracker location data, then delete its optional location fields."""
+    """Update tracker location data, then delete its optional location fields.
+
+    Args:
+        hass: Home Assistant test instance.
+        config_entry_factory: Factory for test configuration entries.
+    """
     entity_id = "device_tracker.service_tracker"
     entry = config_entry_factory(
         {
@@ -426,7 +467,12 @@ async def test_device_tracker_in_zones_service_and_delete(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,
 ) -> None:
-    """Set and delete a coordinate-free tracker's explicit zone membership."""
+    """Set and delete a coordinate-free tracker's explicit zone membership.
+
+    Args:
+        hass: Home Assistant test instance.
+        config_entry_factory: Factory for test configuration entries.
+    """
     entity_id = "device_tracker.zone_tracker"
     zone_id = "zone.workshop"
     hass.states.async_set(

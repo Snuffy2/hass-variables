@@ -48,7 +48,11 @@ ConfigEntryFactory = Callable[[Mapping[str, Any]], ConfigEntry]
 async def test_yaml_setup_and_reload_manage_config_entries(
     hass: HomeAssistant,
 ) -> None:
-    """Create, update, and remove YAML variables through Home Assistant APIs."""
+    """Create, update, and remove YAML variables through Home Assistant APIs.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+    """
     initial_config = {
         DOMAIN: {
             "yaml_temperature": {
@@ -111,7 +115,11 @@ async def test_yaml_setup_and_reload_manage_config_entries(
 
 
 async def test_yaml_entry_aborts_options_flow(hass: HomeAssistant) -> None:
-    """Reject options for a variable managed through YAML."""
+    """Reject options for a variable managed through YAML.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+    """
     assert await async_setup_component(
         hass,
         DOMAIN,
@@ -180,7 +188,16 @@ async def test_setup_entry_creates_platform_entity(
     expected_state: str,
     expected_attributes: dict[str, Any],
 ) -> None:
-    """Load a config entry and expose its entity through Home Assistant state."""
+    """Load a config entry and expose its entity through Home Assistant state.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config_entry_factory: Factory that creates the platform config entry.
+        data: Platform-specific config-entry data to load.
+        entity_id: Expected entity identifier after setup.
+        expected_state: Expected state value for the created entity.
+        expected_attributes: Expected attributes for the created entity.
+    """
     marker = expected_attributes["marker"]
     entry_data = {
         **data,
@@ -209,7 +226,12 @@ async def test_setup_device_entry_creates_registry_device(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,
 ) -> None:
-    """Load a device config entry and register its metadata."""
+    """Load a device config entry and register its metadata.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config_entry_factory: Factory that creates the device config entry.
+    """
     entry = config_entry_factory(
         {
             CONF_ENTITY_PLATFORM: CONF_DEVICE,
@@ -234,7 +256,12 @@ async def test_unload_entry_removes_entity(
     hass: HomeAssistant,
     sensor_entry: ConfigEntry,
 ) -> None:
-    """Unload a platform entry and remove both state and registry records."""
+    """Unload a platform entry and remove both state and registry records.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        sensor_entry: Sensor config entry to set up and unload.
+    """
     assert await hass.config_entries.async_setup(sensor_entry.entry_id)
     await hass.async_block_till_done()
     assert hass.states.get("sensor.office_temperature") is not None
@@ -250,7 +277,12 @@ async def test_options_flow_changes_loaded_sensor_value(
     hass: HomeAssistant,
     sensor_entry: ConfigEntry,
 ) -> None:
-    """Change a live entity through the options workflow and its entity service."""
+    """Change a live entity through the options workflow and its entity service.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        sensor_entry: Loaded sensor config entry to update.
+    """
     assert await hass.config_entries.async_setup(sensor_entry.entry_id)
     await hass.async_block_till_done()
 
@@ -282,7 +314,12 @@ async def test_sensor_options_flow_updates_entry_and_live_entity(
     hass: HomeAssistant,
     sensor_entry: ConfigEntry,
 ) -> None:
-    """Persist both sensor option pages and reload the live entity."""
+    """Persist both sensor option pages and reload the live entity.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        sensor_entry: Loaded sensor config entry to update.
+    """
     assert await hass.config_entries.async_setup(sensor_entry.entry_id)
     await hass.async_block_till_done()
 
@@ -328,7 +365,12 @@ async def test_binary_sensor_options_update_entry_and_live_entity(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,
 ) -> None:
-    """Persist binary sensor options and reload its state and attributes."""
+    """Persist binary sensor options and reload its state and attributes.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config_entry_factory: Factory that creates the binary-sensor config entry.
+    """
     entry = config_entry_factory(
         {
             CONF_ENTITY_PLATFORM: Platform.BINARY_SENSOR,
@@ -379,7 +421,12 @@ async def test_device_tracker_options_update_entry_and_live_entity(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,
 ) -> None:
-    """Persist tracker options and reload its coordinates and attributes."""
+    """Persist tracker options and reload its coordinates and attributes.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config_entry_factory: Factory that creates the device-tracker config entry.
+    """
     entry = config_entry_factory(
         {
             CONF_ENTITY_PLATFORM: Platform.DEVICE_TRACKER,
@@ -441,7 +488,12 @@ async def test_sensor_entity_service_updates_state_and_attributes(
     hass: HomeAssistant,
     sensor_entry: ConfigEntry,
 ) -> None:
-    """Mutate a loaded sensor through Home Assistant's registered entity service."""
+    """Mutate a loaded sensor through Home Assistant's registered entity service.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        sensor_entry: Loaded sensor config entry to update.
+    """
     assert await hass.config_entries.async_setup(sensor_entry.entry_id)
     await hass.async_block_till_done()
 
@@ -468,7 +520,12 @@ async def test_binary_sensor_options_flow_changes_live_entity(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,
 ) -> None:
-    """Change binary state and attributes through the options workflow."""
+    """Change binary state and attributes through the options workflow.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config_entry_factory: Factory that creates the binary-sensor config entry.
+    """
     entry = config_entry_factory(
         {
             CONF_ENTITY_PLATFORM: Platform.BINARY_SENSOR,
@@ -507,7 +564,12 @@ async def test_device_tracker_options_flow_changes_live_entity(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,
 ) -> None:
-    """Change tracker coordinates and metadata through the options workflow."""
+    """Change tracker coordinates and metadata through the options workflow.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config_entry_factory: Factory that creates the device-tracker config entry.
+    """
     entry = config_entry_factory(
         {
             CONF_ENTITY_PLATFORM: Platform.DEVICE_TRACKER,
@@ -558,7 +620,12 @@ async def test_device_options_flow_updates_registry_metadata(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,
 ) -> None:
-    """Persist device options and update the existing registry record."""
+    """Persist device options and update the existing registry record.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config_entry_factory: Factory that creates the device config entry.
+    """
     entry = config_entry_factory(
         {
             CONF_ENTITY_PLATFORM: CONF_DEVICE,
@@ -599,7 +666,12 @@ async def test_device_options_invalid_url_preserves_entry_and_registry(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,
 ) -> None:
-    """Keep device data unchanged when its options URL is invalid."""
+    """Keep device data unchanged when its options URL is invalid.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config_entry_factory: Factory that creates the device config entry.
+    """
     entry = config_entry_factory(
         {
             CONF_ENTITY_PLATFORM: CONF_DEVICE,

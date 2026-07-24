@@ -26,7 +26,14 @@ def auto_enable_custom_integrations(
     enable_custom_integrations: None,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Enable loading custom integrations in every test."""
+    """Enable loading custom integrations in every test.
+
+    Args:
+        enable_custom_integrations: Home Assistant fixture that enables custom
+            integration loading.
+        monkeypatch: Pytest fixture used to expose the repository integration
+            package.
+    """
     monkeypatch.setattr(
         custom_components,
         "__path__",
@@ -36,10 +43,24 @@ def auto_enable_custom_integrations(
 
 @pytest.fixture
 def config_entry_factory(hass: HomeAssistant) -> ConfigEntryFactory:
-    """Return a factory that adds a Variable config entry to Home Assistant."""
+    """Return a factory that adds Variable config entries to Home Assistant.
+
+    Args:
+        hass: Home Assistant test instance that receives each config entry.
+
+    Returns:
+        A factory that creates and registers a Variable config entry.
+    """
 
     def _create(data: Mapping[str, Any]) -> ConfigEntry:
-        """Create and register a Variable config entry from the supplied data."""
+        """Create and register a Variable config entry from supplied data.
+
+        Args:
+            data: Config-entry data to copy into the mock entry.
+
+        Returns:
+            The registered Variable config entry.
+        """
         entry = MockConfigEntry(
             domain=DOMAIN,
             title=str(data.get(CONF_VARIABLE_ID, data.get("name", "Variable"))),
@@ -53,7 +74,14 @@ def config_entry_factory(hass: HomeAssistant) -> ConfigEntryFactory:
 
 @pytest.fixture
 def sensor_entry(config_entry_factory: ConfigEntryFactory) -> ConfigEntry:
-    """Create a representative sensor config entry."""
+    """Create a representative sensor config entry.
+
+    Args:
+        config_entry_factory: Factory that creates registered Variable entries.
+
+    Returns:
+        A registered numeric sensor config entry.
+    """
     return config_entry_factory(
         {
             CONF_ENTITY_PLATFORM: Platform.SENSOR,

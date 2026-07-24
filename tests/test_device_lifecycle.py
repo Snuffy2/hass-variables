@@ -41,7 +41,12 @@ async def test_clearing_variable_device_links_preserves_entities_when_device_rem
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,
 ) -> None:
-    """Unlink every variable platform before removing its virtual device."""
+    """Unlink every variable platform before removing its virtual device.
+
+    Args:
+        hass: Home Assistant test instance used for the lifecycle workflow.
+        config_entry_factory: Factory that creates registered Variable entries.
+    """
     flow_result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": "user"},

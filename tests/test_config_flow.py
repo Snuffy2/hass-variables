@@ -44,7 +44,15 @@ from custom_components.variable.const import (
 async def _start_sensor_flow(
     hass: HomeAssistant, page_1_input: dict[str, Any]
 ) -> config_entries.ConfigFlowResult:
-    """Start a sensor flow and submit its first page."""
+    """Start a sensor flow and submit its first page.
+
+    Args:
+        hass: Home Assistant instance that owns the flow.
+        page_1_input: Data submitted to the sensor flow's first page.
+
+    Returns:
+        The sensor flow result for its second page.
+    """
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": config_entries.SOURCE_USER},
@@ -64,7 +72,11 @@ async def _start_sensor_flow(
 
 
 async def test_user_flow_menu(hass: HomeAssistant) -> None:
-    """Expose every supported config-entry workflow from the user menu."""
+    """Expose every supported config-entry workflow from the user menu.
+
+    Args:
+        hass: Home Assistant instance that owns the flow.
+    """
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
@@ -80,7 +92,11 @@ async def test_user_flow_menu(hass: HomeAssistant) -> None:
 
 
 async def test_sensor_flow_creates_typed_entry(hass: HomeAssistant) -> None:
-    """Create a numeric sensor through both pages of the real flow API."""
+    """Create a numeric sensor through both pages of the real flow API.
+
+    Args:
+        hass: Home Assistant instance that owns the flow.
+    """
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": config_entries.SOURCE_USER},
@@ -254,7 +270,18 @@ async def test_typed_sensor_flow_matrix(
     expected_state: str,
     expected_attributes: dict[str, Any],
 ) -> None:
-    """Create typed sensors through the public flow and expose their live state."""
+    """Create typed sensors through the public flow and expose their live state.
+
+    Args:
+        hass: Home Assistant instance that owns the flow.
+        variable_id: Unique identifier for the variable under test.
+        device_class: Sensor device class that determines value validation.
+        page_2_input: Data submitted to the sensor flow's second page.
+        expected_value_type: Expected stored variable value type.
+        expected_value: Expected stored variable value.
+        expected_state: Expected Home Assistant entity state.
+        expected_attributes: Expected attributes exposed by the entity.
+    """
     result = await _start_sensor_flow(
         hass,
         {
@@ -319,7 +346,15 @@ async def test_typed_sensor_flow_rejects_incompatible_values(
     invalid_value: str,
     raises_invalid_data: bool,
 ) -> None:
-    """Keep typed sensor flows open and entry-free for incompatible values."""
+    """Keep typed sensor flows open and entry-free for incompatible values.
+
+    Args:
+        hass: Home Assistant instance that owns the flow.
+        variable_id: Unique identifier for the variable under test.
+        device_class: Sensor device class that determines value validation.
+        invalid_value: Value that is incompatible with the device class.
+        raises_invalid_data: Whether the flow is expected to raise InvalidData.
+    """
     result = await _start_sensor_flow(
         hass,
         {
@@ -368,7 +403,13 @@ async def test_temperature_flow_rejects_invalid_typed_selection(
     invalid_input: dict[str, Any],
     error_key: str,
 ) -> None:
-    """Reject state classes and units not offered by the typed sensor page."""
+    """Reject state classes and units not offered by the typed sensor page.
+
+    Args:
+        hass: Home Assistant instance that owns the flow.
+        invalid_input: Invalid data submitted to the sensor flow's second page.
+        error_key: Schema field expected to report the validation error.
+    """
     result = await _start_sensor_flow(
         hass,
         {
@@ -444,7 +485,16 @@ async def test_single_page_flows_create_entries(
     expected_entity_id: str | None,
     expected_state: str | None,
 ) -> None:
-    """Create and fully set up each single-page config flow."""
+    """Create and fully set up each single-page config flow.
+
+    Args:
+        hass: Home Assistant instance that owns the flow.
+        step_id: Menu option that selects the config-flow step.
+        user_input: Data submitted to the selected flow step.
+        expected_platform: Expected platform stored in the config entry.
+        expected_entity_id: Expected entity ID, if the flow creates an entity.
+        expected_state: Expected entity state, if the flow creates an entity.
+    """
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
@@ -477,7 +527,11 @@ async def test_single_page_flows_create_entries(
 
 
 async def test_device_flow_rejects_invalid_configuration_url(hass: HomeAssistant) -> None:
-    """Report an invalid URL without creating a device config entry."""
+    """Report an invalid URL without creating a device config entry.
+
+    Args:
+        hass: Home Assistant instance that owns the flow.
+    """
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
