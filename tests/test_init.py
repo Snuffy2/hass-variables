@@ -39,7 +39,7 @@ ConfigEntryFactory = Callable[[Mapping[str, Any]], ConfigEntry]
 @pytest.mark.parametrize(
     ("data", "entity_id", "expected_state", "expected_attributes"),
     [
-        (
+        pytest.param(
             {
                 CONF_ENTITY_PLATFORM: Platform.SENSOR,
                 CONF_VARIABLE_ID: "workflow_sensor",
@@ -49,8 +49,9 @@ ConfigEntryFactory = Callable[[Mapping[str, Any]], ConfigEntry]
             "sensor.workflow_sensor",
             "ready",
             {"marker": "sensor"},
+            id="sensor",
         ),
-        (
+        pytest.param(
             {
                 CONF_ENTITY_PLATFORM: Platform.BINARY_SENSOR,
                 CONF_VARIABLE_ID: "workflow_switch",
@@ -59,8 +60,9 @@ ConfigEntryFactory = Callable[[Mapping[str, Any]], ConfigEntry]
             "binary_sensor.workflow_switch",
             STATE_ON,
             {"marker": "binary"},
+            id="binary-sensor",
         ),
-        (
+        pytest.param(
             {
                 CONF_ENTITY_PLATFORM: Platform.DEVICE_TRACKER,
                 CONF_VARIABLE_ID: "workflow_tracker",
@@ -72,6 +74,7 @@ ConfigEntryFactory = Callable[[Mapping[str, Any]], ConfigEntry]
             "device_tracker.workflow_tracker",
             "not_home",
             {"latitude": 40.0, "longitude": -75.0, "marker": "tracker"},
+            id="device-tracker",
         ),
     ],
 )

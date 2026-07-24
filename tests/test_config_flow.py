@@ -140,7 +140,7 @@ async def test_sensor_flow_rejects_incompatible_value(hass: HomeAssistant) -> No
 @pytest.mark.parametrize(
     ("step_id", "user_input", "expected_platform", "expected_entity_id", "expected_state"),
     [
-        (
+        pytest.param(
             "add_binary_sensor",
             {
                 CONF_VARIABLE_ID: "garage_open",
@@ -151,8 +151,9 @@ async def test_sensor_flow_rejects_incompatible_value(hass: HomeAssistant) -> No
             Platform.BINARY_SENSOR,
             "binary_sensor.garage_open",
             "on",
+            id="binary-sensor",
         ),
-        (
+        pytest.param(
             "add_device_tracker",
             {
                 CONF_VARIABLE_ID: "test_tracker",
@@ -165,8 +166,9 @@ async def test_sensor_flow_rejects_incompatible_value(hass: HomeAssistant) -> No
             Platform.DEVICE_TRACKER,
             "device_tracker.test_tracker",
             "not_home",
+            id="device-tracker",
         ),
-        (
+        pytest.param(
             "add_device",
             {
                 CONF_NAME: "Virtual Hub",
@@ -176,6 +178,7 @@ async def test_sensor_flow_rejects_incompatible_value(hass: HomeAssistant) -> No
             CONF_DEVICE,
             None,
             None,
+            id="device",
         ),
     ],
 )
