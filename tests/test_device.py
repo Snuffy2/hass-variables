@@ -230,8 +230,7 @@ async def test_remove_device_reloads_only_attached_variable_entities(
     assert await remove_device(hass, device_entry)
 
     assert device_registry.async_get_device(identifiers={(DOMAIN, device_entry.entry_id)}) is None
-    scheduled_entry_ids = {call.args[0] for call in schedule_reload.call_args_list}
-    assert scheduled_entry_ids == {linked_entry.entry_id}
+    schedule_reload.assert_called_once_with(linked_entry.entry_id)
 
 
 async def test_remove_device_succeeds_when_registry_device_is_missing(
