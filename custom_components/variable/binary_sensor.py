@@ -2,7 +2,6 @@ from collections.abc import MutableMapping
 import copy
 import logging
 from typing import cast
-import yaml
 
 from homeassistant.components.binary_sensor import PLATFORM_SCHEMA, BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
@@ -26,7 +25,9 @@ import homeassistant.helpers.entity_registry as er
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.util import slugify
 import voluptuous as vol
+import yaml
 
+from . import _async_exclude_entity_from_recorder
 from .const import (
     ATTR_ATTRIBUTES,
     ATTR_REPLACE_ATTRIBUTES,
@@ -44,7 +45,6 @@ from .const import (
     DOMAIN,
 )
 from .helpers import merge_attribute_dict
-from . import _async_exclude_entity_from_recorder
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -85,9 +85,7 @@ async def async_setup_entry(
                 )
             ),
             vol.Optional(ATTR_ATTRIBUTES): dict,
-            vol.Optional(
-                ATTR_REPLACE_ATTRIBUTES, default=DEFAULT_REPLACE_ATTRIBUTES
-            ): cv.boolean,
+            vol.Optional(ATTR_REPLACE_ATTRIBUTES, default=DEFAULT_REPLACE_ATTRIBUTES): cv.boolean,
         },
         "async_update_variable",
     )
@@ -96,9 +94,7 @@ async def async_setup_entry(
         SERVICE_TOGGLE_VARIABLE,
         {
             vol.Optional(ATTR_ATTRIBUTES): dict,
-            vol.Optional(
-                ATTR_REPLACE_ATTRIBUTES, default=DEFAULT_REPLACE_ATTRIBUTES
-            ): cv.boolean,
+            vol.Optional(ATTR_REPLACE_ATTRIBUTES, default=DEFAULT_REPLACE_ATTRIBUTES): cv.boolean,
         },
         "async_toggle_variable",
     )
@@ -111,8 +107,7 @@ async def async_setup_entry(
 
     if config.get(CONF_EXCLUDE_FROM_RECORDER, DEFAULT_EXCLUDE_FROM_RECORDER):
         _LOGGER.debug(
-            f"({config.get(CONF_NAME, config.get(CONF_VARIABLE_ID, None))}) "
-            "Excluding from Recorder"
+            f"({config.get(CONF_NAME, config.get(CONF_VARIABLE_ID, None))}) Excluding from Recorder"
         )
         async_add_entities([VariableNoRecorder(hass, config, config_entry, unique_id)])
     else:
@@ -176,9 +171,7 @@ class Variable(BinarySensorEntity, RestoreEntity):  # type: ignore[misc]
         else:
             self._attr_extra_state_attributes = {}
         registry = er.async_get(self._hass)
-        current_entity_id = registry.async_get_entity_id(
-            DOMAIN, PLATFORM, self._attr_unique_id
-        )
+        current_entity_id = registry.async_get_entity_id(DOMAIN, PLATFORM, self._attr_unique_id)
         if current_entity_id is not None:
             self.entity_id = current_entity_id
         else:
@@ -218,8 +211,7 @@ class Variable(BinarySensorEntity, RestoreEntity):  # type: ignore[misc]
                 if hasattr(state, "state"):
                     if state.state is None or (
                         isinstance(state.state, str)
-                        and state.state.lower()
-                        in ["", "none", "unknown", "unavailable"]
+                        and state.state.lower() in ["", "none", "unknown", "unavailable"]
                     ):
                         self._attr_is_on = None
                     elif state.state == STATE_OFF:
@@ -232,18 +224,15 @@ class Variable(BinarySensorEntity, RestoreEntity):  # type: ignore[misc]
                         self._attr_is_on = None
                 else:
                     self._attr_is_on = None
-            _LOGGER.debug(
-                f"({self._attr_name}) [restored] _attr_is_on: {self._attr_is_on}"
-            )
+            _LOGGER.debug(f"({self._attr_name}) [restored] _attr_is_on: {self._attr_is_on}")
             _LOGGER.debug(
                 f"({self._attr_name}) [restored] attributes: {getattr(self, '_attr_extra_state_attributes', {})}"
             )
             # If there were no attributes restored from state, apply attributes from config
             if (
-                (not getattr(self, "_attr_extra_state_attributes", None)
-                 or self._attr_extra_state_attributes == {})
-                and self._config.get(CONF_ATTRIBUTES)
-            ):
+                not getattr(self, "_attr_extra_state_attributes", None)
+                or self._attr_extra_state_attributes == {}
+            ) and self._config.get(CONF_ATTRIBUTES):
                 self._attr_extra_state_attributes = cast(
                     dict, self._update_attr_settings(self._config.get(CONF_ATTRIBUTES))
                 )
@@ -261,10 +250,9 @@ class Variable(BinarySensorEntity, RestoreEntity):  # type: ignore[misc]
         else:
             # If not restoring from state, ensure config-provided attributes are applied
             if (
-                (not getattr(self, "_attr_extra_state_attributes", None)
-                 or self._attr_extra_state_attributes == {})
-                and self._config.get(CONF_ATTRIBUTES)
-            ):
+                not getattr(self, "_attr_extra_state_attributes", None)
+                or self._attr_extra_state_attributes == {}
+            ) and self._config.get(CONF_ATTRIBUTES):
                 self._attr_extra_state_attributes = cast(
                     dict, self._update_attr_settings(self._config.get(CONF_ATTRIBUTES))
                 )
@@ -334,9 +322,7 @@ class Variable(BinarySensorEntity, RestoreEntity):  # type: ignore[misc]
     async def async_update_variable(self, **kwargs) -> None:
         """Update Binary Sensor Variable."""
 
-        _LOGGER.debug(
-            f"({self._attr_name}) [async_update_variable] kwargs: {kwargs}"
-        )
+        _LOGGER.debug(f"({self._attr_name}) [async_update_variable] kwargs: {kwargs}")
 
         updated_attributes = None
 
@@ -358,9 +344,7 @@ class Variable(BinarySensorEntity, RestoreEntity):  # type: ignore[misc]
                 try:
                     attributes = yaml.safe_load(attributes)
                 except Exception as err:
-                    _LOGGER.error(
-                        f"({self._attr_name}) Failed to parse attributes string: %s", err
-                    )
+                    _LOGGER.error(f"({self._attr_name}) Failed to parse attributes string: %s", err)
                     attributes = None
             if isinstance(attributes, MutableMapping):
                 _LOGGER.debug(
@@ -384,9 +368,7 @@ class Variable(BinarySensorEntity, RestoreEntity):  # type: ignore[misc]
                 )
 
         if updated_attributes is not None:
-            self._attr_extra_state_attributes = cast(
-                dict, copy.deepcopy(updated_attributes)
-            )
+            self._attr_extra_state_attributes = cast(dict, copy.deepcopy(updated_attributes))
             _LOGGER.debug(
                 f"({self._attr_name}) [async_update_variable] Final Attributes: {updated_attributes}"
             )
@@ -396,8 +378,7 @@ class Variable(BinarySensorEntity, RestoreEntity):  # type: ignore[misc]
         if ATTR_VALUE in kwargs:
             val = kwargs.get(ATTR_VALUE)
             if val is None or (
-                isinstance(val, str)
-                and val.lower() in ["", "none", "unknown", "unavailable"]
+                isinstance(val, str) and val.lower() in ["", "none", "unknown", "unavailable"]
             ):
                 self._attr_is_on = None
             elif isinstance(val, str):
@@ -416,9 +397,7 @@ class Variable(BinarySensorEntity, RestoreEntity):  # type: ignore[misc]
     async def async_toggle_variable(self, **kwargs) -> None:
         """Toggle Binary Sensor Variable."""
 
-        _LOGGER.debug(
-            f"({self._attr_name}) [async_toggle_variable] kwargs: {kwargs}"
-        )
+        _LOGGER.debug(f"({self._attr_name}) [async_toggle_variable] kwargs: {kwargs}")
 
         updated_attributes = None
 
@@ -440,9 +419,7 @@ class Variable(BinarySensorEntity, RestoreEntity):  # type: ignore[misc]
                 try:
                     attributes = yaml.safe_load(attributes)
                 except Exception as err:
-                    _LOGGER.error(
-                        f"({self._attr_name}) Failed to parse attributes string: %s", err
-                    )
+                    _LOGGER.error(f"({self._attr_name}) Failed to parse attributes string: %s", err)
                     attributes = None
             if isinstance(attributes, MutableMapping):
                 _LOGGER.debug(
@@ -466,9 +443,7 @@ class Variable(BinarySensorEntity, RestoreEntity):  # type: ignore[misc]
                 )
 
         if updated_attributes is not None:
-            self._attr_extra_state_attributes = cast(
-                dict, copy.deepcopy(updated_attributes)
-            )
+            self._attr_extra_state_attributes = cast(dict, copy.deepcopy(updated_attributes))
             _LOGGER.debug(
                 f"({self._attr_name}) [async_toggle_variable] Final Attributes: {updated_attributes}"
             )
@@ -477,9 +452,7 @@ class Variable(BinarySensorEntity, RestoreEntity):  # type: ignore[misc]
 
         if self._attr_is_on is not None:
             self._attr_is_on = not self._attr_is_on
-        _LOGGER.debug(
-            f"({self._attr_name}) [async_toggle_variable] New Value: {self._attr_is_on}"
-        )
+        _LOGGER.debug(f"({self._attr_name}) [async_toggle_variable] New Value: {self._attr_is_on}")
 
         self.async_write_ha_state()
 

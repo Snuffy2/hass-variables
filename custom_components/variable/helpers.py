@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import MutableMapping
 import copy
 import datetime
 import logging
-from collections.abc import MutableMapping
 from typing import Any
 
 import homeassistant.util.dt as dt_util
@@ -30,7 +30,7 @@ def _parse_attribute_path(path: str) -> list:
             closing = path.find("]", index)
             if closing == -1:
                 raise ValueError(f"Invalid attribute path: {path}")
-            index_str = path[index + 1:closing]
+            index_str = path[index + 1 : closing]
             if not index_str.isdigit():
                 raise ValueError(f"Invalid list index in attribute path: {path}")
             tokens.append(int(index_str))
@@ -61,9 +61,7 @@ def set_nested_attribute(target: MutableMapping, path: str, value) -> None:
         is_last = idx == len(tokens) - 1
         if isinstance(token, str):
             if not isinstance(current, MutableMapping):
-                raise ValueError(
-                    f"Expected mapping while navigating attribute path: {path}"
-                )
+                raise ValueError(f"Expected mapping while navigating attribute path: {path}")
             if is_last:
                 current[token] = copy.deepcopy(value)
             else:
@@ -79,9 +77,7 @@ def set_nested_attribute(target: MutableMapping, path: str, value) -> None:
                 current = existing
         else:
             if not isinstance(current, list):
-                raise ValueError(
-                    f"Expected list while navigating attribute path: {path}"
-                )
+                raise ValueError(f"Expected list while navigating attribute path: {path}")
             next_token = tokens[idx + 1] if not is_last else None
             if is_last:
                 while len(current) <= token:
@@ -126,8 +122,7 @@ def to_num(s):
 
 def value_to_type(init_val, dest_type):  # noqa: C901
     if init_val is None or (
-        isinstance(init_val, str)
-        and init_val.lower() in ["", "none", "unknown", "unavailable"]
+        isinstance(init_val, str) and init_val.lower() in ["", "none", "unknown", "unavailable"]
     ):
         _LOGGER.debug(f"[value_to_type] return value: {init_val}, returning None")
         return None
@@ -141,18 +136,14 @@ def value_to_type(init_val, dest_type):  # noqa: C901
     if isinstance(init_val, str):
         # _LOGGER.debug("[value_to_type] Processing as string")
         if dest_type is None or dest_type == "string":
-            _LOGGER.debug(
-                f"[value_to_type] return value: {init_val}, type: {type(init_val)}"
-            )
+            _LOGGER.debug(f"[value_to_type] return value: {init_val}, type: {type(init_val)}")
             return init_val
 
         elif dest_type == "date":
             try:
                 value_date = datetime.date.fromisoformat(init_val)
             except ValueError:
-                _LOGGER.debug(
-                    f"Cannot convert string to {dest_type}: {init_val}, returning None"
-                )
+                _LOGGER.debug(f"Cannot convert string to {dest_type}: {init_val}, returning None")
                 raise ValueError(f"Cannot convert string to {dest_type}: {init_val}")
                 return None
             else:
@@ -165,9 +156,7 @@ def value_to_type(init_val, dest_type):  # noqa: C901
             try:
                 value_datetime = datetime.datetime.fromisoformat(init_val)
             except ValueError:
-                _LOGGER.debug(
-                    f"Cannot convert string to {dest_type}: {init_val}, returning None"
-                )
+                _LOGGER.debug(f"Cannot convert string to {dest_type}: {init_val}, returning None")
                 raise ValueError(f"Cannot convert string to {dest_type}: {init_val}")
                 return None
             else:
@@ -183,14 +172,10 @@ def value_to_type(init_val, dest_type):  # noqa: C901
 
         elif dest_type == "number":
             if (value_num := to_num(init_val)) is not None:
-                _LOGGER.debug(
-                    f"[value_to_type] return value: {value_num}, type: {type(value_num)}"
-                )
+                _LOGGER.debug(f"[value_to_type] return value: {value_num}, type: {type(value_num)}")
                 return value_num
             else:
-                _LOGGER.debug(
-                    f"Cannot convert string to {dest_type}: {init_val}, returning None"
-                )
+                _LOGGER.debug(f"Cannot convert string to {dest_type}: {init_val}, returning None")
                 raise ValueError(f"Cannot convert string to {dest_type}: {init_val}")
         else:
             _LOGGER.debug(f"Invalid dest_type: {dest_type}, returning None")
@@ -207,9 +192,7 @@ def value_to_type(init_val, dest_type):  # noqa: C901
             try:
                 value_date = datetime.date.fromisoformat(str(init_val))
             except ValueError:
-                _LOGGER.debug(
-                    f"Cannot convert number to {dest_type}: {init_val}, returning None"
-                )
+                _LOGGER.debug(f"Cannot convert number to {dest_type}: {init_val}, returning None")
                 raise ValueError(f"Cannot convert number to {dest_type}: {init_val}")
                 return None
             else:
@@ -222,9 +205,7 @@ def value_to_type(init_val, dest_type):  # noqa: C901
             try:
                 value_datetime = datetime.datetime.fromisoformat(str(init_val))
             except ValueError:
-                _LOGGER.debug(
-                    f"Cannot convert number to {dest_type}: {init_val}, returning None"
-                )
+                _LOGGER.debug(f"Cannot convert number to {dest_type}: {init_val}, returning None")
                 raise ValueError(f"Cannot convert number to {dest_type}: {init_val}")
                 return None
             else:
@@ -238,9 +219,7 @@ def value_to_type(init_val, dest_type):  # noqa: C901
                     return value_datetime.replace(tzinfo=dt_util.UTC)
                 return value_datetime
         elif dest_type == "number":
-            _LOGGER.debug(
-                f"[value_to_type] return value: {init_val}, type: {type(init_val)}"
-            )
+            _LOGGER.debug(f"[value_to_type] return value: {init_val}, type: {type(init_val)}")
             return init_val
         else:
             _LOGGER.debug(f"Invalid dest_type: {dest_type}, returning None")
@@ -254,9 +233,7 @@ def value_to_type(init_val, dest_type):  # noqa: C901
             )
             return init_val.isoformat()
         elif dest_type == "date":
-            _LOGGER.debug(
-                f"[value_to_type] return value: {init_val}, type: {type(init_val)}"
-            )
+            _LOGGER.debug(f"[value_to_type] return value: {init_val}, type: {type(init_val)}")
             return init_val
         elif dest_type == "datetime":
             _LOGGER.debug(
@@ -274,9 +251,7 @@ def value_to_type(init_val, dest_type):  # noqa: C901
             _LOGGER.debug(f"Invalid dest_type: {dest_type}, returning None")
             raise ValueError(f"Invalid dest_type: {dest_type}")
             return None
-    elif (
-        isinstance(init_val, datetime.datetime) and type(init_val) is datetime.datetime
-    ):
+    elif isinstance(init_val, datetime.datetime) and type(init_val) is datetime.datetime:
         # _LOGGER.debug("[value_to_type] Processing as datetime")
         if dest_type is None or dest_type == "string":
             _LOGGER.debug(
@@ -289,9 +264,7 @@ def value_to_type(init_val, dest_type):  # noqa: C901
             )
             return init_val.date()
         elif dest_type == "datetime":
-            _LOGGER.debug(
-                f"[value_to_type] return value: {init_val}, type: {type(init_val)}"
-            )
+            _LOGGER.debug(f"[value_to_type] return value: {init_val}, type: {type(init_val)}")
             return init_val
         elif dest_type == "number":
             _LOGGER.debug(

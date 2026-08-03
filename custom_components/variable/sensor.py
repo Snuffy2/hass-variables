@@ -2,13 +2,8 @@ from collections.abc import MutableMapping
 import copy
 import logging
 from typing import cast
-import yaml
 
-from homeassistant.components.sensor import (
-    CONF_STATE_CLASS,
-    PLATFORM_SCHEMA,
-    RestoreSensor,
-)
+from homeassistant.components.sensor import CONF_STATE_CLASS, PLATFORM_SCHEMA, RestoreSensor
 from homeassistant.components.sensor.const import UNIT_CONVERTERS
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -23,17 +18,15 @@ from homeassistant.const import (
     Platform,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import (
-    config_validation as cv,
-    device_registry as dr,
-    entity_platform,
-)
+from homeassistant.helpers import config_validation as cv, device_registry as dr, entity_platform
 from homeassistant.helpers.device import async_device_info_to_link_from_device_id
 from homeassistant.helpers.entity import generate_entity_id
 import homeassistant.helpers.entity_registry as er
 from homeassistant.util import slugify
 import voluptuous as vol
+import yaml
 
+from . import _async_exclude_entity_from_recorder
 from .const import (
     ATTR_ATTRIBUTES,
     ATTR_NATIVE_UNIT_OF_MEASUREMENT,
@@ -56,11 +49,10 @@ from .const import (
     DEFAULT_REPLACE_ATTRIBUTES,
     DEFAULT_RESTORE,
     DOMAIN,
-    SERVICE_INCREMENT_SENSOR,
     SERVICE_DECREMENT_SENSOR,
+    SERVICE_INCREMENT_SENSOR,
 )
 from .helpers import merge_attribute_dict, value_to_type
-from . import _async_exclude_entity_from_recorder
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -76,9 +68,7 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
         vol.Optional(CONF_ATTRIBUTES): dict,
         vol.Optional(CONF_RESTORE, default=DEFAULT_RESTORE): cv.boolean,
         vol.Optional(CONF_FORCE_UPDATE, default=DEFAULT_FORCE_UPDATE): cv.boolean,
-        vol.Optional(
-            CONF_EXCLUDE_FROM_RECORDER, default=DEFAULT_EXCLUDE_FROM_RECORDER
-        ): cv.boolean,
+        vol.Optional(CONF_EXCLUDE_FROM_RECORDER, default=DEFAULT_EXCLUDE_FROM_RECORDER): cv.boolean,
     }
 )
 
@@ -108,9 +98,7 @@ async def async_setup_entry(
         {
             vol.Optional(ATTR_VALUE): cv.match_all,
             vol.Optional(ATTR_ATTRIBUTES): dict,
-            vol.Optional(
-                ATTR_REPLACE_ATTRIBUTES, default=DEFAULT_REPLACE_ATTRIBUTES
-            ): cv.boolean,
+            vol.Optional(ATTR_REPLACE_ATTRIBUTES, default=DEFAULT_REPLACE_ATTRIBUTES): cv.boolean,
         },
         "async_update_variable",
     )
@@ -136,8 +124,7 @@ async def async_setup_entry(
 
     if config.get(CONF_EXCLUDE_FROM_RECORDER, DEFAULT_EXCLUDE_FROM_RECORDER):
         _LOGGER.debug(
-            f"({config.get(CONF_NAME, config.get(CONF_VARIABLE_ID, None))}) "
-            "Excluding from Recorder"
+            f"({config.get(CONF_NAME, config.get(CONF_VARIABLE_ID, None))}) Excluding from Recorder"
         )
         async_add_entities([VariableNoRecorder(hass, config, config_entry, unique_id)])
     else:
@@ -166,9 +153,7 @@ class Variable(RestoreSensor):
         self._attr_unique_id = unique_id
         self._attr_name = config.get(CONF_NAME, config.get(CONF_VARIABLE_ID, ""))
         registry = er.async_get(self._hass)
-        current_entity_id = registry.async_get_entity_id(
-            DOMAIN, PLATFORM, self._attr_unique_id
-        )
+        current_entity_id = registry.async_get_entity_id(DOMAIN, PLATFORM, self._attr_unique_id)
         if current_entity_id is not None:
             self.entity_id = current_entity_id
         else:
@@ -209,15 +194,11 @@ class Variable(RestoreSensor):
             self._attr_native_value = None
         else:
             try:
-                self._attr_native_value = value_to_type(
-                    config.get(CONF_VALUE), self._value_type
-                )
+                self._attr_native_value = value_to_type(config.get(CONF_VALUE), self._value_type)
             except ValueError:
                 self._attr_native_value = None
         if config.get(CONF_DEVICE_CLASS) in UNIT_CONVERTERS:
-            self._attr_suggested_unit_of_measurement = config.get(
-                CONF_UNIT_OF_MEASUREMENT
-            )
+            self._attr_suggested_unit_of_measurement = config.get(CONF_UNIT_OF_MEASUREMENT)
 
         # _LOGGER.debug(f"({self._attr_name}) [init] unrecorded_attributes: {self._unrecorded_attributes}")
 
@@ -270,9 +251,7 @@ class Variable(RestoreSensor):
                         ),
                     )
                     if self._config.get(CONF_UPDATED, True):
-                        self._attr_extra_state_attributes.pop(
-                            CONF_UNIT_OF_MEASUREMENT, None
-                        )
+                        self._attr_extra_state_attributes.pop(CONF_UNIT_OF_MEASUREMENT, None)
                     if self._attr_device_info:
                         device_registry = dr.async_get(self._hass)
                         device = device_registry.async_get_device(
@@ -292,33 +271,24 @@ class Variable(RestoreSensor):
                         if (
                             isinstance(device_name, str)
                             and isinstance(self._attr_name, str)
-                            and self._attr_name.lower().strip()
-                            != device_name.lower().strip()
+                            and self._attr_name.lower().strip() != device_name.lower().strip()
                             and self._attr_name.lower().startswith(device_name.lower())
                         ):
                             old_name = self._attr_name
-                            self._attr_name = self._attr_name.replace(
-                                device_name, "", 1
-                            ).strip()
-                            _LOGGER.debug(
-                                f"({self._attr_name}) [restored] Truncated: {old_name}"
-                            )
+                            self._attr_name = self._attr_name.replace(device_name, "", 1).strip()
+                            _LOGGER.debug(f"({self._attr_name}) [restored] Truncated: {old_name}")
                         elif (
                             isinstance(device_name_by_user, str)
                             and isinstance(self._attr_name, str)
                             and self._attr_name.lower().strip()
                             != device_name_by_user.lower().strip()
-                            and self._attr_name.lower().startswith(
-                                device_name_by_user.lower()
-                            )
+                            and self._attr_name.lower().startswith(device_name_by_user.lower())
                         ):
                             old_name = self._attr_name
                             self._attr_name = self._attr_name.replace(
                                 device_name_by_user, "", 1
                             ).strip()
-                            _LOGGER.debug(
-                                f"({self._attr_name}) [restored] Truncated: {old_name}"
-                            )
+                            _LOGGER.debug(f"({self._attr_name}) [restored] Truncated: {old_name}")
             _LOGGER.debug(
                 f"({self._attr_name}) [restored] _attr_native_value: {self._attr_native_value}"
             )
@@ -327,10 +297,9 @@ class Variable(RestoreSensor):
             )
             # If there were no attributes restored from state, apply attributes from config
             if (
-                (not getattr(self, "_attr_extra_state_attributes", None)
-                 or self._attr_extra_state_attributes == {})
-                and self._config.get(CONF_ATTRIBUTES)
-            ):
+                not getattr(self, "_attr_extra_state_attributes", None)
+                or self._attr_extra_state_attributes == {}
+            ) and self._config.get(CONF_ATTRIBUTES):
                 self._attr_extra_state_attributes = cast(
                     dict, self._update_attr_settings(self._config.get(CONF_ATTRIBUTES))
                 )
@@ -369,9 +338,7 @@ class Variable(RestoreSensor):
 
     def _update_attr_settings(self, new_attributes=None, just_pop=False):
         if new_attributes is not None:
-            _LOGGER.debug(
-                f"({self._attr_name}) [update_attr_settings] Updating Special Attributes"
-            )
+            _LOGGER.debug(f"({self._attr_name}) [update_attr_settings] Updating Special Attributes")
             if isinstance(new_attributes, MutableMapping):
                 attributes = copy.deepcopy(new_attributes)
                 for attrib, setting in VARIABLE_ATTR_SETTINGS.items():
@@ -394,9 +361,7 @@ class Variable(RestoreSensor):
     async def async_update_variable(self, **kwargs) -> None:
         """Update Sensor Variable."""
 
-        _LOGGER.debug(
-            f"({self._attr_name}) [async_update_variable] kwargs: {kwargs}"
-        )
+        _LOGGER.debug(f"({self._attr_name}) [async_update_variable] kwargs: {kwargs}")
 
         updated_attributes = None
 
@@ -418,9 +383,7 @@ class Variable(RestoreSensor):
                 try:
                     attributes = yaml.safe_load(attributes)
                 except Exception as err:
-                    _LOGGER.error(
-                        f"({self._attr_name}) Failed to parse attributes string: %s", err
-                    )
+                    _LOGGER.error(f"({self._attr_name}) Failed to parse attributes string: %s", err)
                     attributes = None
             if isinstance(attributes, MutableMapping):
                 _LOGGER.debug(
@@ -451,15 +414,11 @@ class Variable(RestoreSensor):
                 raise ValueError(ERROR)
                 return
             else:
-                _LOGGER.debug(
-                    f"({self._attr_name}) [async_update_variable] New Value: {newval}"
-                )
+                _LOGGER.debug(f"({self._attr_name}) [async_update_variable] New Value: {newval}")
                 self._attr_native_value = newval
 
         if updated_attributes is not None:
-            self._attr_extra_state_attributes = cast(
-                dict, copy.deepcopy(updated_attributes)
-            )
+            self._attr_extra_state_attributes = cast(dict, copy.deepcopy(updated_attributes))
             _LOGGER.debug(
                 f"({self._attr_name}) [async_update_variable] Final Attributes: {updated_attributes}"
             )
@@ -500,7 +459,7 @@ class Variable(RestoreSensor):
             if isinstance(current_value, str):
                 try:
                     current_value = float(current_value)
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     _LOGGER.error(
                         f"({self._attr_name}) Cannot convert current value to number: {current_value}"
                     )
@@ -514,9 +473,7 @@ class Variable(RestoreSensor):
                 if isinstance(new_value, float) and new_value.is_integer():
                     new_value = int(new_value)
 
-            _LOGGER.debug(
-                f"({self._attr_name}) [async_increment_variable] New Value: {new_value}"
-            )
+            _LOGGER.debug(f"({self._attr_name}) [async_increment_variable] New Value: {new_value}")
             self._attr_native_value = new_value
             self.async_write_ha_state()
 
@@ -550,7 +507,7 @@ class Variable(RestoreSensor):
             if isinstance(current_value, str):
                 try:
                     current_value = float(current_value)
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     _LOGGER.error(
                         f"({self._attr_name}) Cannot convert current value to number: {current_value}"
                     )
@@ -564,9 +521,7 @@ class Variable(RestoreSensor):
                 if isinstance(new_value, float) and new_value.is_integer():
                     new_value = int(new_value)
 
-            _LOGGER.debug(
-                f"({self._attr_name}) [async_decrement_variable] New Value: {new_value}"
-            )
+            _LOGGER.debug(f"({self._attr_name}) [async_decrement_variable] New Value: {new_value}")
             self._attr_native_value = new_value
             self.async_write_ha_state()
 
