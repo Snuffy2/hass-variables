@@ -33,6 +33,7 @@ from .const import (
     ATTR_VARIABLE,
     CONF_ATTRIBUTES,
     CONF_ENTITY_PLATFORM,
+    CONF_EXCLUDE_FROM_RECORDER,
     CONF_FORCE_UPDATE,
     CONF_RESTORE,
     CONF_VALUE,
@@ -67,6 +68,27 @@ SERVICE_SET_ENTITY_LEGACY_SCHEMA = vol.Schema(
         vol.Optional(ATTR_ATTRIBUTES): dict,
         vol.Optional(ATTR_REPLACE_ATTRIBUTES, default=DEFAULT_REPLACE_ATTRIBUTES): cv.boolean,
     }
+)
+
+CONFIG_SCHEMA = vol.Schema(
+    {
+        vol.Optional(DOMAIN): vol.Schema(
+            {
+                cv.string: vol.Schema(
+                    {
+                        vol.Optional(CONF_ATTRIBUTES): dict,
+                        vol.Optional(CONF_EXCLUDE_FROM_RECORDER): cv.boolean,
+                        vol.Optional(CONF_FORCE_UPDATE): cv.boolean,
+                        vol.Optional(CONF_NAME): cv.string,
+                        vol.Optional(CONF_RESTORE): cv.boolean,
+                        vol.Optional(CONF_VALUE): cv.match_all,
+                    },
+                    extra=vol.ALLOW_EXTRA,
+                )
+            }
+        )
+    },
+    extra=vol.ALLOW_EXTRA,
 )
 
 
