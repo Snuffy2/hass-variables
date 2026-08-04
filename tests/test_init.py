@@ -1,7 +1,8 @@
 """End-to-end setup orchestration tests for the Variable integration."""
 
+import importlib
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -203,6 +204,74 @@ async def test_unload_entry_removes_active_entity(
     unloaded_state = hass.states.get("sensor.office_temperature")
     assert unloaded_state is not None
     assert unloaded_state.state == STATE_UNAVAILABLE
+
+
+async def test_setup_entry_calls_helper_device_cleanup(
+    hass: HomeAssistant,
+    sensor_entry: ConfigEntry,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Call helper device cleanup before forwarding platform setup.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        sensor_entry: Sensor config entry to set up.
+        monkeypatch: Pytest fixture used to stub helper cleanup.
+    """
+    cleanup = MagicMock()
+    monkeypatch.setattr(
+        "custom_components.variable.async_remove_helper_devices",
+        cleanup,
+    )
+
+    assert await hass.config_entries.async_setup(sensor_entry.entry_id)
+    await hass.async_block_till_done()
+
+    cleanup.assert_any_call(
+        hass,
+        helper_config_entry_id=sensor_entry.entry_id,
+        source_device_id=sensor_entry.data.get("device_id"),
+        remove_all_devices=True,
+    )
+
+
+def test_async_remove_helper_devices_fallback_maps_keyword_arguments(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Map the 2026.8 helper cleanup API onto the legacy device helper.
+
+    Args:
+        monkeypatch: Pytest fixture used to simulate missing helper APIs.
+    """
+    stale_calls: list[tuple[str, str | None]] = []
+
+    def fake_stale(
+        _hass: HomeAssistant,
+        helper_config_entry_id: str,
+        source_device_id: str | None,
+    ) -> None:
+        stale_calls.append((helper_config_entry_id, source_device_id))
+
+    import homeassistant.helpers.helper_integration as helper_integration
+    variable_module = importlib.import_module("custom_components.variable")
+
+    monkeypatch.setattr(
+        "homeassistant.helpers.device.async_remove_stale_devices_links_keep_current_device",
+        fake_stale,
+    )
+    monkeypatch.delattr(helper_integration, "async_remove_helper_devices", raising=False)
+
+    variable_module = importlib.reload(variable_module)
+    try:
+        variable_module.async_remove_helper_devices(
+            None,
+            helper_config_entry_id="entry-1",
+            source_device_id="device-1",
+            remove_all_devices=True,
+        )
+        assert stale_calls == [("entry-1", "device-1")]
+    finally:
+        importlib.reload(variable_module)
 
 
 async def test_remove_entry_cleans_up_entity_registry(
