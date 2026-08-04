@@ -409,12 +409,6 @@ def test_value_to_type_converts_dates(
     assert value_to_type(datetime.date(2026, 7, 24), destination) == expected
 
 
-def test_value_to_type_rejects_invalid_date_destination() -> None:
-    """Reject an unsupported destination for date input."""
-    with pytest.raises(ValueError, match="Invalid dest_type"):
-        value_to_type(datetime.date(2026, 7, 24), "boolean")
-
-
 @pytest.mark.parametrize(
     ("destination", "expected"),
     [
@@ -448,9 +442,23 @@ def test_value_to_type_converts_datetimes(
     assert value_to_type(initial, destination) == expected
 
 
-def test_value_to_type_rejects_invalid_datetime_destination() -> None:
-    """Reject an unsupported destination for datetime input."""
-    initial = datetime.datetime(2026, 7, 24, 12, 30, tzinfo=datetime.UTC)
+@pytest.mark.parametrize(
+    "initial",
+    [
+        pytest.param(datetime.date(2026, 7, 24), id="date"),
+        pytest.param(
+            datetime.datetime(2026, 7, 24, 12, 30, tzinfo=datetime.UTC),
+            id="aware-datetime",
+        ),
+    ],
+)
+def test_value_to_type_rejects_invalid_temporal_destination(
+    initial: datetime.date | datetime.datetime,
+) -> None:
+    """Reject an unsupported destination for temporal input.
 
+    Args:
+        initial: Date or timezone-aware datetime input.
+    """
     with pytest.raises(ValueError, match="Invalid dest_type"):
         value_to_type(initial, "boolean")
