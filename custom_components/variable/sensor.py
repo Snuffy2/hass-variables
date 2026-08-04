@@ -19,7 +19,6 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv, device_registry as dr, entity_platform
-from homeassistant.helpers.device import async_device_info_to_link_from_device_id
 from homeassistant.helpers.entity import generate_entity_id
 import homeassistant.helpers.entity_registry as er
 from homeassistant.util import slugify
@@ -172,10 +171,8 @@ class Variable(RestoreSensor):
         self._attr_native_unit_of_measurement = config.get(CONF_UNIT_OF_MEASUREMENT)
         self._attr_suggested_unit_of_measurement = None
         self._attr_state_class = config.get(CONF_STATE_CLASS)
-        self._attr_device_info = async_device_info_to_link_from_device_id(
-            hass,
-            config.get(CONF_DEVICE_ID),
-        )
+        if (device_id := config.get(CONF_DEVICE_ID)) is not None:
+            self.device_entry = dr.async_get(hass).async_get(device_id)
         # _LOGGER.debug(f"({self._attr_name}) [init] device_id: {config.get(CONF_DEVICE_ID)}, device_info: {self.device_info}")
         if (
             config.get(CONF_ATTRIBUTES) is not None

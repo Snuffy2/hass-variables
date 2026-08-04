@@ -19,8 +19,8 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers.device import async_remove_stale_devices_links_keep_current_device
 import homeassistant.helpers.entity_registry as er
+from homeassistant.helpers.helper_integration import async_remove_helper_devices
 from homeassistant.helpers.reload import async_integration_yaml_config
 from homeassistant.helpers.typing import ConfigType
 import voluptuous as vol
@@ -260,16 +260,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         entry.async_on_unload(entry.add_update_listener(_async_on_entry_update))
 
-    async_remove_stale_devices_links_keep_current_device(
-        hass,
-        entry.entry_id,
-        entry.data.get(CONF_DEVICE_ID),
-    )
     hass.data.setdefault(DOMAIN, {})
     hass_data = dict(entry.data)
     hass.data[DOMAIN][entry.entry_id] = hass_data
     platform = hass_data.get(CONF_ENTITY_PLATFORM)
     if platform in PLATFORMS:
+        async_remove_helper_devices(
+            hass,
+            helper_config_entry_id=entry.entry_id,
+            source_device_id=entry.data.get(CONF_DEVICE_ID),
+            remove_all_devices=True,
+        )
         await hass.config_entries.async_forward_entry_setups(entry, [platform])
     elif hass_data.get(CONF_ENTITY_PLATFORM) == CONF_DEVICE:
         await create_device(hass, entry)
