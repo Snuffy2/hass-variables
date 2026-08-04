@@ -50,12 +50,12 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Skip when release already exists
-        if: steps.check.outputs.exists == 'true'
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          echo "Release ${VERSION} already exists - skipping."
+      # Build the HACS zip in this same job. Releases created with
+      # GITHUB_TOKEN do not cascade into release.yml, so the asset must be
+      # attached here or HACS downloads 404.
+      - name: Create Zip
+        working-directory: custom_components/variable
+        run: zip "$GITHUB_WORKSPACE/variable.zip" -r ./
 
       - name: Create tag and release with changelog
         if: steps.check.outputs.exists == 'false'
@@ -66,4 +66,15 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
             --title "${VERSION}" \
+            variable.zip \
             --generate-notes
+
+      - name: Upload Zip to existing release
+        if: steps.check.outputs.exists == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release upload "${VERSION}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --clobber \
+            variable.zip
