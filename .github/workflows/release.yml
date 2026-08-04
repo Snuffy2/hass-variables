@@ -25,21 +25,9 @@ jobs:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: python .github/scripts/update_version.py
 
-      - name: Commit & Push Version Changes
-        if: github.event_name == 'release' && github.event.release.prerelease == false
-        uses: stefanzweifel/git-auto-commit-action@v7
-        with:
-          branch: ${{ github.event.release.target_commitish }}
-          commit_message: 'Updating to version ${{ github.event.release.tag_name }} [skip ci]'
-
-      - name: Update Release with Version Changes Commit
-        if: github.event_name == 'release' && github.event.release.prerelease == false
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: |
-          git tag -f "$RELEASE_TAG"
-          git push --force origin "$RELEASE_TAG"
-
+      # Build and upload the zip before the version-bump push: master is a
+      # protected branch, so the push can be rejected (GH006) and must not
+      # block the release asset that HACS zip_release downloads.
       - name: Create Zip
         working-directory: custom_components/variable
         run: zip "$GITHUB_WORKSPACE/variable.zip" -r ./
@@ -50,6 +38,23 @@ jobs:
         with:
           files: variable.zip
           tag_name: ${{ github.event.release.tag_name }}
+
+      - name: Commit & Push Version Changes
+        if: github.event_name == 'release' && github.event.release.prerelease == false
+        continue-on-error: true
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          branch: ${{ github.event.release.target_commitish }}
+          commit_message: 'Updating to version ${{ github.event.release.tag_name }} [skip ci]'
+
+      - name: Update Release with Version Changes Commit
+        if: github.event_name == 'release' && github.event.release.prerelease == false
+        continue-on-error: true
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          git tag -f "$RELEASE_TAG"
+          git push --force origin "$RELEASE_TAG"
 
       - name: Add Zip to Action
         if: github.event_name == 'workflow_dispatch'
