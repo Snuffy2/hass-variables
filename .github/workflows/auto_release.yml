@@ -20,6 +20,10 @@ jobs:
   release:
     name: Create Release from Version Bump
     runs-on: ubuntu-latest
+
+    env:
+      GH_TOKEN: ${{ github.token }}
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v7
@@ -39,7 +43,8 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          if gh release view "${VERSION}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+          if gh release view "${VERSION}" \
+            --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
@@ -49,7 +54,8 @@ jobs:
         if: steps.check.outputs.exists == 'true'
         env:
           VERSION: ${{ steps.version.outputs.version }}
-        run: echo "Release ${VERSION} already exists - skipping."
+        run: |
+          echo "Release ${VERSION} already exists - skipping."
 
       - name: Create tag and release with changelog
         if: steps.check.outputs.exists == 'false'
@@ -60,4 +66,3 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
             --title "${VERSION}" \
-            --generate-notes
