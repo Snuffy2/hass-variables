@@ -1,7 +1,7 @@
 from collections.abc import MutableMapping
 import copy
 import logging
-from typing import Optional, cast, final
+from typing import cast, final
 
 from homeassistant.components.device_tracker.config_entry import TrackerEntity
 from homeassistant.components.device_tracker.const import (
@@ -25,9 +25,7 @@ from homeassistant.const import (
     Platform,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import config_validation as cv, entity_platform
-from homeassistant.helpers.device import async_device_info_to_link_from_device_id
-from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers import config_validation as cv, device_registry as dr, entity_platform
 from homeassistant.helpers.entity import generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 import homeassistant.helpers.entity_registry as er
@@ -148,13 +146,8 @@ class Variable(RestoreEntity, TrackerEntity):
         self._force_update = config.get(CONF_FORCE_UPDATE)
         self._yaml_variable = config.get(CONF_YAML_VARIABLE)
         self._exclude_from_recorder = config.get(CONF_EXCLUDE_FROM_RECORDER)
-        self._attr_device_info = cast(
-            Optional[DeviceInfo],
-            async_device_info_to_link_from_device_id(
-                hass,
-                config.get(CONF_DEVICE_ID),
-            ),
-        )
+        if (device_id := config.get(CONF_DEVICE_ID)) is not None:
+            self.device_entry = dr.async_get(hass).async_get(device_id)
         if (
             config.get(CONF_ATTRIBUTES) is not None
             and config.get(CONF_ATTRIBUTES)
@@ -406,11 +399,6 @@ class Variable(RestoreEntity, TrackerEntity):
         if self._attr_location_name is not None:
             attr[ATTR_LOCATION_NAME] = self._attr_location_name
         return attr
-
-    @property
-    def device_info(self) -> Optional[DeviceInfo]:  # type: ignore[override]
-        """Return device info."""
-        return self._attr_device_info
 
 
 class VariableNoRecorder(Variable):

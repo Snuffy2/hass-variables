@@ -18,8 +18,12 @@ from homeassistant.const import (
     Platform,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import config_validation as cv, entity_platform, selector
-from homeassistant.helpers.device import async_device_info_to_link_from_device_id
+from homeassistant.helpers import (
+    config_validation as cv,
+    device_registry as dr,
+    entity_platform,
+    selector,
+)
 from homeassistant.helpers.entity import generate_entity_id
 import homeassistant.helpers.entity_registry as er
 from homeassistant.helpers.restore_state import RestoreEntity
@@ -153,10 +157,8 @@ class Variable(BinarySensorEntity, RestoreEntity):  # type: ignore[misc]
         self._force_update = config.get(CONF_FORCE_UPDATE)
         self._yaml_variable = config.get(CONF_YAML_VARIABLE)
         self._exclude_from_recorder = config.get(CONF_EXCLUDE_FROM_RECORDER)
-        self._attr_device_info = async_device_info_to_link_from_device_id(
-            hass,
-            config.get(CONF_DEVICE_ID),
-        )
+        if (device_id := config.get(CONF_DEVICE_ID)) is not None:
+            self.device_entry = dr.async_get(hass).async_get(device_id)
         if (
             config.get(CONF_ATTRIBUTES) is not None
             and config.get(CONF_ATTRIBUTES)

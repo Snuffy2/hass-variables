@@ -19,8 +19,8 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers.device import async_remove_stale_devices_links_keep_current_device
 import homeassistant.helpers.entity_registry as er
+from homeassistant.helpers.helper_integration import async_remove_helper_devices
 from homeassistant.helpers.reload import async_integration_yaml_config
 from homeassistant.helpers.typing import ConfigType
 import voluptuous as vol
@@ -260,16 +260,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         entry.async_on_unload(entry.add_update_listener(_async_on_entry_update))
 
-    async_remove_stale_devices_links_keep_current_device(
-        hass,
-        entry.entry_id,
-        entry.data.get(CONF_DEVICE_ID),
-    )
     hass.data.setdefault(DOMAIN, {})
     hass_data = dict(entry.data)
     hass.data[DOMAIN][entry.entry_id] = hass_data
     platform = hass_data.get(CONF_ENTITY_PLATFORM)
     if platform in PLATFORMS:
+        async_remove_helper_devices(
+            hass,
+            helper_config_entry_id=entry.entry_id,
+            source_device_id=entry.data.get(CONF_DEVICE_ID),
+            remove_all_devices=True,
+        )
         await hass.config_entries.async_forward_entry_setups(entry, [platform])
     elif hass_data.get(CONF_ENTITY_PLATFORM) == CONF_DEVICE:
         await create_device(hass, entry)
@@ -291,22 +292,21 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok:
         # Remove stored hass data
         hass.data[DOMAIN].pop(entry.entry_id)
-        # Also remove any entity registry entries tied to this config entry to
-        # avoid leaving orphaned entities without unique_id in the Entities list.
-        try:
-            registry = er.async_get(hass)
-            entries = er.async_entries_for_config_entry(registry, entry.entry_id)
-            for entity_entry in list(entries):
-                _LOGGER.debug(
-                    f"Removing entity registry entry for unloaded config: {entity_entry.entity_id}"
-                )
-                try:
-                    registry.async_remove(entity_entry.entity_id)
-                except Exception:
-                    _LOGGER.exception(
-                        f"Failed to remove entity registry entry: {entity_entry.entity_id}"
-                    )
-        except Exception:
-            _LOGGER.exception("Error cleaning up entity registry on unload")
 
     return unload_ok
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Remove entity registry entries tied to a config entry.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        entry: Config entry being permanently removed.
+    """
+    registry = er.async_get(hass)
+    entries = er.async_entries_for_config_entry(registry, entry.entry_id)
+    for entity_entry in entries:
+        _LOGGER.debug(
+            f"Removing entity registry entry for removed config: {entity_entry.entity_id}"
+        )
+        registry.async_remove(entity_entry.entity_id)
