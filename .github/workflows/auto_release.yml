@@ -1,0 +1,63 @@
+name: Auto Release on Version Bump
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - custom_components/variable/manifest.json
+      - custom_components/variable/const.py
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Create Release from Version Bump
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+        with:
+          # Full history is needed for the generated changelog.
+          fetch-depth: 0
+
+      - name: Read version from manifest.json
+        id: version
+        run: |
+          VERSION="$(python -c 'import json; print(json.load(open("custom_components/variable/manifest.json"))["version"])')"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Version: ${VERSION}"
+
+      - name: Check if release already exists
+        id: check
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if gh release view "${VERSION}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip when release already exists
+        if: steps.check.outputs.exists == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: echo "Release ${VERSION} already exists - skipping."
+
+      - name: Create tag and release with changelog
+        if: steps.check.outputs.exists == 'false'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "${VERSION}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${GITHUB_SHA}" \
+            --title "${VERSION}" \
+            --generate-notes
