@@ -65,12 +65,14 @@ async def create_device(hass: HomeAssistant, entry: ConfigEntry) -> None:
         _LOGGER.debug(f"({device.name}) [create_device] Reloading all Variable entities")
         reload_entities = domain_entities
 
+    scheduled_entry_ids: set[str] = set()
     for entity in reload_entities:
         # May actually want to do this for all entities, will see
         if entity.platform != DOMAIN:
             continue
         _LOGGER.debug(f"({device.name}) [create_device] Reloading entity_id: {entity.entity_id}")
-        if entity.config_entry_id:
+        if entity.config_entry_id and entity.config_entry_id not in scheduled_entry_ids:
+            scheduled_entry_ids.add(entity.config_entry_id)
             hass.config_entries.async_schedule_reload(entity.config_entry_id)
 
 

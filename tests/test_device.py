@@ -109,8 +109,7 @@ async def test_create_device_reloads_only_linked_variable_entities(
 
     await create_device(hass, device_entry)
 
-    scheduled_entry_ids = {call.args[0] for call in schedule_reload.call_args_list}
-    assert scheduled_entry_ids == {linked_entry.entry_id}
+    schedule_reload.assert_called_once_with(linked_entry.entry_id)
 
 
 async def test_update_device_changes_all_registry_metadata(
