@@ -66,3 +66,4 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
             --title "${VERSION}" \
+            --generate-notes
