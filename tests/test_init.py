@@ -11,6 +11,7 @@ from homeassistant.const import (
     ATTR_LONGITUDE,
     SERVICE_RELOAD,
     STATE_ON,
+    STATE_UNAVAILABLE,
     Platform,
 )
 from homeassistant.core import HomeAssistant
@@ -182,11 +183,11 @@ async def test_setup_entry_creates_platform_entity(
     assert registry_entry.config_entry_id == entry.entry_id
 
 
-async def test_unload_entry_removes_entity(
+async def test_unload_entry_removes_active_entity(
     hass: HomeAssistant,
     sensor_entry: ConfigEntry,
 ) -> None:
-    """Unload a platform entry and remove both state and registry records.
+    """Unload a platform entry and remove its active entity state.
 
     Args:
         hass: Home Assistant instance that hosts the integration.
@@ -199,5 +200,26 @@ async def test_unload_entry_removes_entity(
     assert await hass.config_entries.async_unload(sensor_entry.entry_id)
     await hass.async_block_till_done()
 
-    assert hass.states.get("sensor.office_temperature") is None
+    unloaded_state = hass.states.get("sensor.office_temperature")
+    assert unloaded_state is not None
+    assert unloaded_state.state == STATE_UNAVAILABLE
+
+
+async def test_remove_entry_cleans_up_entity_registry(
+    hass: HomeAssistant,
+    sensor_entry: ConfigEntry,
+) -> None:
+    """Remove a config entry and clean up its entity registry record.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        sensor_entry: Sensor config entry to set up and remove.
+    """
+    assert await hass.config_entries.async_setup(sensor_entry.entry_id)
+    await hass.async_block_till_done()
+    assert er.async_get(hass).async_get("sensor.office_temperature") is not None
+
+    await hass.config_entries.async_remove(sensor_entry.entry_id)
+    await hass.async_block_till_done()
+
     assert er.async_get(hass).async_get("sensor.office_temperature") is None

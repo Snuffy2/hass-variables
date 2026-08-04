@@ -292,22 +292,21 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok:
         # Remove stored hass data
         hass.data[DOMAIN].pop(entry.entry_id)
-        # Also remove any entity registry entries tied to this config entry to
-        # avoid leaving orphaned entities without unique_id in the Entities list.
-        try:
-            registry = er.async_get(hass)
-            entries = er.async_entries_for_config_entry(registry, entry.entry_id)
-            for entity_entry in list(entries):
-                _LOGGER.debug(
-                    f"Removing entity registry entry for unloaded config: {entity_entry.entity_id}"
-                )
-                try:
-                    registry.async_remove(entity_entry.entity_id)
-                except Exception:
-                    _LOGGER.exception(
-                        f"Failed to remove entity registry entry: {entity_entry.entity_id}"
-                    )
-        except Exception:
-            _LOGGER.exception("Error cleaning up entity registry on unload")
 
     return unload_ok
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Remove entity registry entries tied to a config entry.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        entry: Config entry being permanently removed.
+    """
+    registry = er.async_get(hass)
+    entries = er.async_entries_for_config_entry(registry, entry.entry_id)
+    for entity_entry in entries:
+        _LOGGER.debug(
+            f"Removing entity registry entry for removed config: {entity_entry.entity_id}"
+        )
+        registry.async_remove(entity_entry.entity_id)
