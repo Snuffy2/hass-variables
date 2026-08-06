@@ -1,13 +1,16 @@
 """Variable implementation for Home Assistant."""
 
+from collections.abc import Mapping
 import contextlib
 import copy
-import json
 import logging
+from typing import Any
 
+from homeassistant.components import sensor as ha_sensor
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.const import (
     CONF_DEVICE,
+    CONF_DEVICE_CLASS,
     CONF_DEVICE_ID,
     CONF_ENTITY_ID,
     CONF_FRIENDLY_NAME,
@@ -36,6 +39,7 @@ from .const import (
     CONF_FORCE_UPDATE,
     CONF_RESTORE,
     CONF_VALUE,
+    CONF_VALUE_TYPE,
     CONF_VARIABLE_ID,
     CONF_YAML_PRESENT,
     CONF_YAML_VARIABLE,
@@ -183,11 +187,38 @@ async def async_setup(hass: HomeAssistant, config: ConfigType):
     )
     hass.services.async_register(DOMAIN, SERVICE_RELOAD, _async_reload_service_handler)
 
-    return await _async_process_yaml(hass, config)
+    return await _async_process_yaml(hass, config, wait_for_completion=False)
 
 
-async def _async_process_yaml(hass: HomeAssistant, config: ConfigType) -> bool:
-    variables = json.loads(json.dumps(config.get(DOMAIN, {})))
+async def _async_process_yaml(
+    hass: HomeAssistant,
+    config: ConfigType,
+    *,
+    wait_for_completion: bool = True,
+) -> bool:
+    """Reconcile YAML-defined variables with their config entries.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config: Complete Home Assistant configuration containing this domain.
+        wait_for_completion: Whether to wait for config-entry lifecycle work.
+            This must be false during initial integration setup to avoid a
+            config-entry setup cycle.
+
+    Returns:
+        True after all YAML imports, updates, and removals have completed.
+    """
+    variables = copy.deepcopy(config.get(DOMAIN, {}))
+    entries_by_variable_id: dict[str, list[ConfigEntry]] = {}
+    yaml_entries_by_variable_id: dict[str, list[ConfigEntry]] = {}
+
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        variable_id = entry.data.get(CONF_VARIABLE_ID)
+        if not isinstance(variable_id, str):
+            continue
+        entries_by_variable_id.setdefault(variable_id, []).append(entry)
+        if entry.data.get(CONF_YAML_VARIABLE, False):
+            yaml_entries_by_variable_id.setdefault(variable_id, []).append(entry)
 
     for var, var_fields in variables.items():
         if var is not None:
@@ -198,73 +229,104 @@ async def _async_process_yaml(hass: HomeAssistant, config: ConfigType) -> bool:
                 if var_empty is None:
                     var_fields.pop(key_empty)
 
-            attr = var_fields.get(CONF_ATTRIBUTES, {})
-            icon = attr.pop(CONF_ICON, None)
-            name = var_fields.get(CONF_NAME, attr.pop(CONF_FRIENDLY_NAME, None))
-            attr.pop(CONF_FRIENDLY_NAME, None)
-
-            if var not in {
-                entry.data.get(CONF_VARIABLE_ID)
-                for entry in hass.config_entries.async_entries(DOMAIN)
-            }:
-                _LOGGER.warning(f"[YAML] Creating New Sensor Variable: {var}")
-                hass.async_create_task(
-                    hass.config_entries.flow.async_init(
-                        DOMAIN,
-                        context={"source": SOURCE_IMPORT},
-                        data={
-                            CONF_ENTITY_PLATFORM: Platform.SENSOR,
-                            CONF_VARIABLE_ID: var,
-                            CONF_NAME: name,
-                            CONF_VALUE: var_fields.get(CONF_VALUE),
-                            CONF_RESTORE: var_fields.get(CONF_RESTORE),
-                            CONF_FORCE_UPDATE: var_fields.get(CONF_FORCE_UPDATE),
-                            CONF_ATTRIBUTES: attr,
-                            CONF_ICON: icon,
-                        },
-                    )
+            yaml_entries = yaml_entries_by_variable_id.get(var, [])
+            if not yaml_entries and var in entries_by_variable_id:
+                _LOGGER.error(
+                    "[YAML] Cannot import %s because that variable ID belongs to a UI-created entry",
+                    var,
                 )
+                continue
+
+            if not yaml_entries:
+                _LOGGER.warning(f"[YAML] Creating New Sensor Variable: {var}")
+                import_flow = hass.config_entries.flow.async_init(
+                    DOMAIN,
+                    context={"source": SOURCE_IMPORT},
+                    data=_yaml_entry_data(var, var_fields),
+                )
+                if wait_for_completion:
+                    await import_flow
+                else:
+                    hass.async_create_task(import_flow)
             else:
                 _LOGGER.info(f"[YAML] Updating Existing Sensor Variable: {var}")
-
-                entry = None
-                entry_id = None
-                for ent in hass.config_entries.async_entries(DOMAIN):
-                    if var == ent.data.get(CONF_VARIABLE_ID):
-                        entry = ent
-                        entry_id = ent.entry_id
-                        break
-                # _LOGGER.debug(f"[YAML] entry_id: {entry_id}")
-                if entry_id and entry is not None:
-                    # _LOGGER.debug(f"[YAML] entry before: {entry.as_dict()}")
-
-                    for m in dict(entry.data).keys():
-                        var_fields.setdefault(m, entry.data[m])
-                    var_fields.update({CONF_YAML_PRESENT: True})
-                    # _LOGGER.debug(f"[YAML] Updated var_fields: {var_fields}")
-                    hass.config_entries.async_update_entry(entry, data=var_fields, options={})
-
-                    hass.async_create_task(hass.config_entries.async_reload(entry_id))
-
+                entry = yaml_entries[0]
+                yaml_data = _yaml_entry_data(var, var_fields)
+                hass.config_entries.async_update_entry(entry, data=yaml_data)
+                reload_entry = hass.config_entries.async_reload(entry.entry_id)
+                if wait_for_completion:
+                    await reload_entry
                 else:
-                    _LOGGER.error(f"[YAML] Update Error. Could not find entry_id for: {var}")
+                    hass.async_create_task(reload_entry)
 
     # Remove any config entries that were originally created from YAML imports
     # but are no longer present in the current YAML configuration.
-    try:
-        yaml_variable_ids = set(variables.keys())
-        for entry in hass.config_entries.async_entries(DOMAIN):
-            if entry.data.get(CONF_YAML_VARIABLE, False) is True:
-                var_id = entry.data.get(CONF_VARIABLE_ID)
-                if var_id and var_id not in yaml_variable_ids:
-                    _LOGGER.warning(
-                        f"[YAML] YAML Entry no longer exists in configuration, deleting entry: {var_id}"
-                    )
-                    hass.async_create_task(hass.config_entries.async_remove(entry.entry_id))
-    except Exception:
-        _LOGGER.exception("Error while cleaning up removed YAML variable entries")
+    yaml_variable_ids = set(variables)
+    for entries in yaml_entries_by_variable_id.values():
+        for entry in entries:
+            variable_id = entry.data.get(CONF_VARIABLE_ID)
+            if variable_id not in yaml_variable_ids:
+                _LOGGER.warning(
+                    "[YAML] YAML Entry no longer exists in configuration, deleting entry: %s",
+                    variable_id,
+                )
+                remove_entry = hass.config_entries.async_remove(entry.entry_id)
+                if wait_for_completion:
+                    await remove_entry
+                else:
+                    hass.async_create_task(remove_entry)
 
     return True
+
+
+def _yaml_entry_data(variable_id: str, variable_config: Mapping[str, Any]) -> dict[str, object]:
+    """Build the complete config-entry data owned by one YAML variable.
+
+    Args:
+        variable_id: YAML mapping key that identifies the variable.
+        variable_config: Configuration supplied for that variable.
+
+    Returns:
+        Config entry data which contains only the current YAML settings and
+        required YAML provenance fields.
+    """
+    yaml_config = copy.deepcopy(dict(variable_config))
+    attributes = yaml_config.pop(CONF_ATTRIBUTES, {})
+    icon = attributes.pop(CONF_ICON, None)
+    name = yaml_config.pop(CONF_NAME, attributes.pop(CONF_FRIENDLY_NAME, None))
+    attributes.pop(CONF_FRIENDLY_NAME, None)
+
+    entry_data: dict[str, object] = {
+        CONF_ENTITY_PLATFORM: Platform.SENSOR,
+        CONF_VARIABLE_ID: variable_id,
+        CONF_YAML_VARIABLE: True,
+        CONF_ATTRIBUTES: attributes,
+    }
+    for key in (
+        CONF_VALUE,
+        CONF_RESTORE,
+        CONF_FORCE_UPDATE,
+        CONF_EXCLUDE_FROM_RECORDER,
+    ):
+        value = yaml_config.get(key)
+        if value is not None:
+            entry_data[key] = value
+    if name is not None:
+        entry_data[CONF_NAME] = name
+    if icon is not None:
+        entry_data[CONF_ICON] = icon
+
+    device_class = attributes.get(CONF_DEVICE_CLASS)
+    if device_class == ha_sensor.SensorDeviceClass.DATE:
+        entry_data[CONF_VALUE_TYPE] = "date"
+    elif device_class == ha_sensor.SensorDeviceClass.TIMESTAMP:
+        entry_data[CONF_VALUE_TYPE] = "datetime"
+    elif device_class == ha_sensor.SensorDeviceClass.MONETARY:
+        entry_data[CONF_VALUE_TYPE] = "string"
+    elif device_class is not None:
+        entry_data[CONF_VALUE_TYPE] = "number"
+
+    return entry_data
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
