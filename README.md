@@ -188,8 +188,9 @@ Used to update the value or attributes of a Device Tracker Variable
 | `Targets`              | `target:`<br />&nbsp;&nbsp;`entity_id:` | `Yes`    |         | The entity_ids of one or more device tracker variables to update (ex. `device_tracker.test_variable`) |
 | `Latitude`             | `latitude`                              | `No`     |         | Latitude                                                                                              |
 | `Longitude`            | `longitude`                             | `No`     |         | Longitude                                                                                             |
-| `Location Name`        | `location_name`                         | `No`     |         | If set, will show this as the state                                                                   |
-| `Delete Location Name` | `delete_location_name`                  | `No`     |         | Remove the Location Name so state will be based on Lat/Long (`boolean`)                               |
+| `Location Name`        | `location_name`                         | `No`     |         | HA 2026.3.4–2026.5: free-form value sets state.<br />HA 2026.6+: `location_name` attribute; does not set state |
+| `Delete Location Name` | `delete_location_name`                  | `No`     |         | Removes location context (`boolean`). HA 2026.3.4–2026.5: removes legacy state so it can use Lat/Long.<br />HA 2026.6+: removes only the attribute; does not drive state |
+| `In Zones`             | `in_zones`                              | `No`     |         | HA 2026.6+ only: list of zone entity IDs that controls state. State can also be derived from coordinates |
 | `GPS Accuracy`         | `gps_accuracy`                          | `No`     |         | Accuracy in meters                                                                                    |
 | `Battery Level`        | `battery_level`                         | `No`     |         | Battery level from 0-100%                                                                             |
 
