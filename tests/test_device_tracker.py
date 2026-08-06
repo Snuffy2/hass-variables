@@ -2,8 +2,6 @@
 
 import ast
 from pathlib import Path
-from typing import ClassVar
-import unittest
 
 from homeassistant.components.device_tracker.const import ATTR_LOCATION_NAME
 from homeassistant.const import (
@@ -462,78 +460,83 @@ DEVICE_TRACKER_PATH = (
 )
 
 
-class DeviceTrackerDeprecationTests(unittest.TestCase):
-    """Verify the integration avoids deprecated device tracker APIs."""
+@pytest.fixture(scope="module")
+def device_tracker_ast() -> tuple[ast.Module, ast.ClassDef]:
+    """Parse the device tracker platform once for all tests."""
+    module = ast.parse(DEVICE_TRACKER_PATH.read_text(encoding="utf-8"))
+    variable_class = next(
+        node for node in module.body if isinstance(node, ast.ClassDef) and node.name == "Variable"
+    )
+    return module, variable_class
 
-    module: ClassVar[ast.Module]
-    variable_class: ClassVar[ast.ClassDef]
 
-    @classmethod
-    def setUpClass(cls) -> None:
-        """Parse the device tracker platform once for all tests."""
-        cls.module = ast.parse(DEVICE_TRACKER_PATH.read_text(encoding="utf-8"))
-        cls.variable_class = next(
-            node
-            for node in cls.module.body
-            if isinstance(node, ast.ClassDef) and node.name == "Variable"
+def test_tracker_entity_is_imported_from_public_module(
+    device_tracker_ast: tuple[ast.Module, ast.ClassDef],
+) -> None:
+    """TrackerEntity should use Home Assistant's public import path."""
+    module, _ = device_tracker_ast
+    tracker_imports = [
+        node.module
+        for node in module.body
+        if isinstance(node, ast.ImportFrom)
+        and any(alias.name == "TrackerEntity" for alias in node.names)
+    ]
+
+    assert tracker_imports == ["homeassistant.components.device_tracker"]
+
+
+def test_variable_does_not_override_location_name(
+    device_tracker_ast: tuple[ast.Module, ast.ClassDef],
+) -> None:
+    """Variable should not override the deprecated location_name property."""
+    _, variable_class = device_tracker_ast
+    method_names = {
+        node.name
+        for node in variable_class.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+
+    assert "location_name" not in method_names
+
+
+def test_legacy_location_name_attribute_is_capability_gated(
+    device_tracker_ast: tuple[ast.Module, ast.ClassDef],
+) -> None:
+    """Only the legacy compatibility helper may use the deprecated shorthand."""
+    module, variable_class = device_tracker_ast
+    legacy_usage_methods = [
+        node.name
+        for node in variable_class.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and any(
+            attribute.attr == "_attr_location_name"
+            for attribute in ast.walk(node)
+            if isinstance(attribute, ast.Attribute)
         )
+    ]
 
-    def test_tracker_entity_is_imported_from_public_module(self) -> None:
-        """TrackerEntity should use Home Assistant's public import path."""
-        tracker_imports = [
-            node.module
-            for node in self.module.body
-            if isinstance(node, ast.ImportFrom)
-            and any(alias.name == "TrackerEntity" for alias in node.names)
-        ]
-
-        self.assertEqual(tracker_imports, ["homeassistant.components.device_tracker"])
-
-    def test_variable_does_not_override_location_name(self) -> None:
-        """Variable should not override the deprecated location_name property."""
-        method_names = {
-            node.name
-            for node in self.variable_class.body
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-        }
-
-        self.assertNotIn("location_name", method_names)
-
-    def test_legacy_location_name_attribute_is_capability_gated(self) -> None:
-        """Only the legacy compatibility helper may use the deprecated shorthand."""
-        legacy_usage_methods = [
-            node.name
-            for node in self.variable_class.body
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and any(
-                attribute.attr == "_attr_location_name"
-                for attribute in ast.walk(node)
-                if isinstance(attribute, ast.Attribute)
-            )
-        ]
-
-        self.assertEqual(legacy_usage_methods, ["_set_location_name"])
-        setter = next(
-            node
-            for node in self.variable_class.body
-            if isinstance(node, ast.FunctionDef) and node.name == "_set_location_name"
+    assert legacy_usage_methods == ["_set_location_name"]
+    setter = next(
+        node
+        for node in variable_class.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_set_location_name"
+    )
+    conditions = [node.test for node in ast.walk(setter) if isinstance(node, ast.If)]
+    assert len(conditions) == 1
+    condition = conditions[0]
+    assert isinstance(condition, ast.UnaryOp)
+    assert isinstance(condition.op, ast.Not)
+    assert isinstance(condition.operand, ast.Name)
+    assert condition.operand.id == "SUPPORTS_TRACKER_IN_ZONES"
+    capability_flag = next(
+        node
+        for node in module.body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "SUPPORTS_TRACKER_IN_ZONES"
+            for target in node.targets
         )
-        conditions = [node.test for node in ast.walk(setter) if isinstance(node, ast.If)]
-        self.assertEqual(len(conditions), 1)
-        condition = conditions[0]
-        self.assertIsInstance(condition, ast.UnaryOp)
-        self.assertIsInstance(condition.op, ast.Not)
-        self.assertIsInstance(condition.operand, ast.Name)
-        self.assertEqual(condition.operand.id, "SUPPORTS_TRACKER_IN_ZONES")
-        capability_flag = next(
-            node
-            for node in self.module.body
-            if isinstance(node, ast.Assign)
-            and any(
-                isinstance(target, ast.Name) and target.id == "SUPPORTS_TRACKER_IN_ZONES"
-                for target in node.targets
-            )
-        )
-        self.assertIsInstance(capability_flag.value, ast.Call)
-        self.assertIsInstance(capability_flag.value.func, ast.Name)
-        self.assertEqual(capability_flag.value.func.id, "hasattr")
+    )
+    assert isinstance(capability_flag.value, ast.Call)
+    assert isinstance(capability_flag.value.func, ast.Name)
+    assert capability_flag.value.func.id == "hasattr"
