@@ -357,24 +357,9 @@ class Variable(RestoreEntity, TrackerEntity):
             )
 
     @property
-    def should_poll(self):  # type: ignore[override]
-        """If entity should be polled."""
-        return False
-
-    @property
     def force_update(self) -> bool:  # type: ignore[override]
         """Force update status of the entity."""
         return self._force_update
-
-    @property
-    def latitude(self):  # type: ignore[override]
-        """Return latitude value of the device."""
-        return self._attr_latitude
-
-    @property
-    def longitude(self):  # type: ignore[override]
-        """Return longitude value of the device."""
-        return self._attr_longitude
 
     @property
     def location_accuracy(self) -> int:  # type: ignore[override]
