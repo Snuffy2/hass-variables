@@ -325,10 +325,7 @@ class Variable(RestoreEntity, TrackerEntity):
             self._attr_battery_level = kwargs.get(ATTR_BATTERY_LEVEL)
         if ATTR_GPS_ACCURACY in kwargs:
             self._attr_gps_accuracy = kwargs.get(ATTR_GPS_ACCURACY)
-        if (
-            ATTR_DELETE_LOCATION_NAME in kwargs
-            and kwargs.get(ATTR_DELETE_LOCATION_NAME) is True
-        ):
+        if ATTR_DELETE_LOCATION_NAME in kwargs and kwargs.get(ATTR_DELETE_LOCATION_NAME) is True:
             self._location_name = None
         try:
             self.async_write_ha_state()
@@ -346,6 +343,13 @@ class Variable(RestoreEntity, TrackerEntity):
     def force_update(self) -> bool:  # type: ignore[override]
         """Force update status of the entity."""
         return self._force_update
+
+    @property
+    def state(self) -> str | None:
+        """Return the configured location or the calculated tracker state."""
+        if self._location_name is not None:
+            return self._location_name
+        return super().state
 
     @property
     def source_type(self) -> SourceType:
