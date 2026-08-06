@@ -278,8 +278,7 @@ class DeviceTrackerDeprecationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         """Parse the device tracker platform once for all tests."""
-        cls.source = DEVICE_TRACKER_PATH.read_text(encoding="utf-8")
-        cls.module = ast.parse(cls.source)
+        cls.module = ast.parse(DEVICE_TRACKER_PATH.read_text(encoding="utf-8"))
         cls.variable_class = next(
             node
             for node in cls.module.body
@@ -298,7 +297,7 @@ class DeviceTrackerDeprecationTests(unittest.TestCase):
         self.assertEqual(tracker_imports, ["homeassistant.components.device_tracker"])
 
     def test_variable_does_not_override_location_name(self) -> None:
-        """Variable should let TrackerEntity calculate location state."""
+        """Variable should not override the deprecated location_name property."""
         method_names = {
             node.name
             for node in self.variable_class.body
