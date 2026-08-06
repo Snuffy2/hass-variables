@@ -21,6 +21,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers import device_registry as dr
+import pytest
 from pytest_homeassistant_custom_component.common import mock_restore_cache
 
 from custom_components.variable.const import (
@@ -211,6 +212,76 @@ async def test_device_tracker_update_and_delete_services(
     assert deleted.state == STATE_NOT_HOME
 
 
+async def test_legacy_device_tracker_location_name_state_compatibility(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Preserve location-name state when running on HA before 2026.6.
+
+    Args:
+        hass: Home Assistant test instance.
+        config_entry_factory: Factory for test configuration entries.
+        monkeypatch: Pytest fixture for selecting the legacy capability path.
+    """
+    monkeypatch.setattr(
+        "custom_components.variable.device_tracker.SUPPORTS_TRACKER_IN_ZONES",
+        False,
+    )
+    entity_id = "device_tracker.legacy_location_tracker"
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.DEVICE_TRACKER,
+            CONF_VARIABLE_ID: "legacy_location_tracker",
+            ATTR_LOCATION_NAME: "Studio",
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    initial = hass.states.get(entity_id)
+    assert initial is not None
+    assert initial.state == "Studio"
+    assert initial.attributes[ATTR_LOCATION_NAME] == "Studio"
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_UPDATE_DEVICE_TRACKER,
+        {
+            "entity_id": [entity_id],
+            ATTR_ATTRIBUTES: {ATTR_LOCATION_NAME: "Archive"},
+        },
+        blocking=True,
+    )
+    attribute_updated = hass.states.get(entity_id)
+    assert attribute_updated is not None
+    assert attribute_updated.state == "Archive"
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_UPDATE_DEVICE_TRACKER,
+        {"entity_id": [entity_id], ATTR_LOCATION_NAME: "Workshop"},
+        blocking=True,
+    )
+    service_updated = hass.states.get(entity_id)
+    assert service_updated is not None
+    assert service_updated.state == "Workshop"
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_UPDATE_DEVICE_TRACKER,
+        {"entity_id": [entity_id], ATTR_DELETE_LOCATION_NAME: True},
+        blocking=True,
+    )
+    deleted = hass.states.get(entity_id)
+    assert deleted is not None
+    assert deleted.state == STATE_UNKNOWN
+    assert ATTR_LOCATION_NAME not in deleted.attributes
+
+
 async def test_device_tracker_in_zones_service_and_delete(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,
@@ -311,10 +382,41 @@ class DeviceTrackerDeprecationTests(unittest.TestCase):
 
         self.assertNotIn("location_name", method_names)
 
-    def test_deprecated_location_name_attribute_is_not_set(self) -> None:
-        """Variable should not set TrackerEntity's deprecated shorthand."""
-        attribute_names = {
-            node.attr for node in ast.walk(self.variable_class) if isinstance(node, ast.Attribute)
-        }
+    def test_legacy_location_name_attribute_is_capability_gated(self) -> None:
+        """Only the legacy compatibility helper may use the deprecated shorthand."""
+        legacy_usage_methods = [
+            node.name
+            for node in self.variable_class.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and any(
+                attribute.attr == "_attr_location_name"
+                for attribute in ast.walk(node)
+                if isinstance(attribute, ast.Attribute)
+            )
+        ]
 
-        self.assertNotIn("_attr_location_name", attribute_names)
+        self.assertEqual(legacy_usage_methods, ["_set_location_name"])
+        setter = next(
+            node
+            for node in self.variable_class.body
+            if isinstance(node, ast.FunctionDef) and node.name == "_set_location_name"
+        )
+        conditions = [node.test for node in ast.walk(setter) if isinstance(node, ast.If)]
+        self.assertEqual(len(conditions), 1)
+        condition = conditions[0]
+        self.assertIsInstance(condition, ast.UnaryOp)
+        self.assertIsInstance(condition.op, ast.Not)
+        self.assertIsInstance(condition.operand, ast.Name)
+        self.assertEqual(condition.operand.id, "SUPPORTS_TRACKER_IN_ZONES")
+        capability_flag = next(
+            node
+            for node in self.module.body
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name) and target.id == "SUPPORTS_TRACKER_IN_ZONES"
+                for target in node.targets
+            )
+        )
+        self.assertIsInstance(capability_flag.value, ast.Call)
+        self.assertIsInstance(capability_flag.value.func, ast.Name)
+        self.assertEqual(capability_flag.value.func.id, "hasattr")
