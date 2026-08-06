@@ -51,14 +51,14 @@ async def test_device_tracker_restore_cache_is_applied_during_config_entry_setup
         config_entry_factory: Factory for test configuration entries.
     """
     entity_id = "device_tracker.restored_tracker"
-    restored_state = "Studio"
+    restored_location_name = "Studio"
     restored_attributes = {
         ATTR_LATITUDE: 41.25,
         ATTR_LONGITUDE: -74.75,
-        ATTR_LOCATION_NAME: "Studio",
+        ATTR_LOCATION_NAME: restored_location_name,
         "source": "tracker-cache",
     }
-    cached_state = State(entity_id, restored_state, restored_attributes)
+    cached_state = State(entity_id, restored_location_name, restored_attributes)
     mock_restore_cache(hass, [cached_state])
     entry = config_entry_factory(
         {
@@ -78,7 +78,7 @@ async def test_device_tracker_restore_cache_is_applied_during_config_entry_setup
 
     state = hass.states.get(entity_id)
     assert state is not None
-    assert state.state == restored_state
+    assert state.state == STATE_NOT_HOME
     assert state.attributes["source"] == restored_attributes["source"]
     for attribute in (ATTR_LATITUDE, ATTR_LONGITUDE, ATTR_LOCATION_NAME):
         assert state.attributes[attribute] == restored_attributes[attribute]
@@ -187,7 +187,8 @@ async def test_device_tracker_update_and_delete_services(
     )
     updated = hass.states.get(entity_id)
     assert updated is not None
-    assert updated.state == "Workshop"
+    assert updated.state == STATE_NOT_HOME
+    assert updated.attributes[ATTR_LOCATION_NAME] == "Workshop"
     assert updated.attributes[ATTR_BATTERY_LEVEL] == 64
     assert updated.attributes[ATTR_LATITUDE] == 41.5
     assert updated.attributes[ATTR_LONGITUDE] == -74.5

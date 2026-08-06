@@ -345,13 +345,6 @@ class Variable(RestoreEntity, TrackerEntity):
         return self._force_update
 
     @property
-    def state(self) -> str | None:
-        """Return the configured location or the calculated tracker state."""
-        if self._location_name is not None:
-            return self._location_name
-        return super().state
-
-    @property
     def latitude(self):  # type: ignore[override]
         """Return latitude value of the device."""
         return self._attr_latitude
