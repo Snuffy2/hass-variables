@@ -1,5 +1,6 @@
 """End-to-end setup orchestration tests for the Variable integration."""
 
+import datetime
 import importlib
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -10,6 +11,9 @@ from homeassistant.const import (
     ATTR_GPS_ACCURACY,
     ATTR_LATITUDE,
     ATTR_LONGITUDE,
+    CONF_FRIENDLY_NAME,
+    CONF_ICON,
+    CONF_NAME,
     SERVICE_RELOAD,
     STATE_ON,
     STATE_UNAVAILABLE,
@@ -21,7 +25,11 @@ from homeassistant.setup import async_setup_component
 import pytest
 
 from custom_components.variable.const import (
+    CONF_ATTRIBUTES,
     CONF_ENTITY_PLATFORM,
+    CONF_EXCLUDE_FROM_RECORDER,
+    CONF_FORCE_UPDATE,
+    CONF_RESTORE,
     CONF_VALUE,
     CONF_VARIABLE_ID,
     CONF_YAML_PRESENT,
@@ -84,7 +92,6 @@ async def test_yaml_setup_and_reload_manage_config_entries(
         new=AsyncMock(return_value=reloaded_config),
     ):
         await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
-        await hass.async_block_till_done()
 
     current_entry = hass.config_entries.async_get_entry(temperature_entry.entry_id)
     assert current_entry is not None
@@ -98,6 +105,182 @@ async def test_yaml_setup_and_reload_manage_config_entries(
     assert hass.config_entries.async_get_entry(removed_entry.entry_id) is None
     assert hass.states.get("sensor.yaml_removed") is None
     assert er.async_get(hass).async_get("sensor.yaml_removed") is None
+
+
+@pytest.mark.parametrize(
+    ("variable_id", "yaml_config", "entity_id", "expected_state"),
+    [
+        pytest.param(
+            "yaml_number",
+            {CONF_VALUE: 42},
+            "sensor.yaml_number",
+            "42",
+            id="number",
+        ),
+        pytest.param(
+            "yaml_date",
+            {
+                CONF_VALUE: datetime.date(2026, 8, 5),
+                CONF_ATTRIBUTES: {"device_class": "date"},
+            },
+            "sensor.yaml_date",
+            "2026-08-05",
+            id="native-date",
+        ),
+    ],
+)
+async def test_yaml_reload_creates_entities_before_service_returns(
+    hass: HomeAssistant,
+    variable_id: str,
+    yaml_config: dict[str, Any],
+    entity_id: str,
+    expected_state: str,
+) -> None:
+    """Create YAML entities synchronously through the reload service.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        variable_id: YAML variable ID to import.
+        yaml_config: Configuration for the imported YAML variable.
+        entity_id: Expected entity identifier after import.
+        expected_state: Expected state after import.
+    """
+    assert await async_setup_component(hass, DOMAIN, {DOMAIN: {}})
+
+    with patch(
+        "custom_components.variable.async_integration_yaml_config",
+        new=AsyncMock(return_value={DOMAIN: {variable_id: yaml_config}}),
+    ):
+        await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
+
+    entry = next(
+        entry
+        for entry in hass.config_entries.async_entries(DOMAIN)
+        if entry.data.get(CONF_VARIABLE_ID) == variable_id
+    )
+    assert entry.data[CONF_YAML_VARIABLE] is True
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.state == expected_state
+
+
+@pytest.mark.parametrize(
+    ("initial_config", "removed_key", "removed_attribute"),
+    [
+        pytest.param({CONF_VALUE: 12}, CONF_VALUE, None, id="value"),
+        pytest.param({CONF_RESTORE: False}, CONF_RESTORE, None, id="restore"),
+        pytest.param({CONF_FORCE_UPDATE: True}, CONF_FORCE_UPDATE, None, id="force-update"),
+        pytest.param(
+            {CONF_EXCLUDE_FROM_RECORDER: True},
+            CONF_EXCLUDE_FROM_RECORDER,
+            None,
+            id="exclude-from-recorder",
+        ),
+        pytest.param(
+            {CONF_NAME: "Configured Name"},
+            CONF_NAME,
+            None,
+            id="name",
+        ),
+        pytest.param(
+            {CONF_ATTRIBUTES: {CONF_FRIENDLY_NAME: "Configured Name"}},
+            CONF_NAME,
+            None,
+            id="friendly-name-attribute",
+        ),
+        pytest.param(
+            {CONF_ATTRIBUTES: {CONF_ICON: "mdi:thermometer"}},
+            CONF_ICON,
+            None,
+            id="icon-attribute",
+        ),
+        pytest.param(
+            {CONF_ATTRIBUTES: {"obsolete": "setting"}},
+            None,
+            "obsolete",
+            id="attribute",
+        ),
+    ],
+)
+async def test_yaml_reload_removes_omitted_settings(
+    hass: HomeAssistant,
+    initial_config: dict[str, Any],
+    removed_key: str | None,
+    removed_attribute: str | None,
+) -> None:
+    """Replace prior YAML data rather than retaining omitted settings.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        initial_config: Initial settings that the later YAML omits.
+        removed_key: Config-entry key expected to be removed on reload.
+        removed_attribute: Entity attribute expected to be removed on reload.
+    """
+    variable_id = "yaml_settings"
+    assert await async_setup_component(hass, DOMAIN, {DOMAIN: {variable_id: initial_config}})
+    await hass.async_block_till_done()
+
+    with patch(
+        "custom_components.variable.async_integration_yaml_config",
+        new=AsyncMock(return_value={DOMAIN: {variable_id: {}}}),
+    ):
+        await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
+
+    entry = next(
+        entry
+        for entry in hass.config_entries.async_entries(DOMAIN)
+        if entry.data.get(CONF_VARIABLE_ID) == variable_id
+    )
+    if removed_key is not None:
+        assert removed_key not in entry.data
+    if removed_attribute is not None:
+        state = hass.states.get(f"sensor.{variable_id}")
+        assert state is not None
+        assert removed_attribute not in state.attributes
+
+
+async def test_yaml_reload_does_not_overwrite_ui_created_entry(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Leave a UI-created entry unchanged when YAML uses its variable ID.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config_entry_factory: Factory that creates registered config entries.
+    """
+    assert await async_setup_component(hass, DOMAIN, {DOMAIN: {}})
+    ui_entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.SENSOR,
+            CONF_VARIABLE_ID: "shared_variable",
+            CONF_NAME: "UI Variable",
+            CONF_VALUE: "ui-value",
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+            CONF_ATTRIBUTES: {"source": "ui"},
+        }
+    )
+    assert await hass.config_entries.async_setup(ui_entry.entry_id)
+    await hass.async_block_till_done()
+    original_data = dict(ui_entry.data)
+
+    with patch(
+        "custom_components.variable.async_integration_yaml_config",
+        new=AsyncMock(return_value={DOMAIN: {"shared_variable": {CONF_VALUE: "yaml-value"}}}),
+    ):
+        await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
+
+    current_entry = hass.config_entries.async_get_entry(ui_entry.entry_id)
+    assert current_entry is not None
+    assert dict(current_entry.data) == original_data
+    assert [entry.entry_id for entry in hass.config_entries.async_entries(DOMAIN)] == [
+        ui_entry.entry_id
+    ]
+    state = hass.states.get("sensor.shared_variable")
+    assert state is not None
+    assert state.state == "ui-value"
 
 
 @pytest.mark.parametrize(
@@ -253,6 +436,7 @@ def test_async_remove_helper_devices_fallback_maps_keyword_arguments(
         stale_calls.append((helper_config_entry_id, source_device_id))
 
     import homeassistant.helpers.helper_integration as helper_integration
+
     variable_module = importlib.import_module("custom_components.variable")
 
     monkeypatch.setattr(
