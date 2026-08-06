@@ -2,6 +2,7 @@
 
 import ast
 from pathlib import Path
+from typing import ClassVar
 import unittest
 
 from homeassistant.components.device_tracker.const import ATTR_LOCATION_NAME
@@ -274,6 +275,9 @@ DEVICE_TRACKER_PATH = (
 
 class DeviceTrackerDeprecationTests(unittest.TestCase):
     """Verify the integration avoids deprecated device tracker APIs."""
+
+    module: ClassVar[ast.Module]
+    variable_class: ClassVar[ast.ClassDef]
 
     @classmethod
     def setUpClass(cls) -> None:
