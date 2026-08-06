@@ -11,6 +11,8 @@
 - For non-trivial edits, provide a short plan. For small, low-risk edits, implement and include a one-line summary.
 - Focus on a single conceptual change at a time when public APIs or multiple modules are affected.
 - Maintain project style and Python 3.14+ compatibility. Target latest Home Assistant core.
+- Treat the `homeassistant` value in `hacs.json` as the minimum supported Home Assistant version. HA-facing changes must work from that minimum through the Home Assistant version used for validation; verify the relevant version boundaries rather than assuming the latest API exists everywhere in that range.
+- When an API or behavior differs within the supported range, ask the user to choose before implementing: add a narrow, capability-gated compatibility shim, or raise the `hacs.json` minimum version. Do not make that compatibility-policy decision autonomously.
 - If deviating from these guidelines, explicitly state which guideline is deviated from and why.
 
 ## Agent permissions and venv policy

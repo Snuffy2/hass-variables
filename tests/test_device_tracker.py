@@ -1,4 +1,7 @@
-"""Integration tests for Variable device-tracker restore and services."""
+"""Integration and regression tests for Variable device trackers."""
+
+import ast
+from pathlib import Path
 
 from homeassistant.components.device_tracker.const import ATTR_LOCATION_NAME
 from homeassistant.const import (
@@ -16,6 +19,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers import device_registry as dr
+import pytest
 from pytest_homeassistant_custom_component.common import mock_restore_cache
 
 from custom_components.variable.const import (
@@ -27,11 +31,13 @@ from custom_components.variable.const import (
     CONF_ENTITY_PLATFORM,
     CONF_FORCE_UPDATE,
     CONF_RESTORE,
+    CONF_UPDATED,
     CONF_VARIABLE_ID,
     CONF_YAML_VARIABLE,
     DOMAIN,
     SERVICE_UPDATE_DEVICE_TRACKER,
 )
+from custom_components.variable.device_tracker import Variable
 from tests.types import ConfigEntryFactory
 
 
@@ -46,14 +52,14 @@ async def test_device_tracker_restore_cache_is_applied_during_config_entry_setup
         config_entry_factory: Factory for test configuration entries.
     """
     entity_id = "device_tracker.restored_tracker"
-    restored_state = "Studio"
+    restored_location_name = "Studio"
     restored_attributes = {
         ATTR_LATITUDE: 41.25,
         ATTR_LONGITUDE: -74.75,
-        ATTR_LOCATION_NAME: "Studio",
+        ATTR_LOCATION_NAME: restored_location_name,
         "source": "tracker-cache",
     }
-    cached_state = State(entity_id, restored_state, restored_attributes)
+    cached_state = State(entity_id, restored_location_name, restored_attributes)
     mock_restore_cache(hass, [cached_state])
     entry = config_entry_factory(
         {
@@ -73,10 +79,82 @@ async def test_device_tracker_restore_cache_is_applied_during_config_entry_setup
 
     state = hass.states.get(entity_id)
     assert state is not None
-    assert state.state == restored_state
+    assert state.state == STATE_NOT_HOME
     assert state.attributes["source"] == restored_attributes["source"]
     for attribute in (ATTR_LATITUDE, ATTR_LONGITUDE, ATTR_LOCATION_NAME):
         assert state.attributes[attribute] == restored_attributes[attribute]
+
+
+async def test_updated_device_tracker_discards_reserved_restored_attributes(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Keep updated tracker settings while restoring only custom attributes.
+
+    Args:
+        hass: Home Assistant test instance.
+        config_entry_factory: Factory for test configuration entries.
+    """
+    entity_id = "device_tracker.updated_tracker"
+    mock_restore_cache(
+        hass,
+        [
+            State(
+                entity_id,
+                "Cached Location",
+                {
+                    ATTR_LATITUDE: 1.0,
+                    ATTR_LONGITUDE: 2.0,
+                    ATTR_LOCATION_NAME: "Cached Location",
+                    "source": "restore-cache",
+                },
+            )
+        ],
+    )
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.DEVICE_TRACKER,
+            CONF_VARIABLE_ID: "updated_tracker",
+            ATTR_LATITUDE: 41.0,
+            ATTR_LONGITUDE: -75.0,
+            ATTR_LOCATION_NAME: "Config Location",
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: True,
+            CONF_UPDATED: True,
+            CONF_FORCE_UPDATE: False,
+        }
+    )
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.attributes[ATTR_LATITUDE] == 41.0
+    assert state.attributes[ATTR_LONGITUDE] == -75.0
+    assert state.attributes[ATTR_LOCATION_NAME] == "Config Location"
+    assert state.attributes["source"] == "restore-cache"
+
+
+def test_update_attr_settings_rejects_non_mapping_and_handles_none(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Return unsupported helper inputs unchanged and report invalid data.
+
+    Args:
+        hass: Home Assistant test instance.
+        config_entry_factory: Factory for test configuration entries.
+        caplog: Pytest log capture fixture.
+    """
+    entry = config_entry_factory({CONF_VARIABLE_ID: "helper_tracker"})
+    tracker = Variable(hass, entry.data, entry, entry.entry_id)
+    invalid_attributes = ["not", "a", "mapping"]
+
+    assert tracker._update_attr_settings(invalid_attributes) is invalid_attributes
+    assert "Attributes must be a dictionary" in caplog.text
+    assert tracker._update_attr_settings(None) is None
 
 
 async def test_device_linked_tracker_name_is_not_prefixed_again_after_reload(
@@ -182,7 +260,8 @@ async def test_device_tracker_update_and_delete_services(
     )
     updated = hass.states.get(entity_id)
     assert updated is not None
-    assert updated.state == "Workshop"
+    assert updated.state == STATE_NOT_HOME
+    assert updated.attributes[ATTR_LOCATION_NAME] == "Workshop"
     assert updated.attributes[ATTR_BATTERY_LEVEL] == 64
     assert updated.attributes[ATTR_LATITUDE] == 41.5
     assert updated.attributes[ATTR_LONGITUDE] == -74.5
@@ -203,6 +282,119 @@ async def test_device_tracker_update_and_delete_services(
     assert deleted is not None
     assert ATTR_LOCATION_NAME not in deleted.attributes
     assert deleted.state == STATE_NOT_HOME
+
+
+async def test_device_tracker_update_contains_state_write_failure(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Contain a state-write failure from the public tracker update service.
+
+    Args:
+        hass: Home Assistant test instance.
+        config_entry_factory: Factory for test configuration entries.
+        monkeypatch: Pytest fixture for replacing the state writer.
+        caplog: Pytest log capture fixture.
+    """
+    entity_id = "device_tracker.failing_write_tracker"
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.DEVICE_TRACKER,
+            CONF_VARIABLE_ID: "failing_write_tracker",
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    def raise_write_failure(self: Variable) -> None:
+        """Raise a representative Home Assistant state-write failure."""
+        raise RuntimeError("state write failed")
+
+    monkeypatch.setattr(Variable, "async_write_ha_state", raise_write_failure)
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_UPDATE_DEVICE_TRACKER,
+        {"entity_id": [entity_id], ATTR_BATTERY_LEVEL: 50},
+        blocking=True,
+    )
+
+    assert "async_write_ha_state failed during update: state write failed" in caplog.text
+
+
+async def test_legacy_device_tracker_location_name_state_compatibility(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Preserve location-name state when running on HA before 2026.6.
+
+    Args:
+        hass: Home Assistant test instance.
+        config_entry_factory: Factory for test configuration entries.
+        monkeypatch: Pytest fixture for selecting the legacy capability path.
+    """
+    monkeypatch.setattr(
+        "custom_components.variable.device_tracker.SUPPORTS_TRACKER_IN_ZONES",
+        False,
+    )
+    entity_id = "device_tracker.legacy_location_tracker"
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.DEVICE_TRACKER,
+            CONF_VARIABLE_ID: "legacy_location_tracker",
+            ATTR_LOCATION_NAME: "Studio",
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    initial = hass.states.get(entity_id)
+    assert initial is not None
+    assert initial.state == "Studio"
+    assert initial.attributes[ATTR_LOCATION_NAME] == "Studio"
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_UPDATE_DEVICE_TRACKER,
+        {
+            "entity_id": [entity_id],
+            ATTR_ATTRIBUTES: {ATTR_LOCATION_NAME: "Archive"},
+        },
+        blocking=True,
+    )
+    attribute_updated = hass.states.get(entity_id)
+    assert attribute_updated is not None
+    assert attribute_updated.state == "Archive"
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_UPDATE_DEVICE_TRACKER,
+        {"entity_id": [entity_id], ATTR_LOCATION_NAME: "Workshop"},
+        blocking=True,
+    )
+    service_updated = hass.states.get(entity_id)
+    assert service_updated is not None
+    assert service_updated.state == "Workshop"
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_UPDATE_DEVICE_TRACKER,
+        {"entity_id": [entity_id], ATTR_DELETE_LOCATION_NAME: True},
+        blocking=True,
+    )
+    deleted = hass.states.get(entity_id)
+    assert deleted is not None
+    assert deleted.state == STATE_UNKNOWN
+    assert ATTR_LOCATION_NAME not in deleted.attributes
 
 
 async def test_device_tracker_in_zones_service_and_delete(
@@ -261,3 +453,90 @@ async def test_device_tracker_in_zones_service_and_delete(
     assert unzoned is not None
     assert unzoned.state == STATE_UNKNOWN
     assert unzoned.attributes["in_zones"] == []
+
+
+DEVICE_TRACKER_PATH = (
+    Path(__file__).parents[1] / "custom_components" / "variable" / "device_tracker.py"
+)
+
+
+@pytest.fixture(scope="module")
+def device_tracker_ast() -> tuple[ast.Module, ast.ClassDef]:
+    """Parse the device tracker platform once for all tests."""
+    module = ast.parse(DEVICE_TRACKER_PATH.read_text(encoding="utf-8"))
+    variable_class = next(
+        node for node in module.body if isinstance(node, ast.ClassDef) and node.name == "Variable"
+    )
+    return module, variable_class
+
+
+def test_tracker_entity_is_imported_from_public_module(
+    device_tracker_ast: tuple[ast.Module, ast.ClassDef],
+) -> None:
+    """TrackerEntity should use Home Assistant's public import path."""
+    module, _ = device_tracker_ast
+    tracker_imports = [
+        node.module
+        for node in module.body
+        if isinstance(node, ast.ImportFrom)
+        and any(alias.name == "TrackerEntity" for alias in node.names)
+    ]
+
+    assert tracker_imports == ["homeassistant.components.device_tracker"]
+
+
+def test_variable_does_not_override_location_name(
+    device_tracker_ast: tuple[ast.Module, ast.ClassDef],
+) -> None:
+    """Variable should not override the deprecated location_name property."""
+    _, variable_class = device_tracker_ast
+    method_names = {
+        node.name
+        for node in variable_class.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+
+    assert "location_name" not in method_names
+
+
+def test_legacy_location_name_attribute_is_capability_gated(
+    device_tracker_ast: tuple[ast.Module, ast.ClassDef],
+) -> None:
+    """Only the legacy compatibility helper may use the deprecated shorthand."""
+    module, variable_class = device_tracker_ast
+    legacy_usage_methods = [
+        node.name
+        for node in variable_class.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and any(
+            attribute.attr == "_attr_location_name"
+            for attribute in ast.walk(node)
+            if isinstance(attribute, ast.Attribute)
+        )
+    ]
+
+    assert legacy_usage_methods == ["_set_location_name"]
+    setter = next(
+        node
+        for node in variable_class.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_set_location_name"
+    )
+    conditions = [node.test for node in ast.walk(setter) if isinstance(node, ast.If)]
+    assert len(conditions) == 1
+    condition = conditions[0]
+    assert isinstance(condition, ast.UnaryOp)
+    assert isinstance(condition.op, ast.Not)
+    assert isinstance(condition.operand, ast.Name)
+    assert condition.operand.id == "SUPPORTS_TRACKER_IN_ZONES"
+    capability_flag = next(
+        node
+        for node in module.body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "SUPPORTS_TRACKER_IN_ZONES"
+            for target in node.targets
+        )
+    )
+    assert isinstance(capability_flag.value, ast.Call)
+    assert isinstance(capability_flag.value.func, ast.Name)
+    assert capability_flag.value.func.id == "hasattr"

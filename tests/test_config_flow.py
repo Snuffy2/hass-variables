@@ -22,6 +22,7 @@ from homeassistant.const import (
     CONF_ICON,
     CONF_NAME,
     CONF_UNIT_OF_MEASUREMENT,
+    STATE_NOT_HOME,
     Platform,
 )
 from homeassistant.core import HomeAssistant
@@ -773,7 +774,8 @@ async def test_device_tracker_options_update_entry_and_live_entity(
     assert entry.data[CONF_EXCLUDE_FROM_RECORDER] is False
     state = hass.states.get("device_tracker.configured_tracker")
     assert state is not None
-    assert state.state == "Studio"
+    assert state.state == STATE_NOT_HOME
+    assert state.attributes[ATTR_LOCATION_NAME] == "Studio"
     assert state.attributes[ATTR_LATITUDE] == 41.25
     assert state.attributes[ATTR_LONGITUDE] == -74.75
     assert state.attributes[ATTR_GPS_ACCURACY] == 4
