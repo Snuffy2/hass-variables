@@ -352,11 +352,6 @@ class Variable(RestoreEntity, TrackerEntity):
         return super().state
 
     @property
-    def source_type(self) -> SourceType:
-        """Return the source type, e.g. gps or router, of the device."""
-        return self._attr_source_type
-
-    @property
     def latitude(self):  # type: ignore[override]
         """Return latitude value of the device."""
         return self._attr_latitude
