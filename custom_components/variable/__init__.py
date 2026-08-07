@@ -252,15 +252,24 @@ async def _async_process_yaml(
                     var_fields.pop(key_empty)
 
             yaml_entries = yaml_entries_by_variable_id.get(var, [])
-            if not yaml_entries and var in entries_by_variable_id:
+            if any(
+                not entry.data.get(CONF_YAML_VARIABLE, False)
+                for entry in entries_by_variable_id.get(var, [])
+            ):
                 _LOGGER.error(
                     "[YAML] Cannot import %s because that variable ID belongs to a UI-created entry",
                     var,
                 )
+                for entry in yaml_entries:
+                    remove_entry = hass.config_entries.async_remove(entry.entry_id)
+                    if wait_for_completion:
+                        await remove_entry
+                    else:
+                        hass.async_create_task(remove_entry)
                 continue
 
             if not yaml_entries:
-                _LOGGER.warning(f"[YAML] Creating New Sensor Variable: {var}")
+                _LOGGER.warning("[YAML] Creating New Sensor Variable: %s", var)
                 import_flow = hass.config_entries.flow.async_init(
                     DOMAIN,
                     context={"source": SOURCE_IMPORT},
@@ -271,7 +280,7 @@ async def _async_process_yaml(
                 else:
                     hass.async_create_task(import_flow)
             else:
-                _LOGGER.info(f"[YAML] Updating Existing Sensor Variable: {var}")
+                _LOGGER.info("[YAML] Updating Existing Sensor Variable: %s", var)
                 entry = yaml_entries[0]
                 yaml_data = _yaml_entry_data(var, var_fields)
                 hass.config_entries.async_update_entry(entry, data=yaml_data)

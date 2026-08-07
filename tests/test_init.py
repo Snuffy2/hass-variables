@@ -159,6 +159,7 @@ async def test_yaml_reload_creates_entities_before_service_returns(
         if entry.data.get(CONF_VARIABLE_ID) == variable_id
     )
     assert entry.data[CONF_YAML_VARIABLE] is True
+    assert entry.data[CONF_VALUE] == yaml_config[CONF_VALUE]
     state = hass.states.get(entity_id)
     assert state is not None
     assert state.state == expected_state
@@ -262,9 +263,31 @@ async def test_yaml_reload_does_not_overwrite_ui_created_entry(
             CONF_ATTRIBUTES: {"source": "ui"},
         }
     )
+    yaml_entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.SENSOR,
+            CONF_VARIABLE_ID: "shared_variable",
+            CONF_NAME: "YAML Variable",
+            CONF_VALUE: "stale-yaml-value",
+            CONF_YAML_VARIABLE: True,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+            CONF_ATTRIBUTES: {"source": "yaml"},
+        }
+    )
     assert await hass.config_entries.async_setup(ui_entry.entry_id)
+    assert await hass.config_entries.async_setup(yaml_entry.entry_id)
     await hass.async_block_till_done()
     original_data = dict(ui_entry.data)
+    registry = er.async_get(hass)
+    ui_registry_entry = er.async_entries_for_config_entry(registry, ui_entry.entry_id)[0]
+    yaml_registry_entry = er.async_entries_for_config_entry(registry, yaml_entry.entry_id)[0]
+    ui_state = hass.states.get(ui_registry_entry.entity_id)
+    yaml_state = hass.states.get(yaml_registry_entry.entity_id)
+    assert ui_state is not None
+    assert ui_state.state == "ui-value"
+    assert yaml_state is not None
+    assert yaml_state.state == "stale-yaml-value"
 
     with patch(
         "custom_components.variable.async_integration_yaml_config",
@@ -275,12 +298,16 @@ async def test_yaml_reload_does_not_overwrite_ui_created_entry(
     current_entry = hass.config_entries.async_get_entry(ui_entry.entry_id)
     assert current_entry is not None
     assert dict(current_entry.data) == original_data
+    assert hass.config_entries.async_get_entry(yaml_entry.entry_id) is None
     assert [entry.entry_id for entry in hass.config_entries.async_entries(DOMAIN)] == [
         ui_entry.entry_id
     ]
-    state = hass.states.get("sensor.shared_variable")
-    assert state is not None
-    assert state.state == "ui-value"
+    assert registry.async_get(yaml_registry_entry.entity_id) is None
+    assert hass.states.get(yaml_registry_entry.entity_id) is None
+    assert registry.async_get(ui_registry_entry.entity_id) == ui_registry_entry
+    ui_state = hass.states.get(ui_registry_entry.entity_id)
+    assert ui_state is not None
+    assert ui_state.state == "ui-value"
 
 
 @pytest.mark.parametrize(
