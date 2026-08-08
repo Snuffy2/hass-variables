@@ -1,7 +1,7 @@
 """Variable implementation for Home Assistant."""
 
 import asyncio
-from collections.abc import Mapping
+from collections.abc import Coroutine, Mapping
 import contextlib
 import copy
 import logging
@@ -84,6 +84,7 @@ _LOGGER = logging.getLogger(__name__)
 SERVICE_SET_VARIABLE_LEGACY = "set_variable"
 SERVICE_SET_ENTITY_LEGACY = "set_entity"
 _YAML_RECONCILE_LOCK = f"{DOMAIN}_yaml_reconcile_lock"
+_YAML_LIFECYCLE_TASKS = f"{DOMAIN}_yaml_lifecycle_tasks"
 
 SERVICE_SET_VARIABLE_LEGACY_SCHEMA = vol.Schema(
     {
@@ -235,7 +236,38 @@ async def _async_process_yaml(
     """
     reconcile_lock: asyncio.Lock = hass.data.setdefault(_YAML_RECONCILE_LOCK, asyncio.Lock())
     async with reconcile_lock:
+        if wait_for_completion:
+            pending_tasks: set[asyncio.Task[Any]] = hass.data.setdefault(
+                _YAML_LIFECYCLE_TASKS, set()
+            )
+            if pending_tasks:
+                results = await asyncio.gather(*tuple(pending_tasks), return_exceptions=True)
+                for result in results:
+                    if isinstance(result, BaseException):
+                        raise result
         return await _async_reconcile_yaml(hass, config, wait_for_completion)
+
+
+async def _async_dispatch_yaml_lifecycle(
+    hass: HomeAssistant,
+    lifecycle_work: Coroutine[Any, Any, object],
+    wait_for_completion: bool,
+) -> None:
+    """Await lifecycle work or track it until background completion.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        lifecycle_work: Config-entry lifecycle operation to dispatch.
+        wait_for_completion: Whether to wait for the operation to finish.
+    """
+    if wait_for_completion:
+        await lifecycle_work
+        return
+
+    pending_tasks: set[asyncio.Task[Any]] = hass.data.setdefault(_YAML_LIFECYCLE_TASKS, set())
+    task: asyncio.Task[object] = hass.async_create_task(lifecycle_work)
+    pending_tasks.add(task)
+    task.add_done_callback(pending_tasks.discard)
 
 
 async def _async_reconcile_yaml(
@@ -285,11 +317,11 @@ async def _async_reconcile_yaml(
                     var,
                 )
                 for entry in yaml_entries:
-                    remove_entry = hass.config_entries.async_remove(entry.entry_id)
-                    if wait_for_completion:
-                        await remove_entry
-                    else:
-                        hass.async_create_task(remove_entry)
+                    await _async_dispatch_yaml_lifecycle(
+                        hass,
+                        hass.config_entries.async_remove(entry.entry_id),
+                        wait_for_completion,
+                    )
                 continue
 
             if not yaml_entries:
@@ -299,26 +331,20 @@ async def _async_reconcile_yaml(
                     context={"source": SOURCE_IMPORT},
                     data=_yaml_entry_data(var, var_fields),
                 )
-                if wait_for_completion:
-                    await import_flow
-                else:
-                    hass.async_create_task(import_flow)
+                await _async_dispatch_yaml_lifecycle(hass, import_flow, wait_for_completion)
             else:
                 _LOGGER.info("[YAML] Updating Existing Sensor Variable: %s", var)
                 entry = yaml_entries[0]
                 for duplicate_entry in yaml_entries[1:]:
-                    remove_entry = hass.config_entries.async_remove(duplicate_entry.entry_id)
-                    if wait_for_completion:
-                        await remove_entry
-                    else:
-                        hass.async_create_task(remove_entry)
+                    await _async_dispatch_yaml_lifecycle(
+                        hass,
+                        hass.config_entries.async_remove(duplicate_entry.entry_id),
+                        wait_for_completion,
+                    )
                 yaml_data = _yaml_entry_data(var, var_fields)
                 hass.config_entries.async_update_entry(entry, data=yaml_data)
                 reload_entry = hass.config_entries.async_reload(entry.entry_id)
-                if wait_for_completion:
-                    await reload_entry
-                else:
-                    hass.async_create_task(reload_entry)
+                await _async_dispatch_yaml_lifecycle(hass, reload_entry, wait_for_completion)
 
     # Remove any config entries that were originally created from YAML imports
     # but are no longer present in the current YAML configuration.
@@ -331,11 +357,11 @@ async def _async_reconcile_yaml(
                     "[YAML] YAML Entry no longer exists in configuration, deleting entry: %s",
                     variable_id,
                 )
-                remove_entry = hass.config_entries.async_remove(entry.entry_id)
-                if wait_for_completion:
-                    await remove_entry
-                else:
-                    hass.async_create_task(remove_entry)
+                await _async_dispatch_yaml_lifecycle(
+                    hass,
+                    hass.config_entries.async_remove(entry.entry_id),
+                    wait_for_completion,
+                )
 
     return True
 
