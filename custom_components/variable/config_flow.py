@@ -387,7 +387,8 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ign
             },
         )
 
-    def yaml_import_get_value_type(self):
+    def yaml_import_get_value_type(self) -> str | None:
+        """Return the value type used to import the current YAML sensor."""
         if self.add_sensor_input.get(CONF_ATTRIBUTES, {}).get(CONF_DEVICE_CLASS) is None:
             return None
         elif self.add_sensor_input.get(CONF_ATTRIBUTES, {}).get(CONF_DEVICE_CLASS) in [
@@ -398,9 +399,9 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ign
             sensor.SensorDeviceClass.TIMESTAMP
         ]:
             return "datetime"
-        elif (
-            self.add_sensor_input.get(CONF_ATTRIBUTES, {}).get(CONF_DEVICE_CLASS)
-            == sensor.SensorDeviceClass.MONETARY
+        elif self.add_sensor_input.get(CONF_ATTRIBUTES, {}).get(CONF_DEVICE_CLASS) in (
+            sensor.SensorDeviceClass.MONETARY,
+            sensor.SensorDeviceClass.ENUM,
         ):
             return "string"
         else:

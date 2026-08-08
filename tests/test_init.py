@@ -31,6 +31,7 @@ from custom_components.variable.const import (
     CONF_FORCE_UPDATE,
     CONF_RESTORE,
     CONF_VALUE,
+    CONF_VALUE_TYPE,
     CONF_VARIABLE_ID,
     CONF_YAML_PRESENT,
     CONF_YAML_VARIABLE,
@@ -107,14 +108,92 @@ async def test_yaml_setup_and_reload_manage_config_entries(
     assert er.async_get(hass).async_get("sensor.yaml_removed") is None
 
 
+async def test_yaml_reload_removes_duplicate_yaml_entries(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Retain one updated YAML entry and fully remove its duplicate.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config_entry_factory: Factory that creates registered config entries.
+    """
+    assert await async_setup_component(hass, DOMAIN, {DOMAIN: {}})
+    entries = [
+        config_entry_factory(
+            {
+                CONF_ENTITY_PLATFORM: Platform.SENSOR,
+                CONF_VARIABLE_ID: "duplicate_yaml",
+                CONF_VALUE: value,
+                CONF_VALUE_TYPE: "string",
+                CONF_YAML_VARIABLE: True,
+                CONF_RESTORE: False,
+                CONF_FORCE_UPDATE: False,
+                CONF_ATTRIBUTES: {"source": source},
+            }
+        )
+        for value, source in (("retained", "canonical"), ("removed", "duplicate"))
+    ]
+    for entry in entries:
+        assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    registry = er.async_get(hass)
+    registry_entries = [
+        er.async_entries_for_config_entry(registry, entry.entry_id)[0] for entry in entries
+    ]
+    for registry_entry in registry_entries:
+        assert hass.states.get(registry_entry.entity_id) is not None
+
+    with patch(
+        "custom_components.variable.async_integration_yaml_config",
+        new=AsyncMock(
+            return_value={
+                DOMAIN: {
+                    "duplicate_yaml": {
+                        CONF_VALUE: "updated",
+                        CONF_ATTRIBUTES: {"source": "reload"},
+                    }
+                }
+            }
+        ),
+    ):
+        await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
+
+    retained_entry = hass.config_entries.async_get_entry(entries[0].entry_id)
+    assert retained_entry is not None
+    assert retained_entry.data[CONF_VALUE] == "updated"
+    assert hass.config_entries.async_get_entry(entries[1].entry_id) is None
+    assert [
+        entry.entry_id
+        for entry in hass.config_entries.async_entries(DOMAIN)
+        if entry.data.get(CONF_VARIABLE_ID) == "duplicate_yaml"
+    ] == [entries[0].entry_id]
+    assert registry.async_get(registry_entries[1].entity_id) is None
+    assert hass.states.get(registry_entries[1].entity_id) is None
+    retained_registry_entry = registry.async_get(registry_entries[0].entity_id)
+    assert retained_registry_entry is not None
+    retained_state = hass.states.get(retained_registry_entry.entity_id)
+    assert retained_state is not None
+    assert retained_state.state == "updated"
+    assert retained_state.attributes["source"] == "reload"
+
+
 @pytest.mark.parametrize(
-    ("variable_id", "yaml_config", "entity_id", "expected_state"),
+    (
+        "variable_id",
+        "yaml_config",
+        "entity_id",
+        "expected_state",
+        "expected_value_type",
+    ),
     [
         pytest.param(
             "yaml_number",
             {CONF_VALUE: 42},
             "sensor.yaml_number",
             "42",
+            None,
             id="number",
         ),
         pytest.param(
@@ -125,7 +204,19 @@ async def test_yaml_setup_and_reload_manage_config_entries(
             },
             "sensor.yaml_date",
             "2026-08-05",
+            "date",
             id="native-date",
+        ),
+        pytest.param(
+            "yaml_enum",
+            {
+                CONF_VALUE: "heating",
+                CONF_ATTRIBUTES: {"device_class": "enum"},
+            },
+            "sensor.yaml_enum",
+            "heating",
+            "string",
+            id="enum",
         ),
     ],
 )
@@ -135,6 +226,7 @@ async def test_yaml_reload_creates_entities_before_service_returns(
     yaml_config: dict[str, Any],
     entity_id: str,
     expected_state: str,
+    expected_value_type: str | None,
 ) -> None:
     """Create YAML entities synchronously through the reload service.
 
@@ -144,6 +236,7 @@ async def test_yaml_reload_creates_entities_before_service_returns(
         yaml_config: Configuration for the imported YAML variable.
         entity_id: Expected entity identifier after import.
         expected_state: Expected state after import.
+        expected_value_type: Expected stored value type, if any.
     """
     assert await async_setup_component(hass, DOMAIN, {DOMAIN: {}})
 
@@ -160,6 +253,10 @@ async def test_yaml_reload_creates_entities_before_service_returns(
     )
     assert entry.data[CONF_YAML_VARIABLE] is True
     assert entry.data[CONF_VALUE] == yaml_config[CONF_VALUE]
+    if expected_value_type is None:
+        assert CONF_VALUE_TYPE not in entry.data
+    else:
+        assert entry.data[CONF_VALUE_TYPE] == expected_value_type
     state = hass.states.get(entity_id)
     assert state is not None
     assert state.state == expected_state
@@ -240,15 +337,18 @@ async def test_yaml_reload_removes_omitted_settings(
         assert removed_attribute not in state.attributes
 
 
+@pytest.mark.parametrize("yaml_entry_present", [False, True], ids=["ui-only", "with-yaml"])
 async def test_yaml_reload_does_not_overwrite_ui_created_entry(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,
+    yaml_entry_present: bool,
 ) -> None:
     """Leave a UI-created entry unchanged when YAML uses its variable ID.
 
     Args:
         hass: Home Assistant instance that hosts the integration.
         config_entry_factory: Factory that creates registered config entries.
+        yaml_entry_present: Whether a stale YAML-owned entry also exists.
     """
     assert await async_setup_component(hass, DOMAIN, {DOMAIN: {}})
     ui_entry = config_entry_factory(
@@ -263,31 +363,35 @@ async def test_yaml_reload_does_not_overwrite_ui_created_entry(
             CONF_ATTRIBUTES: {"source": "ui"},
         }
     )
-    yaml_entry = config_entry_factory(
-        {
-            CONF_ENTITY_PLATFORM: Platform.SENSOR,
-            CONF_VARIABLE_ID: "shared_variable",
-            CONF_NAME: "YAML Variable",
-            CONF_VALUE: "stale-yaml-value",
-            CONF_YAML_VARIABLE: True,
-            CONF_RESTORE: False,
-            CONF_FORCE_UPDATE: False,
-            CONF_ATTRIBUTES: {"source": "yaml"},
-        }
-    )
     assert await hass.config_entries.async_setup(ui_entry.entry_id)
-    assert await hass.config_entries.async_setup(yaml_entry.entry_id)
+    yaml_entry = None
+    if yaml_entry_present:
+        yaml_entry = config_entry_factory(
+            {
+                CONF_ENTITY_PLATFORM: Platform.SENSOR,
+                CONF_VARIABLE_ID: "shared_variable",
+                CONF_NAME: "YAML Variable",
+                CONF_VALUE: "stale-yaml-value",
+                CONF_YAML_VARIABLE: True,
+                CONF_RESTORE: False,
+                CONF_FORCE_UPDATE: False,
+                CONF_ATTRIBUTES: {"source": "yaml"},
+            }
+        )
+        assert await hass.config_entries.async_setup(yaml_entry.entry_id)
     await hass.async_block_till_done()
     original_data = dict(ui_entry.data)
     registry = er.async_get(hass)
     ui_registry_entry = er.async_entries_for_config_entry(registry, ui_entry.entry_id)[0]
-    yaml_registry_entry = er.async_entries_for_config_entry(registry, yaml_entry.entry_id)[0]
     ui_state = hass.states.get(ui_registry_entry.entity_id)
-    yaml_state = hass.states.get(yaml_registry_entry.entity_id)
     assert ui_state is not None
     assert ui_state.state == "ui-value"
-    assert yaml_state is not None
-    assert yaml_state.state == "stale-yaml-value"
+    yaml_registry_entry = None
+    if yaml_entry is not None:
+        yaml_registry_entry = er.async_entries_for_config_entry(registry, yaml_entry.entry_id)[0]
+        yaml_state = hass.states.get(yaml_registry_entry.entity_id)
+        assert yaml_state is not None
+        assert yaml_state.state == "stale-yaml-value"
 
     with patch(
         "custom_components.variable.async_integration_yaml_config",
@@ -298,12 +402,14 @@ async def test_yaml_reload_does_not_overwrite_ui_created_entry(
     current_entry = hass.config_entries.async_get_entry(ui_entry.entry_id)
     assert current_entry is not None
     assert dict(current_entry.data) == original_data
-    assert hass.config_entries.async_get_entry(yaml_entry.entry_id) is None
+    if yaml_entry is not None:
+        assert hass.config_entries.async_get_entry(yaml_entry.entry_id) is None
     assert [entry.entry_id for entry in hass.config_entries.async_entries(DOMAIN)] == [
         ui_entry.entry_id
     ]
-    assert registry.async_get(yaml_registry_entry.entity_id) is None
-    assert hass.states.get(yaml_registry_entry.entity_id) is None
+    if yaml_registry_entry is not None:
+        assert registry.async_get(yaml_registry_entry.entity_id) is None
+        assert hass.states.get(yaml_registry_entry.entity_id) is None
     assert registry.async_get(ui_registry_entry.entity_id) == ui_registry_entry
     ui_state = hass.states.get(ui_registry_entry.entity_id)
     assert ui_state is not None

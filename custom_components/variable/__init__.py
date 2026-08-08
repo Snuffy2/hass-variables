@@ -260,6 +260,12 @@ async def _async_process_yaml(
             else:
                 _LOGGER.info("[YAML] Updating Existing Sensor Variable: %s", var)
                 entry = yaml_entries[0]
+                for duplicate_entry in yaml_entries[1:]:
+                    remove_entry = hass.config_entries.async_remove(duplicate_entry.entry_id)
+                    if wait_for_completion:
+                        await remove_entry
+                    else:
+                        hass.async_create_task(remove_entry)
                 yaml_data = _yaml_entry_data(var, var_fields)
                 hass.config_entries.async_update_entry(entry, data=yaml_data)
                 reload_entry = hass.config_entries.async_reload(entry.entry_id)
@@ -330,7 +336,10 @@ def _yaml_entry_data(variable_id: str, variable_config: Mapping[str, Any]) -> di
         entry_data[CONF_VALUE_TYPE] = "date"
     elif device_class == ha_sensor.SensorDeviceClass.TIMESTAMP:
         entry_data[CONF_VALUE_TYPE] = "datetime"
-    elif device_class == ha_sensor.SensorDeviceClass.MONETARY:
+    elif device_class in (
+        ha_sensor.SensorDeviceClass.MONETARY,
+        ha_sensor.SensorDeviceClass.ENUM,
+    ):
         entry_data[CONF_VALUE_TYPE] = "string"
     elif device_class is not None:
         entry_data[CONF_VALUE_TYPE] = "number"
