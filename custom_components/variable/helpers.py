@@ -18,6 +18,20 @@ class _AttributePathTypeError(TypeError, ValueError):
 
 
 def _parse_attribute_path(path: str) -> list[str | int]:
+    """Tokenize an attribute path into mapping keys and list indexes.
+
+    Dot-delimited path components become string tokens, while numeric components
+    enclosed in brackets become integer tokens.
+
+    Args:
+        path: Attribute path to tokenize.
+
+    Returns:
+        The ordered mapping-key and list-index tokens from the path.
+
+    Raises:
+        ValueError: If a bracket is unclosed or contains a non-numeric index.
+    """
     tokens: list[str | int] = []
     buffer = ""
     index = 0
@@ -47,15 +61,6 @@ def _parse_attribute_path(path: str) -> list[str | int]:
     if buffer:
         tokens.append(buffer)
     return tokens
-
-
-def looks_like_attribute_path(path: str) -> bool:
-    """Return whether an attribute name uses supported nested-path syntax."""
-    # Only treat bracket notation as nested paths (e.g., "test[a]")
-    # Treat dots as literal attribute names for backward compatibility.
-    if "[" in path:
-        return True
-    return False
 
 
 def set_nested_attribute(target: MutableMapping[str, Any], path: str, value: Any) -> None:
@@ -114,7 +119,7 @@ def merge_attribute_dict(
     """Deep-copy and merge attributes, resolving bracket-path keys."""
     merged = copy.deepcopy(dict(existing)) if existing is not None else {}
     for attr, value in updates.items():
-        if isinstance(attr, str) and looks_like_attribute_path(attr):
+        if isinstance(attr, str) and "[" in attr:
             set_nested_attribute(merged, attr, value)
         else:
             merged[attr] = copy.deepcopy(value)
@@ -197,7 +202,7 @@ def _date_to_type(
         return value.isoformat()
     if dest_type == "date":
         return value
-    combined = datetime.datetime.combine(value, datetime.time.min)
+    combined = _normalize_datetime(datetime.datetime.combine(value, datetime.time.min))
     if dest_type == "datetime":
         return combined
     if dest_type == "number":
@@ -239,8 +244,8 @@ def value_to_type(
         return _string_to_type(init_val, dest_type)
     if isinstance(init_val, (int, float)):
         return _number_to_type(init_val, dest_type)
-    if type(init_val) is datetime.date:
-        return _date_to_type(init_val, dest_type)
-    if type(init_val) is datetime.datetime:
+    if isinstance(init_val, datetime.datetime):
         return _datetime_to_type(init_val, dest_type)
+    if isinstance(init_val, datetime.date):
+        return _date_to_type(init_val, dest_type)
     raise ValueError(f"Invalid initial type: {type(init_val)}")

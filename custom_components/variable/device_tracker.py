@@ -240,6 +240,16 @@ class Variable(RestoreEntity, TrackerEntity):
             )
 
     def _update_attr_settings(self, new_attributes: Any = None, just_pop: bool = False) -> Any:
+        """Apply special entity settings and return unconsumed attributes.
+
+        Args:
+            new_attributes: Dynamic attribute payload to process.
+            just_pop: Remove special attributes without applying their values.
+
+        Returns:
+            A copy of the remaining attributes, the unsupported input unchanged,
+            or ``None`` when no attributes were provided.
+        """
         if new_attributes is not None:
             _LOGGER.debug(
                 "(%s) [update_attr_settings] Updating Special Attributes", self._attr_name
@@ -378,27 +388,12 @@ class Variable(RestoreEntity, TrackerEntity):
         """
         return self._attr_gps_accuracy if self._attr_gps_accuracy is not None else 0
 
-    @property  # type: ignore[misc]
-    def state_attributes(self) -> dict[str, StateType]:
-        """Return the device state attributes."""
-        attr: dict[str, StateType] = {}
-        try:
-            attr.update(super().state_attributes)
-        except AttributeError as err:
-            _LOGGER.debug(
-                "(%s) Unable to read base state_attributes during startup: %s",
-                self._attr_name,
-                err,
-            )
-        if self._attr_extra_state_attributes is not None:
-            attr.update(self._attr_extra_state_attributes)
+    @property
+    def extra_state_attributes(self) -> dict[str, StateType]:
+        """Return custom device-tracker state attributes."""
+        attr = dict(self._attr_extra_state_attributes or {})
         if self._attr_source_type is not None:
             attr[ATTR_SOURCE_TYPE] = self._attr_source_type
-        if self._attr_latitude is not None and self._attr_longitude is not None:
-            attr[ATTR_LATITUDE] = self._attr_latitude
-            attr[ATTR_LONGITUDE] = self._attr_longitude
-        if self._attr_gps_accuracy is not None:
-            attr[ATTR_GPS_ACCURACY] = self._attr_gps_accuracy
         if self._attr_battery_level is not None:
             attr[ATTR_BATTERY_LEVEL] = self._attr_battery_level
         if self._location_name is not None:
