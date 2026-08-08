@@ -95,7 +95,7 @@ async def update_device(
         user_input (dict[str, Any]): Device registry fields to update.
 
     Returns:
-        True when the device was updated; False when no matching device exists.
+        bool: True when the device was updated; False when no matching device exists.
     """
     # _LOGGER.debug(f"({entry.title}) [update_device] entry: {entry}")
     # _LOGGER.debug(f"({entry.title}) [update_device] user_input: {user_input}")
@@ -128,7 +128,7 @@ async def remove_device(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry (ConfigEntry): Variable config entry associated with the helper device.
 
     Returns:
-        True after the matching device is removed or when none exists.
+        bool: True after the matching device is removed or when none exists.
     """
     # _LOGGER.debug(f"({entry.title}) [remove_device] entry: {entry}")
 

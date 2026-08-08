@@ -27,7 +27,7 @@ def _parse_attribute_path(path: str) -> list[str | int]:
         path (str): Attribute path to tokenize.
 
     Returns:
-        The ordered mapping-key and list-index tokens from the path.
+        list[str | int]: The ordered mapping-key and list-index tokens from the path.
 
     Raises:
         ValueError: If a bracket is unclosed or contains a non-numeric index.
@@ -73,7 +73,7 @@ def set_nested_attribute(target: MutableMapping[str, Any], path: str, value: Any
 
     Raises:
         ValueError: If the path is empty or has invalid bracket notation.
-        TypeError: If an existing container conflicts with the path.
+        _AttributePathTypeError: If an existing container conflicts with the path.
     """
     tokens = _parse_attribute_path(path)
     if not tokens:
@@ -133,7 +133,7 @@ def merge_attribute_dict(
         updates (Mapping[str, Any]): New attributes to merge into the result.
 
     Returns:
-        A deep-copied attribute mapping containing both inputs.
+        dict[str, Any]: A deep-copied attribute mapping containing both inputs.
     """
     merged = copy.deepcopy(dict(existing)) if existing is not None else {}
     for attr, value in updates.items():
@@ -151,7 +151,7 @@ def to_num(s: str) -> int | float | None:
         s (str): String representation of a numeric value.
 
     Returns:
-        The parsed integer or float, or ``None`` when the string is not numeric.
+        int | float | None: The parsed integer or float, or ``None`` when the string is not numeric.
     """
     try:
         return int(s)
@@ -174,7 +174,7 @@ def _raise_conversion_error(source: str, dest_type: str, value: object) -> Never
         ValueError: Always, with the conversion context.
 
     Returns:
-        This function never returns.
+        Never: This function never returns.
     """
     _LOGGER.debug("Cannot convert %s to %s: %s, returning None", source, dest_type, value)
     raise ValueError(f"Cannot convert {source} to {dest_type}: {value}")
@@ -187,7 +187,7 @@ def _normalize_datetime(value: datetime.datetime) -> datetime.datetime:
         value (datetime.datetime): Datetime value to normalize.
 
     Returns:
-        The original aware datetime or a UTC-aware replacement for a naive one.
+        datetime.datetime: The original aware datetime or a UTC-aware replacement for a naive one.
     """
     if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
         return value.replace(tzinfo=dt_util.UTC)
@@ -204,7 +204,8 @@ def _string_to_type(
         dest_type (str | None): Requested Variable value type.
 
     Returns:
-        The value converted to the requested type.
+        str | int | float | datetime.date | datetime.datetime: The value converted
+            to the requested type.
 
     Raises:
         ValueError: If the destination type is invalid or conversion fails.
@@ -238,7 +239,7 @@ def _number_to_type(
         dest_type (str | None): Requested Variable value type.
 
     Returns:
-        The value converted to the requested type.
+        str | float | datetime.date | datetime.datetime: The value converted to the requested type.
 
     Raises:
         ValueError: If the destination type is invalid or conversion fails.
@@ -270,7 +271,7 @@ def _date_to_type(
         dest_type (str | None): Requested Variable value type.
 
     Returns:
-        The value converted to the requested type.
+        str | float | datetime.date | datetime.datetime: The value converted to the requested type.
 
     Raises:
         ValueError: If the destination type is invalid.
@@ -297,7 +298,7 @@ def _datetime_to_type(
         dest_type (str | None): Requested Variable value type.
 
     Returns:
-        The value converted to the requested type.
+        str | float | datetime.date | datetime.datetime: The value converted to the requested type.
 
     Raises:
         ValueError: If the destination type is invalid.
@@ -324,7 +325,8 @@ def value_to_type(
         dest_type (str | None): Requested Variable value type.
 
     Returns:
-        The converted value, or ``None`` for an empty or unavailable input.
+        str | int | float | datetime.date | datetime.datetime | None: The converted
+            value, or ``None`` for an empty or unavailable input.
 
     Raises:
         ValueError: If the input or destination type is invalid.

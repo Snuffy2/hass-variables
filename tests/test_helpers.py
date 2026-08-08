@@ -194,7 +194,7 @@ class StringWrapper:
         """Return the wrapped text.
 
         Returns:
-            Text exposed by the wrapper.
+            str: Text exposed by the wrapper.
         """
         return "wrapped"
 

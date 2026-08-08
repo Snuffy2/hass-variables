@@ -354,6 +354,9 @@ async def test_device_tracker_update_contains_state_write_failure(
 
         Args:
             self (Variable): Device tracker entity whose state write is being replaced.
+
+        Raises:
+            RuntimeError: Always, to emulate a failed state write.
         """
         raise RuntimeError("state write failed")
 
@@ -507,7 +510,7 @@ def device_tracker_ast() -> tuple[ast.Module, ast.ClassDef]:
     """Parse the device tracker platform once for all tests.
 
     Returns:
-        Parsed module and its ``Variable`` entity class.
+        tuple[ast.Module, ast.ClassDef]: Parsed module and its ``Variable`` entity class.
     """
     module = ast.parse(DEVICE_TRACKER_PATH.read_text(encoding="utf-8"))
     variable_class = next(

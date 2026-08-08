@@ -176,7 +176,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         config (ConfigType): Validated Home Assistant configuration.
 
     Returns:
-        True when setup and YAML processing complete successfully.
+        bool: True when setup and YAML processing complete successfully.
     """
 
     async def async_set_variable_legacy_service(call: ServiceCall) -> None:
@@ -270,7 +270,7 @@ async def _async_process_yaml(hass: HomeAssistant, config: ConfigType) -> bool:
         config (ConfigType): Validated Home Assistant configuration.
 
     Returns:
-        True when YAML variable processing completes successfully.
+        bool: True when YAML variable processing completes successfully.
     """
     variables = copy.deepcopy(config.get(DOMAIN, {}))
 
@@ -361,7 +361,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry (ConfigEntry): Config entry that defines the Variable helper.
 
     Returns:
-        True when the platform or device setup completes successfully.
+        bool: True when the platform or device setup completes successfully.
     """
     # _LOGGER.debug(f"[init async_setup_entry] entry: {entry.data}")
     if entry.data.get(CONF_YAML_PRESENT) is True:
@@ -409,7 +409,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry (ConfigEntry): Config entry that defines the Variable helper.
 
     Returns:
-        True when the platform or device unload completes successfully.
+        bool: True when the platform or device unload completes successfully.
     """
     _LOGGER.info(
         "Unloading variable %s (config entry %s) with fields: %s",

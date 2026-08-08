@@ -58,7 +58,7 @@ async def _start_sensor_flow(
         page_1_input (dict[str, Any]): Data submitted to the sensor flow's first page.
 
     Returns:
-        The sensor flow result for its second page.
+        config_entries.ConfigFlowResult: The sensor flow result for its second page.
     """
     result = await hass.config_entries.flow.async_init(
         DOMAIN,

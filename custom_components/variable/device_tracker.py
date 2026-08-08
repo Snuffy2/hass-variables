@@ -257,7 +257,7 @@ class Variable(RestoreEntity, TrackerEntity):
             just_pop (bool): Remove special attributes without applying their values.
 
         Returns:
-            A copy of the remaining attributes, the unsupported input unchanged,
+            Any: A copy of the remaining attributes, the unsupported input unchanged,
             or ``None`` when no attributes were provided.
         """
         if new_attributes is not None:
@@ -397,7 +397,7 @@ class Variable(RestoreEntity, TrackerEntity):
         """Return whether state writes should force an update event.
 
         Returns:
-            Whether the configured force-update option is enabled.
+            bool: Whether the configured force-update option is enabled.
         """
         return bool(self._force_update)
 
@@ -406,7 +406,7 @@ class Variable(RestoreEntity, TrackerEntity):
         """Return the location accuracy of the device.
 
         Returns:
-            Location accuracy in meters, or zero when no value is configured.
+            int: Location accuracy in meters, or zero when no value is configured.
         """
         return self._attr_gps_accuracy if self._attr_gps_accuracy is not None else 0
 
@@ -415,7 +415,8 @@ class Variable(RestoreEntity, TrackerEntity):
         """Return custom device-tracker state attributes.
 
         Returns:
-            Attributes configured for the device tracker, including location context.
+            dict[str, StateType]: Attributes configured for the device tracker,
+                including location context.
         """
         attr = dict(self._attr_extra_state_attributes or {})
         if self._attr_source_type is not None:

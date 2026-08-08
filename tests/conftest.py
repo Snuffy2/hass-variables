@@ -53,7 +53,7 @@ def config_entry_factory(hass: HomeAssistant) -> ConfigEntryFactory:
         hass (HomeAssistant): Home Assistant test instance that receives each config entry.
 
     Returns:
-        A factory that creates and registers a Variable config entry.
+        ConfigEntryFactory: A factory that creates and registers a Variable config entry.
     """
 
     def _create(data: Mapping[str, Any]) -> ConfigEntry:
@@ -63,7 +63,7 @@ def config_entry_factory(hass: HomeAssistant) -> ConfigEntryFactory:
             data (Mapping[str, Any]): Config-entry data to copy into the mock entry.
 
         Returns:
-            The registered Variable config entry.
+            ConfigEntry: The registered Variable config entry.
         """
         entry = MockConfigEntry(
             domain=DOMAIN,
@@ -84,7 +84,7 @@ def sensor_entry(config_entry_factory: ConfigEntryFactory) -> ConfigEntry:
         config_entry_factory (ConfigEntryFactory): Factory that creates registered Variable entries.
 
     Returns:
-        A registered numeric sensor config entry.
+        ConfigEntry: A registered numeric sensor config entry.
     """
     return config_entry_factory(
         {

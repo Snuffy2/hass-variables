@@ -324,7 +324,7 @@ class Variable(RestoreSensor):
         """Return whether Home Assistant should poll the entity.
 
         Returns:
-            False because updates are pushed by services and config entry reloads.
+            bool: False because updates are pushed by services and config entry reloads.
         """
         return False
 
@@ -333,7 +333,7 @@ class Variable(RestoreSensor):
         """Return whether state writes should force an update event.
 
         Returns:
-            Whether the configured force-update option is enabled.
+            bool: Whether the configured force-update option is enabled.
         """
         return bool(self._force_update)
 
@@ -345,7 +345,7 @@ class Variable(RestoreSensor):
             just_pop (bool): Remove special attributes without applying their values.
 
         Returns:
-            A copy of the remaining attributes, the unsupported input unchanged,
+            Any: A copy of the remaining attributes, the unsupported input unchanged,
             or ``None`` when no attributes were provided.
         """
         if new_attributes is not None:
@@ -374,6 +374,9 @@ class Variable(RestoreSensor):
 
         Args:
             kwargs (Any): Registered service fields for the update.
+
+        Raises:
+            ValueError: If the supplied value is incompatible with the variable type.
         """
         _LOGGER.debug("(%s) [async_update_variable] kwargs: %s", self._attr_name, kwargs)
 
@@ -469,6 +472,10 @@ class Variable(RestoreSensor):
 
         Args:
             kwargs (Any): Registered service fields for the increment.
+
+        Raises:
+            TypeError: If the current value is not numeric.
+            ValueError: If the variable type or current string value is invalid.
         """
         value_delta = kwargs.get(ATTR_VALUE_DELTA, 1)
         _LOGGER.debug(
@@ -533,6 +540,10 @@ class Variable(RestoreSensor):
 
         Args:
             kwargs (Any): Registered service fields for the decrement.
+
+        Raises:
+            TypeError: If the current value is not numeric.
+            ValueError: If the variable type or current string value is invalid.
         """
         value_delta = kwargs.get(ATTR_VALUE_DELTA, 1)
         _LOGGER.debug(

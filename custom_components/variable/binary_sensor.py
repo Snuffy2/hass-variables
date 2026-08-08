@@ -308,7 +308,7 @@ class Variable(BinarySensorEntity, RestoreEntity):
         """Return whether Home Assistant should poll the entity.
 
         Returns:
-            False because updates are pushed by services and config entry reloads.
+            bool: False because updates are pushed by services and config entry reloads.
         """
         return False
 
@@ -317,7 +317,7 @@ class Variable(BinarySensorEntity, RestoreEntity):
         """Return whether state writes should force an update event.
 
         Returns:
-            Whether the configured force-update option is enabled.
+            bool: Whether the configured force-update option is enabled.
         """
         return self._force_update
 
@@ -331,7 +331,7 @@ class Variable(BinarySensorEntity, RestoreEntity):
             just_pop (bool): Remove special attributes without applying their values.
 
         Returns:
-            A copy of the remaining attributes or ``None`` when no supported
+            dict[str, Any] | None: A copy of the remaining attributes or ``None`` when no supported
             attributes were provided.
         """
         if new_attributes is not None:
