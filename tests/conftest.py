@@ -33,9 +33,9 @@ def auto_enable_custom_integrations(
     """Enable loading custom integrations in every test.
 
     Args:
-        enable_custom_integrations: Home Assistant fixture that enables custom
+        enable_custom_integrations (None): Home Assistant fixture that enables custom
             integration loading.
-        monkeypatch: Pytest fixture used to expose the repository integration
+        monkeypatch (pytest.MonkeyPatch): Pytest fixture used to expose the repository integration
             package.
     """
     monkeypatch.setattr(
@@ -50,7 +50,7 @@ def config_entry_factory(hass: HomeAssistant) -> ConfigEntryFactory:
     """Return a factory that adds Variable config entries to Home Assistant.
 
     Args:
-        hass: Home Assistant test instance that receives each config entry.
+        hass (HomeAssistant): Home Assistant test instance that receives each config entry.
 
     Returns:
         A factory that creates and registers a Variable config entry.
@@ -60,7 +60,7 @@ def config_entry_factory(hass: HomeAssistant) -> ConfigEntryFactory:
         """Create and register a Variable config entry from supplied data.
 
         Args:
-            data: Config-entry data to copy into the mock entry.
+            data (Mapping[str, Any]): Config-entry data to copy into the mock entry.
 
         Returns:
             The registered Variable config entry.
@@ -81,7 +81,7 @@ def sensor_entry(config_entry_factory: ConfigEntryFactory) -> ConfigEntry:
     """Create a representative sensor config entry.
 
     Args:
-        config_entry_factory: Factory that creates registered Variable entries.
+        config_entry_factory (ConfigEntryFactory): Factory that creates registered Variable entries.
 
     Returns:
         A registered numeric sensor config entry.

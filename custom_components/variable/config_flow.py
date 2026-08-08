@@ -77,7 +77,8 @@ def _normalize_sensor_device_class(
     """Normalize a sensor device class supplied as an enum, value, or name.
 
     Args:
-        device_class: Device class enum or selector value to normalize.
+        device_class (sensor.SensorDeviceClass | str | None): Device class enum or
+            selector value to normalize.
 
     Returns:
         The matching sensor device class, or ``None`` when it is absent or invalid.
@@ -102,7 +103,8 @@ def _sensor_unit_options(
     """Build unit selector options for a normalized sensor device class.
 
     Args:
-        device_class: Normalized sensor device class that determines valid units.
+        device_class (sensor.SensorDeviceClass): Normalized sensor device class that
+            determines valid units.
 
     Returns:
         Selector options for units supported by the device class.
@@ -293,8 +295,8 @@ async def validate_sensor_input(hass: HomeAssistant, data: dict) -> dict[str, An
     """Validate sensor input and derive a config-entry title.
 
     Args:
-        hass: Home Assistant instance hosting the configuration flow.
-        data: Submitted sensor configuration fields.
+        hass (HomeAssistant): Home Assistant instance hosting the configuration flow.
+        data (dict): Submitted sensor configuration fields.
 
     Returns:
         Config-entry metadata containing the derived title.
@@ -314,7 +316,7 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Show the initial configuration-flow menu.
 
         Args:
-            user_input: Submitted data for the initial step, if any.
+            user_input (dict | None): Submitted data for the initial step, if any.
 
         Returns:
             The menu result for selecting a Variable helper type.
@@ -334,9 +336,9 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle the first page for creating a sensor variable.
 
         Args:
-            user_input: Submitted sensor configuration fields, if any.
-            errors: Validation errors keyed by form field.
-            yaml_variable: Whether this flow imports a YAML-defined variable.
+            user_input (dict | None): Submitted sensor configuration fields, if any.
+            errors (dict | None): Validation errors keyed by form field.
+            yaml_variable (bool): Whether this flow imports a YAML-defined variable.
 
         Returns:
             The next configuration-flow result.
@@ -367,8 +369,8 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle the second page for creating a sensor variable.
 
         Args:
-            user_input: Submitted value and attribute fields, if any.
-            errors: Validation errors keyed by form field.
+            user_input (dict | None): Submitted value and attribute fields, if any.
+            errors (dict | None): Validation errors keyed by form field.
 
         Returns:
             A created-entry result or the second-page form result.
@@ -591,9 +593,9 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle creation of a binary-sensor variable.
 
         Args:
-            user_input: Submitted binary-sensor configuration fields, if any.
-            errors: Validation errors keyed by form field.
-            yaml_variable: Whether this flow imports a YAML-defined variable.
+            user_input (dict | None): Submitted binary-sensor configuration fields, if any.
+            errors (dict | None): Validation errors keyed by form field.
+            yaml_variable (bool): Whether this flow imports a YAML-defined variable.
 
         Returns:
             A created-entry result or the binary-sensor form result.
@@ -627,9 +629,9 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle creation of a device-tracker variable.
 
         Args:
-            user_input: Submitted device-tracker configuration fields, if any.
-            errors: Validation errors keyed by form field.
-            yaml_variable: Whether this flow imports a YAML-defined variable.
+            user_input (dict | None): Submitted device-tracker configuration fields, if any.
+            errors (dict | None): Validation errors keyed by form field.
+            yaml_variable (bool): Whether this flow imports a YAML-defined variable.
 
         Returns:
             A created-entry result or the device-tracker form result.
@@ -663,9 +665,9 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle creation of a device variable.
 
         Args:
-            user_input: Submitted device configuration fields, if any.
-            errors: Validation errors keyed by form field.
-            yaml_variable: Whether this flow imports a YAML-defined variable.
+            user_input (dict | None): Submitted device configuration fields, if any.
+            errors (dict | None): Validation errors keyed by form field.
+            yaml_variable (bool): Whether this flow imports a YAML-defined variable.
 
         Returns:
             A created-entry result or the device form result.
@@ -698,7 +700,14 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     # this is run to import the configuration.yaml parameters\
     async def async_step_import(self, import_config: dict | None = None) -> Any:
-        """Import a config entry from configuration.yaml."""
+        """Import a config entry from configuration.yaml.
+
+        Args:
+            import_config (dict | None): YAML-derived configuration fields, if any.
+
+        Returns:
+            The sensor creation flow result for the imported configuration.
+        """
         # _LOGGER.debug(f"[async_step_import] import_config: {import_config}")
         return await self.async_step_add_sensor(user_input=import_config, yaml_variable=True)
 
@@ -710,7 +719,7 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Create the options flow for a Variable config entry.
 
         Args:
-            config_entry: Config entry whose options are being managed.
+            config_entry (config_entries.ConfigEntry): Config entry whose options are being managed.
 
         Returns:
             A new Variable options-flow handler.
@@ -725,7 +734,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
         """Show the initial options-flow menu.
 
         Args:
-            user_input: Submitted data for the initial options step, if any.
+            user_input (dict[str, Any] | None): Submitted data for the initial options step, if any.
 
         Returns:
             The next options-flow result or an abort result.
@@ -752,8 +761,8 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
         """Handle a sensor value change in the options flow.
 
         Args:
-            user_input: Submitted sensor value and attributes, if any.
-            errors: Validation errors keyed by form field.
+            user_input (dict | None): Submitted sensor value and attributes, if any.
+            errors (dict | None): Validation errors keyed by form field.
 
         Returns:
             An updated-entry result or the sensor value-change form.
@@ -838,7 +847,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
         """Build the schema for changing a sensor value.
 
         Args:
-            state: Current Home Assistant state for the sensor entity.
+            state (State): Current Home Assistant state for the sensor entity.
 
         Returns:
             Schema with fields compatible with the sensor's current configuration.
@@ -947,8 +956,8 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
         """Handle a binary-sensor value change in the options flow.
 
         Args:
-            user_input: Submitted binary-sensor value and attributes, if any.
-            errors: Validation errors keyed by form field.
+            user_input (dict | None): Submitted binary-sensor value and attributes, if any.
+            errors (dict | None): Validation errors keyed by form field.
 
         Returns:
             An updated-entry result or the binary-sensor value-change form.
@@ -1008,7 +1017,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
         """Build the schema for changing a binary-sensor value.
 
         Args:
-            state: Current Home Assistant state for the binary-sensor entity.
+            state (State): Current Home Assistant state for the binary-sensor entity.
 
         Returns:
             Schema with fields compatible with the binary sensor configuration.
@@ -1064,8 +1073,8 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
         """Handle a device-tracker value change in the options flow.
 
         Args:
-            user_input: Submitted device-tracker value and attributes, if any.
-            errors: Validation errors keyed by form field.
+            user_input (dict | None): Submitted device-tracker value and attributes, if any.
+            errors (dict | None): Validation errors keyed by form field.
 
         Returns:
             An updated-entry result or the device-tracker value-change form.
@@ -1145,7 +1154,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
         """Build the schema for changing a device-tracker value.
 
         Args:
-            state: Current Home Assistant state for the device-tracker entity.
+            state (State): Current Home Assistant state for the device-tracker entity.
 
         Returns:
             Schema with fields compatible with the device tracker configuration.
@@ -1290,8 +1299,8 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
         """Handle the first sensor options page.
 
         Args:
-            user_input: Submitted sensor option fields, if any.
-            errors: Validation errors keyed by form field.
+            user_input (dict[str, Any] | None): Submitted sensor option fields, if any.
+            errors (dict[str, str] | None): Validation errors keyed by form field.
 
         Returns:
             The next options-flow result.
@@ -1394,8 +1403,8 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
         """Handle the second sensor options page.
 
         Args:
-            user_input: Submitted sensor value and attribute fields, if any.
-            errors: Validation errors keyed by form field.
+            user_input (dict[str, Any] | None): Submitted sensor value and attribute fields, if any.
+            errors (dict[str, str] | None): Validation errors keyed by form field.
 
         Returns:
             An updated-entry result or the second sensor options form.
@@ -1480,7 +1489,8 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
         """Return whether the existing value remains a valid default.
 
         Args:
-            new_device_class: Proposed sensor device class from the options form.
+            new_device_class (sensor.SensorDeviceClass | str | None): Proposed sensor
+                device class from the options form.
 
         Returns:
             Whether the current value is valid and the value to use as its default.
@@ -1714,8 +1724,8 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
         """Handle binary-sensor variable options.
 
         Args:
-            user_input: Submitted binary-sensor option fields, if any.
-            errors: Validation errors keyed by form field.
+            user_input (dict[str, Any] | None): Submitted binary-sensor option fields, if any.
+            errors (dict[str, str] | None): Validation errors keyed by form field.
 
         Returns:
             An updated-entry result or the binary-sensor options form.
@@ -1842,8 +1852,8 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
         """Handle device-tracker variable options.
 
         Args:
-            user_input: Submitted device-tracker option fields, if any.
-            errors: Validation errors keyed by form field.
+            user_input (dict[str, Any] | None): Submitted device-tracker option fields, if any.
+            errors (dict[str, str] | None): Validation errors keyed by form field.
 
         Returns:
             An updated-entry result or the device-tracker options form.
@@ -2049,8 +2059,8 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
         """Handle device options.
 
         Args:
-            user_input: Submitted device option fields, if any.
-            errors: Validation errors keyed by form field.
+            user_input (dict[str, Any] | None): Submitted device option fields, if any.
+            errors (dict[str, str] | None): Validation errors keyed by form field.
 
         Returns:
             An updated-entry result or the device options form.

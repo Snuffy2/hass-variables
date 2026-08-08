@@ -76,9 +76,9 @@ async def async_setup_entry(
     """Set up a Binary Sensor Variable config entry.
 
     Args:
-        hass: Home Assistant instance hosting the integration.
-        config_entry: Config entry that defines the variable.
-        async_add_entities: Callback that adds the created entity.
+        hass (HomeAssistant): Home Assistant instance hosting the integration.
+        config_entry (ConfigEntry): Config entry that defines the variable.
+        async_add_entities (AddEntitiesCallback): Callback that adds the created entity.
     """
     platform = entity_platform.async_get_current_platform()
 
@@ -138,10 +138,10 @@ class Variable(BinarySensorEntity, RestoreEntity):
         """Initialize a Binary Sensor Variable.
 
         Args:
-            hass: Home Assistant instance hosting the entity.
-            config: Variable configuration fields.
-            config_entry: Config entry that owns the entity.
-            unique_id: Stable entity unique identifier.
+            hass (HomeAssistant): Home Assistant instance hosting the entity.
+            config (dict[str, Any]): Variable configuration fields.
+            config_entry (ConfigEntry): Config entry that owns the entity.
+            unique_id (str): Stable entity unique identifier.
         """
         configured_value = config.get(CONF_VALUE)
         if configured_value is None or (
@@ -327,8 +327,8 @@ class Variable(BinarySensorEntity, RestoreEntity):
         """Apply special entity settings and return unconsumed attributes.
 
         Args:
-            new_attributes: Dynamic attribute payload to process.
-            just_pop: Remove special attributes without applying their values.
+            new_attributes (Any): Dynamic attribute payload to process.
+            just_pop (bool): Remove special attributes without applying their values.
 
         Returns:
             A copy of the remaining attributes or ``None`` when no supported
@@ -368,12 +368,11 @@ class Variable(BinarySensorEntity, RestoreEntity):
             return None
         return None
 
-    async def async_update_variable(self, **kwargs) -> None:
+    async def async_update_variable(self, **kwargs: Any) -> None:
         """Update the Binary Sensor Variable state and attributes.
 
         Args:
-            **kwargs: Registered update-service fields, including a value,
-                attributes, and the replace-attributes flag.
+            kwargs (Any): Registered service fields for the update.
         """
         _LOGGER.debug("(%s) [async_update_variable] kwargs: %s", self._attr_name, kwargs)
 
@@ -459,12 +458,11 @@ class Variable(BinarySensorEntity, RestoreEntity):
 
         self.async_write_ha_state()
 
-    async def async_toggle_variable(self, **kwargs) -> None:
+    async def async_toggle_variable(self, **kwargs: Any) -> None:
         """Toggle the Binary Sensor Variable state and update attributes.
 
         Args:
-            **kwargs: Registered toggle-service fields, including attributes
-                and the replace-attributes flag.
+            kwargs (Any): Registered service fields for the toggle.
         """
         _LOGGER.debug("(%s) [async_toggle_variable] kwargs: %s", self._attr_name, kwargs)
 

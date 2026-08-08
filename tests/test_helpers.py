@@ -28,8 +28,8 @@ def test_to_num(value: str, expected: float | None) -> None:
     """Parse numeric strings without raising for invalid input.
 
     Args:
-        value: String to parse.
-        expected: Parsed numeric value, or None for invalid input.
+        value (str): String to parse.
+        expected (float | None): Parsed numeric value, or None for invalid input.
     """
     assert to_num(value) == expected
 
@@ -76,9 +76,9 @@ def test_set_nested_attribute_replaces_incompatible_containers(
     """Replace incompatible intermediate values for the requested path.
 
     Args:
-        initial: Mapping containing an incompatible intermediate value.
-        path: Bracket path to update.
-        expected: Mapping expected after the update.
+        initial (MutableMapping[str, object]): Mapping containing an incompatible intermediate value.
+        path (str): Bracket path to update.
+        expected (MutableMapping[str, object]): Mapping expected after the update.
     """
     set_nested_attribute(initial, path, "new")
 
@@ -126,9 +126,9 @@ def test_set_nested_attribute_rejects_invalid_paths(
     """Raise ValueError for malformed paths and incompatible roots.
 
     Args:
-        target: Root container supplied by the caller.
-        path: Invalid path to apply.
-        message: Expected error message fragment.
+        target (object): Root container supplied by the caller.
+        path (str): Invalid path to apply.
+        message (str): Expected error message fragment.
     """
     with pytest.raises(ValueError, match=message):
         set_nested_attribute(target, path, "value")  # type: ignore[arg-type]
@@ -169,7 +169,7 @@ def test_merge_attribute_dict_deep_copies_without_mutating_inputs(
     """Return an isolated merge without mutating either input.
 
     Args:
-        existing: Existing attributes, or None for a new mapping.
+        existing (MutableMapping[str, object] | None): Existing attributes, or None for a new mapping.
     """
     updates: MutableMapping[str, object] = {"added": ["original"]}
     existing_snapshot = copy.deepcopy(existing)
@@ -221,7 +221,7 @@ def test_value_to_type_returns_none_for_null_like_values(initial: str | None) ->
     """Normalize null-like values before destination conversion.
 
     Args:
-        initial: Null-like value to normalize.
+        initial (str | None): Null-like value to normalize.
     """
     assert value_to_type(initial, "number") is None
 
@@ -273,9 +273,9 @@ def test_value_to_type_converts_strings(
     """Convert valid strings to the requested public destination type.
 
     Args:
-        initial: String value to convert.
-        destination: Requested destination type, or None for the default.
-        expected: Converted value.
+        initial (str): String value to convert.
+        destination (str | None): Requested destination type, or None for the default.
+        expected (str | float | datetime.date | datetime.datetime): Converted value.
     """
     assert value_to_type(initial, destination) == expected
 
@@ -305,9 +305,9 @@ def test_value_to_type_rejects_invalid_string_conversions(
     """Reject unsupported or malformed string conversions.
 
     Args:
-        initial: String value that cannot satisfy the conversion.
-        destination: Requested destination type.
-        message: Expected error message fragment.
+        initial (str): String value that cannot satisfy the conversion.
+        destination (str): Requested destination type.
+        message (str): Expected error message fragment.
     """
     with pytest.raises(ValueError, match=message):
         value_to_type(initial, destination)
@@ -342,9 +342,9 @@ def test_value_to_type_converts_numbers(
     """Convert numeric input to supported destination types.
 
     Args:
-        initial: Numeric value to convert.
-        destination: Requested destination type, or None for the default.
-        expected: Converted value.
+        initial (float): Numeric value to convert.
+        destination (str | None): Requested destination type, or None for the default.
+        expected (str | float | datetime.date | datetime.datetime): Converted value.
     """
     assert value_to_type(initial, destination) == expected
 
@@ -365,8 +365,8 @@ def test_value_to_type_rejects_invalid_numeric_conversions(destination: str, mes
     """Reject malformed or unsupported numeric conversions.
 
     Args:
-        destination: Requested destination type.
-        message: Expected error message fragment.
+        destination (str): Requested destination type.
+        message (str): Expected error message fragment.
     """
     with pytest.raises(ValueError, match=message):
         value_to_type(1, destination)
@@ -397,8 +397,8 @@ def test_value_to_type_converts_dates(
     """Convert date input to supported destination types.
 
     Args:
-        destination: Requested destination type, or None for the default.
-        expected: Converted value.
+        destination (str | None): Requested destination type, or None for the default.
+        expected (str | float | datetime.date | datetime.datetime): Converted value.
     """
     assert value_to_type(datetime.date(2026, 7, 24), destination) == expected
 
@@ -435,8 +435,8 @@ def test_value_to_type_converts_datetimes(
     """Convert an aware datetime to supported destination types.
 
     Args:
-        destination: Requested destination type, or None for the default.
-        expected: Converted value.
+        destination (str | None): Requested destination type, or None for the default.
+        expected (str | float | datetime.date | datetime.datetime): Converted value.
     """
     initial = datetime.datetime(2026, 7, 24, 12, 30, tzinfo=datetime.UTC)
 
@@ -467,7 +467,7 @@ def test_value_to_type_rejects_invalid_temporal_destination(
     """Reject an unsupported destination for temporal input.
 
     Args:
-        initial: Date or timezone-aware datetime input.
+        initial (datetime.date | datetime.datetime): Date or timezone-aware datetime input.
     """
     with pytest.raises(ValueError, match="Invalid dest_type"):
         value_to_type(initial, "boolean")

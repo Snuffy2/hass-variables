@@ -38,7 +38,7 @@ async def test_yaml_setup_and_reload_manage_config_entries(
     """Create, update, and remove YAML variables through Home Assistant APIs.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
     """
     initial_config = {
         DOMAIN: {
@@ -105,7 +105,7 @@ async def test_yaml_setup_preserves_native_date(hass: HomeAssistant) -> None:
     """Preserve a YAML-native date through config-entry import.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
     """
     native_date = date(2026, 8, 8)
 
@@ -181,12 +181,12 @@ async def test_setup_entry_creates_platform_entity(
     """Load a config entry and expose its entity through Home Assistant state.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config_entry_factory: Factory that creates the platform config entry.
-        data: Platform-specific config-entry data to load.
-        entity_id: Expected entity identifier after setup.
-        expected_state: Expected state value for the created entity.
-        expected_attributes: Expected attributes for the created entity.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the platform config entry.
+        data (dict[str, Any]): Platform-specific config-entry data to load.
+        entity_id (str): Expected entity identifier after setup.
+        expected_state (str): Expected state value for the created entity.
+        expected_attributes (dict[str, Any]): Expected attributes for the created entity.
     """
     marker = expected_attributes["marker"]
     entry_data = {
@@ -219,8 +219,8 @@ async def test_unload_entry_removes_active_entity(
     """Unload a platform entry and remove its active entity state.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        sensor_entry: Sensor config entry to set up and unload.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        sensor_entry (ConfigEntry): Sensor config entry to set up and unload.
     """
     assert await hass.config_entries.async_setup(sensor_entry.entry_id)
     await hass.async_block_till_done()
@@ -242,9 +242,9 @@ async def test_setup_entry_calls_helper_device_cleanup(
     """Call helper device cleanup before forwarding platform setup.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        sensor_entry: Sensor config entry to set up.
-        monkeypatch: Pytest fixture used to stub helper cleanup.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        sensor_entry (ConfigEntry): Sensor config entry to set up.
+        monkeypatch (pytest.MonkeyPatch): Pytest fixture used to stub helper cleanup.
     """
     cleanup = MagicMock()
     monkeypatch.setattr(
@@ -269,7 +269,7 @@ def test_async_remove_helper_devices_fallback_maps_keyword_arguments(
     """Map the 2026.8 helper cleanup API onto the legacy device helper.
 
     Args:
-        monkeypatch: Pytest fixture used to simulate missing helper APIs.
+        monkeypatch (pytest.MonkeyPatch): Pytest fixture used to simulate missing helper APIs.
     """
     stale_calls: list[tuple[str, str | None]] = []
 
@@ -308,8 +308,8 @@ async def test_remove_entry_cleans_up_entity_registry(
     """Remove a config entry and clean up its entity registry record.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        sensor_entry: Sensor config entry to set up and remove.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        sensor_entry (ConfigEntry): Sensor config entry to set up and remove.
     """
     assert await hass.config_entries.async_setup(sensor_entry.entry_id)
     await hass.async_block_till_done()

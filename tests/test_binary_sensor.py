@@ -35,8 +35,8 @@ async def test_binary_sensor_restore_cache_is_applied_during_config_entry_setup(
     """Restore a binary sensor's public state and custom attributes on startup.
 
     Args:
-        hass: Home Assistant test instance.
-        config_entry_factory: Factory for test configuration entries.
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
     """
     entity_id = "binary_sensor.restored_binary"
     restored_state = STATE_ON
@@ -71,8 +71,8 @@ async def test_device_linked_binary_sensor_name_is_not_prefixed_again_after_relo
     """Keep a device-linked binary sensor's friendly name stable across reload.
 
     Args:
-        hass: Home Assistant test instance.
-        config_entry_factory: Factory for test configuration entries.
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
     """
     entity_id = "binary_sensor.linked_contact"
     restored_state = STATE_ON
@@ -143,11 +143,11 @@ async def test_binary_sensor_toggle_service(
     """Toggle known binary states while preserving the public unknown state.
 
     Args:
-        hass: Home Assistant test instance.
-        config_entry_factory: Factory for test configuration entries.
-        initial_value: Initial variable value provided to the binary sensor.
-        expected_state: Expected public state after toggling.
-        variable_suffix: Stable suffix for the test variable and entity IDs.
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+        initial_value (str | None): Initial variable value provided to the binary sensor.
+        expected_state (str): Expected public state after toggling.
+        variable_suffix (str): Stable suffix for the test variable and entity IDs.
     """
     entry = config_entry_factory(
         {

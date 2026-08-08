@@ -26,8 +26,8 @@ async def create_device(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Create or update a Variable helper device.
 
     Args:
-        hass: Home Assistant instance hosting the integration.
-        entry: Variable config entry that defines the helper device.
+        hass (HomeAssistant): Home Assistant instance hosting the integration.
+        entry (ConfigEntry): Variable config entry that defines the helper device.
     """
     # _LOGGER.debug(f"({entry.title}) [create_device] entry: {entry}")
 
@@ -90,9 +90,9 @@ async def update_device(
     """Update a Variable helper device.
 
     Args:
-        hass: Home Assistant instance hosting the integration.
-        entry: Variable config entry associated with the helper device.
-        user_input: Device registry fields to update.
+        hass (HomeAssistant): Home Assistant instance hosting the integration.
+        entry (ConfigEntry): Variable config entry associated with the helper device.
+        user_input (dict[str, Any]): Device registry fields to update.
 
     Returns:
         True when the device was updated; False when no matching device exists.
@@ -124,8 +124,8 @@ async def remove_device(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Remove a Variable helper device.
 
     Args:
-        hass: Home Assistant instance hosting the integration.
-        entry: Variable config entry associated with the helper device.
+        hass (HomeAssistant): Home Assistant instance hosting the integration.
+        entry (ConfigEntry): Variable config entry associated with the helper device.
 
     Returns:
         True after the matching device is removed or when none exists.

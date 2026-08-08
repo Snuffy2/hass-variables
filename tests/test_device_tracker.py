@@ -48,8 +48,8 @@ async def test_device_tracker_restore_cache_is_applied_during_config_entry_setup
     """Restore a tracker's public state and custom attributes on startup.
 
     Args:
-        hass: Home Assistant test instance.
-        config_entry_factory: Factory for test configuration entries.
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
     """
     entity_id = "device_tracker.restored_tracker"
     restored_location_name = "Studio"
@@ -92,8 +92,8 @@ async def test_device_tracker_empty_restore_uses_config_attributes(
     """Apply configured custom and special attributes when the restore cache is empty.
 
     Args:
-        hass: Home Assistant test instance.
-        config_entry_factory: Factory for test configuration entries.
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
     """
     entity_id = "device_tracker.empty_restored_tracker"
     mock_restore_cache(hass, [State(entity_id, STATE_UNKNOWN, {})])
@@ -130,8 +130,8 @@ async def test_updated_device_tracker_discards_reserved_restored_attributes(
     """Keep updated tracker settings while restoring only custom attributes.
 
     Args:
-        hass: Home Assistant test instance.
-        config_entry_factory: Factory for test configuration entries.
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
     """
     entity_id = "device_tracker.updated_tracker"
     mock_restore_cache(
@@ -182,9 +182,9 @@ def test_update_attr_settings_rejects_non_mapping_and_handles_none(
     """Return unsupported helper inputs unchanged and report invalid data.
 
     Args:
-        hass: Home Assistant test instance.
-        config_entry_factory: Factory for test configuration entries.
-        caplog: Pytest log capture fixture.
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+        caplog (pytest.LogCaptureFixture): Pytest log capture fixture.
     """
     entry = config_entry_factory({CONF_VARIABLE_ID: "helper_tracker"})
     tracker = Variable(hass, entry.data, entry, entry.entry_id)
@@ -202,8 +202,8 @@ async def test_device_linked_tracker_name_is_not_prefixed_again_after_reload(
     """Keep a device-linked tracker's friendly name stable across reload.
 
     Args:
-        hass: Home Assistant test instance.
-        config_entry_factory: Factory for test configuration entries.
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
     """
     entity_id = "device_tracker.linked_tracker"
     restored_state = "Workshop"
@@ -263,8 +263,8 @@ async def test_device_tracker_update_and_delete_services(
     """Update tracker location data, then delete its optional location fields.
 
     Args:
-        hass: Home Assistant test instance.
-        config_entry_factory: Factory for test configuration entries.
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
     """
     entity_id = "device_tracker.service_tracker"
     entry = config_entry_factory(
@@ -331,10 +331,10 @@ async def test_device_tracker_update_contains_state_write_failure(
     """Contain a state-write failure from the public tracker update service.
 
     Args:
-        hass: Home Assistant test instance.
-        config_entry_factory: Factory for test configuration entries.
-        monkeypatch: Pytest fixture for replacing the state writer.
-        caplog: Pytest log capture fixture.
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+        monkeypatch (pytest.MonkeyPatch): Pytest fixture for replacing the state writer.
+        caplog (pytest.LogCaptureFixture): Pytest log capture fixture.
     """
     entity_id = "device_tracker.failing_write_tracker"
     entry = config_entry_factory(
@@ -350,7 +350,11 @@ async def test_device_tracker_update_contains_state_write_failure(
     await hass.async_block_till_done()
 
     def raise_write_failure(self: Variable) -> None:
-        """Raise a representative Home Assistant state-write failure."""
+        """Raise a representative Home Assistant state-write failure.
+
+        Args:
+            self (Variable): Device tracker entity whose state write is being replaced.
+        """
         raise RuntimeError("state write failed")
 
     monkeypatch.setattr(Variable, "async_write_ha_state", raise_write_failure)
@@ -373,9 +377,9 @@ async def test_legacy_device_tracker_location_name_state_compatibility(
     """Preserve location-name state when running on HA before 2026.6.
 
     Args:
-        hass: Home Assistant test instance.
-        config_entry_factory: Factory for test configuration entries.
-        monkeypatch: Pytest fixture for selecting the legacy capability path.
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+        monkeypatch (pytest.MonkeyPatch): Pytest fixture for selecting the legacy capability path.
     """
     monkeypatch.setattr(
         "custom_components.variable.device_tracker.SUPPORTS_TRACKER_IN_ZONES",
@@ -442,8 +446,8 @@ async def test_device_tracker_in_zones_service_and_delete(
     """Set and delete a coordinate-free tracker's explicit zone membership.
 
     Args:
-        hass: Home Assistant test instance.
-        config_entry_factory: Factory for test configuration entries.
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
     """
     entity_id = "device_tracker.zone_tracker"
     zone_id = "zone.workshop"
@@ -500,7 +504,11 @@ DEVICE_TRACKER_PATH = (
 
 @pytest.fixture(scope="module")
 def device_tracker_ast() -> tuple[ast.Module, ast.ClassDef]:
-    """Parse the device tracker platform once for all tests."""
+    """Parse the device tracker platform once for all tests.
+
+    Returns:
+        Parsed module and its ``Variable`` entity class.
+    """
     module = ast.parse(DEVICE_TRACKER_PATH.read_text(encoding="utf-8"))
     variable_class = next(
         node for node in module.body if isinstance(node, ast.ClassDef) and node.name == "Variable"
@@ -511,7 +519,11 @@ def device_tracker_ast() -> tuple[ast.Module, ast.ClassDef]:
 def test_tracker_entity_is_imported_from_public_module(
     device_tracker_ast: tuple[ast.Module, ast.ClassDef],
 ) -> None:
-    """TrackerEntity should use Home Assistant's public import path."""
+    """TrackerEntity should use Home Assistant's public import path.
+
+    Args:
+        device_tracker_ast (tuple[ast.Module, ast.ClassDef]): Parsed device tracker module and entity class.
+    """
     module, _ = device_tracker_ast
     tracker_imports = [
         node.module
@@ -526,7 +538,11 @@ def test_tracker_entity_is_imported_from_public_module(
 def test_variable_does_not_override_final_tracker_properties(
     device_tracker_ast: tuple[ast.Module, ast.ClassDef],
 ) -> None:
-    """Variable should not override deprecated or final tracker properties."""
+    """Variable should not override deprecated or final tracker properties.
+
+    Args:
+        device_tracker_ast (tuple[ast.Module, ast.ClassDef]): Parsed device tracker module and entity class.
+    """
     _, variable_class = device_tracker_ast
     method_names = {
         node.name
@@ -540,7 +556,11 @@ def test_variable_does_not_override_final_tracker_properties(
 def test_legacy_location_name_attribute_is_capability_gated(
     device_tracker_ast: tuple[ast.Module, ast.ClassDef],
 ) -> None:
-    """Only the legacy compatibility helper may use the deprecated shorthand."""
+    """Only the legacy compatibility helper may use the deprecated shorthand.
+
+    Args:
+        device_tracker_ast (tuple[ast.Module, ast.ClassDef]): Parsed device tracker module and entity class.
+    """
     module, variable_class = device_tracker_ast
     legacy_usage_methods = [
         node.name

@@ -68,10 +68,10 @@ def async_remove_helper_devices(
     """Remove stale helper device links.
 
     Args:
-        hass: Home Assistant instance hosting the helper integration.
-        helper_config_entry_id: Config entry identifier for the helper.
-        source_device_id: Device identifier that should remain linked.
-        remove_all_devices: Remove all stale helper devices on HA 2026.8 and newer.
+        hass (HomeAssistant): Home Assistant instance hosting the helper integration.
+        helper_config_entry_id (str): Config entry identifier for the helper.
+        source_device_id (str | None): Device identifier that should remain linked.
+        remove_all_devices (bool): Remove all stale helper devices on HA 2026.8 and newer.
     """
     if _async_remove_helper_devices is not None:
         _async_remove_helper_devices(
@@ -135,7 +135,12 @@ CONFIG_SCHEMA = vol.Schema(
 
 
 async def _async_exclude_entity_from_recorder(hass: HomeAssistant, entity_id: str) -> None:
-    """Exclude an entity from recorder by updating recorder's internal config."""
+    """Exclude an entity from recorder by updating recorder's internal config.
+
+    Args:
+        hass (HomeAssistant): Home Assistant instance hosting the integration.
+        entity_id (str): Entity identifier to exclude from recorder history.
+    """
     try:
         recorder_config_getter = getattr(hass.config, "get", None)
         if not callable(recorder_config_getter):
@@ -167,8 +172,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the Variable services.
 
     Args:
-        hass: Home Assistant instance hosting the integration.
-        config: Validated Home Assistant configuration.
+        hass (HomeAssistant): Home Assistant instance hosting the integration.
+        config (ConfigType): Validated Home Assistant configuration.
 
     Returns:
         True when setup and YAML processing complete successfully.
@@ -178,7 +183,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         """Handle calls to the set_variable legacy service.
 
         Args:
-            call: Legacy service call containing a variable identifier and updates.
+            call (ServiceCall): Legacy service call containing a variable identifier and updates.
         """
         # _LOGGER.debug(f"[async_set_variable_legacy_service] Pre call data: {call.data}")
         entity_id_format = Platform.SENSOR + ".{}"
@@ -190,7 +195,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         """Handle calls to the set_entity legacy service.
 
         Args:
-            call: Legacy service call containing an entity identifier and updates.
+            call (ServiceCall): Legacy service call containing an entity identifier and updates.
         """
         # _LOGGER.debug(f"[async_set_entity_legacy_service] call data: {call.data}")
         entity = call.data.get(ATTR_ENTITY)
@@ -203,8 +208,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         """Forward a legacy service call to the update sensor service.
 
         Args:
-            call: Legacy service call containing the requested updates.
-            var_ent: Entity identifier to update.
+            call (ServiceCall): Legacy service call containing the requested updates.
+            var_ent (str): Entity identifier to update.
         """
         # _LOGGER.debug(f"[async_set_legacy_service] call data: {call.data}")
         update_sensor_data = {
@@ -228,7 +233,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         """Handle a reload service call.
 
         Args:
-            service: Reload service call that triggered YAML processing.
+            service (ServiceCall): Reload service call that triggered YAML processing.
         """
         _LOGGER.info("Service %s.reload called: reloading YAML integration", DOMAIN)
         reload_config = None
@@ -261,8 +266,8 @@ async def _async_process_yaml(hass: HomeAssistant, config: ConfigType) -> bool:
     """Process YAML variable configuration.
 
     Args:
-        hass: Home Assistant instance.
-        config: Validated Home Assistant configuration.
+        hass (HomeAssistant): Home Assistant instance.
+        config (ConfigType): Validated Home Assistant configuration.
 
     Returns:
         True when YAML variable processing completes successfully.
@@ -352,8 +357,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the Variable integration from a config entry.
 
     Args:
-        hass: Home Assistant instance hosting the integration.
-        entry: Config entry that defines the Variable helper.
+        hass (HomeAssistant): Home Assistant instance hosting the integration.
+        entry (ConfigEntry): Config entry that defines the Variable helper.
 
     Returns:
         True when the platform or device setup completes successfully.
@@ -368,7 +373,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not entry.data.get(CONF_YAML_VARIABLE, False):
 
         async def _async_on_entry_update(hass: HomeAssistant, entry: ConfigEntry) -> None:
-            """Handle config entry update."""
+            """Reload an updated Variable config entry.
+
+            Args:
+                hass (HomeAssistant): Home Assistant instance hosting the integration.
+                entry (ConfigEntry): Variable config entry that was updated.
+            """
             _LOGGER.debug("Config entry updated: %s", entry.data.get(CONF_VARIABLE_ID))
             await hass.config_entries.async_reload(entry.entry_id)
 
@@ -395,8 +405,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a Variable config entry.
 
     Args:
-        hass: Home Assistant instance hosting the integration.
-        entry: Config entry that defines the Variable helper.
+        hass (HomeAssistant): Home Assistant instance hosting the integration.
+        entry (ConfigEntry): Config entry that defines the Variable helper.
 
     Returns:
         True when the platform or device unload completes successfully.
@@ -426,8 +436,8 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Remove entity registry entries tied to a config entry.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        entry: Config entry being permanently removed.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        entry (ConfigEntry): Config entry being permanently removed.
     """
     registry = er.async_get(hass)
     entries = er.async_entries_for_config_entry(registry, entry.entry_id)

@@ -54,8 +54,8 @@ async def _start_sensor_flow(
     """Start a sensor flow and submit its first page.
 
     Args:
-        hass: Home Assistant instance that owns the flow.
-        page_1_input: Data submitted to the sensor flow's first page.
+        hass (HomeAssistant): Home Assistant instance that owns the flow.
+        page_1_input (dict[str, Any]): Data submitted to the sensor flow's first page.
 
     Returns:
         The sensor flow result for its second page.
@@ -82,7 +82,7 @@ async def test_user_flow_menu(hass: HomeAssistant) -> None:
     """Expose every supported config-entry workflow from the user menu.
 
     Args:
-        hass: Home Assistant instance that owns the flow.
+        hass (HomeAssistant): Home Assistant instance that owns the flow.
     """
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
@@ -102,7 +102,7 @@ async def test_sensor_flow_creates_typed_entry(hass: HomeAssistant) -> None:
     """Create a numeric sensor through both pages of the real flow API.
 
     Args:
-        hass: Home Assistant instance that owns the flow.
+        hass (HomeAssistant): Home Assistant instance that owns the flow.
     """
     result = await _start_sensor_flow(
         hass,
@@ -270,14 +270,14 @@ async def test_typed_sensor_flow_matrix(
     """Create typed sensors through the public flow and expose their live state.
 
     Args:
-        hass: Home Assistant instance that owns the flow.
-        variable_id: Unique identifier for the variable under test.
-        device_class: Sensor device class that determines value validation.
-        page_2_input: Data submitted to the sensor flow's second page.
-        expected_value_type: Expected stored variable value type.
-        expected_value: Expected stored variable value.
-        expected_state: Expected Home Assistant entity state.
-        expected_attributes: Expected attributes exposed by the entity.
+        hass (HomeAssistant): Home Assistant instance that owns the flow.
+        variable_id (str): Unique identifier for the variable under test.
+        device_class (SensorDeviceClass): Sensor device class that determines value validation.
+        page_2_input (dict[str, Any]): Data submitted to the sensor flow's second page.
+        expected_value_type (str): Expected stored variable value type.
+        expected_value (object): Expected stored variable value.
+        expected_state (str): Expected Home Assistant entity state.
+        expected_attributes (dict[str, Any]): Expected attributes exposed by the entity.
     """
     result = await _start_sensor_flow(
         hass,
@@ -346,11 +346,11 @@ async def test_typed_sensor_flow_rejects_incompatible_values(
     """Keep typed sensor flows open and entry-free for incompatible values.
 
     Args:
-        hass: Home Assistant instance that owns the flow.
-        variable_id: Unique identifier for the variable under test.
-        device_class: Sensor device class that determines value validation.
-        invalid_value: Value that is incompatible with the device class.
-        raises_invalid_data: Whether the flow is expected to raise InvalidData.
+        hass (HomeAssistant): Home Assistant instance that owns the flow.
+        variable_id (str): Unique identifier for the variable under test.
+        device_class (SensorDeviceClass): Sensor device class that determines value validation.
+        invalid_value (str): Value that is incompatible with the device class.
+        raises_invalid_data (bool): Whether the flow is expected to raise InvalidData.
     """
     result = await _start_sensor_flow(
         hass,
@@ -403,9 +403,9 @@ async def test_temperature_flow_rejects_invalid_typed_selection(
     """Reject state classes and units not offered by the typed sensor page.
 
     Args:
-        hass: Home Assistant instance that owns the flow.
-        invalid_input: Invalid data submitted to the sensor flow's second page.
-        error_key: Schema field expected to report the validation error.
+        hass (HomeAssistant): Home Assistant instance that owns the flow.
+        invalid_input (dict[str, Any]): Invalid data submitted to the sensor flow's second page.
+        error_key (str): Schema field expected to report the validation error.
     """
     result = await _start_sensor_flow(
         hass,
@@ -485,12 +485,12 @@ async def test_single_page_flows_create_entries(
     """Create and fully set up each single-page config flow.
 
     Args:
-        hass: Home Assistant instance that owns the flow.
-        step_id: Menu option that selects the config-flow step.
-        user_input: Data submitted to the selected flow step.
-        expected_platform: Expected platform stored in the config entry.
-        expected_entity_id: Expected entity ID, if the flow creates an entity.
-        expected_state: Expected entity state, if the flow creates an entity.
+        hass (HomeAssistant): Home Assistant instance that owns the flow.
+        step_id (str): Menu option that selects the config-flow step.
+        user_input (dict[str, Any]): Data submitted to the selected flow step.
+        expected_platform (str): Expected platform stored in the config entry.
+        expected_entity_id (str | None): Expected entity ID, if the flow creates an entity.
+        expected_state (str | None): Expected entity state, if the flow creates an entity.
     """
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
@@ -527,7 +527,7 @@ async def test_device_flow_rejects_invalid_configuration_url(hass: HomeAssistant
     """Report an invalid URL without creating a device config entry.
 
     Args:
-        hass: Home Assistant instance that owns the flow.
+        hass (HomeAssistant): Home Assistant instance that owns the flow.
     """
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
@@ -552,7 +552,7 @@ async def test_add_sensor_normalizes_enum_name_device_class(hass: HomeAssistant)
     """Build typed state-class and unit choices from a device-class enum name.
 
     Args:
-        hass: Home Assistant instance that owns the flow.
+        hass (HomeAssistant): Home Assistant instance that owns the flow.
     """
     flow = VariableConfigFlow()
     flow.hass = hass
@@ -582,7 +582,7 @@ async def test_yaml_entry_aborts_options_flow(hass: HomeAssistant) -> None:
     """Reject options for a variable managed through YAML.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
     """
     assert await async_setup_component(
         hass,
@@ -609,8 +609,8 @@ async def test_unsupported_platform_aborts_options_flow(
     """Abort options cleanly when an entry has an unsupported platform.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config_entry_factory: Factory that creates the unsupported config entry.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the unsupported config entry.
     """
     entry = config_entry_factory(
         {
@@ -633,8 +633,8 @@ async def test_options_flow_changes_loaded_sensor_value(
     """Change a live entity through the options workflow and its entity service.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        sensor_entry: Loaded sensor config entry to update.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        sensor_entry (ConfigEntry): Loaded sensor config entry to update.
     """
     assert await hass.config_entries.async_setup(sensor_entry.entry_id)
     await hass.async_block_till_done()
@@ -670,8 +670,8 @@ async def test_sensor_options_flow_updates_entry_and_live_entity(
     """Persist both sensor option pages and reload the live entity.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        sensor_entry: Loaded sensor config entry to update.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        sensor_entry (ConfigEntry): Loaded sensor config entry to update.
     """
     assert await hass.config_entries.async_setup(sensor_entry.entry_id)
     await hass.async_block_till_done()
@@ -721,8 +721,8 @@ async def test_sensor_options_normalizes_string_device_class(
     """Expose state-class choices for a string-valued sensor device class.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        sensor_entry: Sensor config entry whose options flow is under test.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        sensor_entry (ConfigEntry): Sensor config entry whose options flow is under test.
     """
     result = await hass.config_entries.options.async_init(sensor_entry.entry_id)
     result = await hass.config_entries.options.async_configure(
@@ -761,8 +761,8 @@ async def test_sensor_pages_use_identical_monetary_unit_options(
     """Expose the same labeled currency choices in add and options flows.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        sensor_entry: Sensor config entry whose options flow is under test.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        sensor_entry (ConfigEntry): Sensor config entry whose options flow is under test.
     """
     add_flow = VariableConfigFlow()
     add_flow.hass = hass
@@ -811,8 +811,8 @@ async def test_binary_sensor_options_update_entry_and_live_entity(
     """Persist binary sensor options and reload its state and attributes.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config_entry_factory: Factory that creates the binary-sensor config entry.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the binary-sensor config entry.
     """
     entry = config_entry_factory(
         {
@@ -867,8 +867,8 @@ async def test_device_tracker_options_update_entry_and_live_entity(
     """Persist tracker options and reload its coordinates and attributes.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config_entry_factory: Factory that creates the device-tracker config entry.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the device-tracker config entry.
     """
     entry = config_entry_factory(
         {
@@ -935,8 +935,8 @@ async def test_binary_sensor_options_flow_changes_live_entity(
     """Change binary state and attributes through the options workflow.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config_entry_factory: Factory that creates the binary-sensor config entry.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the binary-sensor config entry.
     """
     entry = config_entry_factory(
         {
@@ -979,8 +979,8 @@ async def test_device_tracker_options_flow_changes_live_entity(
     """Change tracker coordinates and metadata through the options workflow.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config_entry_factory: Factory that creates the device-tracker config entry.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the device-tracker config entry.
     """
     entry = config_entry_factory(
         {
@@ -1035,8 +1035,8 @@ async def test_device_options_flow_updates_registry_metadata(
     """Persist device options and update the existing registry record.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config_entry_factory: Factory that creates the device config entry.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the device config entry.
     """
     entry = config_entry_factory(
         {
@@ -1081,8 +1081,8 @@ async def test_device_options_invalid_url_preserves_entry_and_registry(
     """Keep device data unchanged when its options URL is invalid.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config_entry_factory: Factory that creates the device config entry.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the device config entry.
     """
     entry = config_entry_factory(
         {

@@ -24,7 +24,7 @@ def _parse_attribute_path(path: str) -> list[str | int]:
     enclosed in brackets become integer tokens.
 
     Args:
-        path: Attribute path to tokenize.
+        path (str): Attribute path to tokenize.
 
     Returns:
         The ordered mapping-key and list-index tokens from the path.
@@ -67,9 +67,9 @@ def set_nested_attribute(target: MutableMapping[str, Any], path: str, value: Any
     """Set a deeply nested mapping or list value from bracket-path notation.
 
     Args:
-        target: Mutable mapping to update in place.
-        path: Dot- and bracket-delimited path to the target value.
-        value: Value to deep-copy into the target path.
+        target (MutableMapping[str, Any]): Mutable mapping to update in place.
+        path (str): Dot- and bracket-delimited path to the target value.
+        value (Any): Value to deep-copy into the target path.
 
     Raises:
         ValueError: If the path is empty or has invalid bracket notation.
@@ -129,8 +129,8 @@ def merge_attribute_dict(
     """Deep-copy and merge attributes, resolving bracket-path keys.
 
     Args:
-        existing: Existing attributes to preserve, if any.
-        updates: New attributes to merge into the result.
+        existing (Mapping[str, Any] | None): Existing attributes to preserve, if any.
+        updates (Mapping[str, Any]): New attributes to merge into the result.
 
     Returns:
         A deep-copied attribute mapping containing both inputs.
@@ -148,7 +148,7 @@ def to_num(s: str) -> int | float | None:
     """Convert a string to an integer or float when possible.
 
     Args:
-        s: String representation of a numeric value.
+        s (str): String representation of a numeric value.
 
     Returns:
         The parsed integer or float, or ``None`` when the string is not numeric.
@@ -166,12 +166,15 @@ def _raise_conversion_error(source: str, dest_type: str, value: object) -> Never
     """Raise a consistent conversion error after recording debug context.
 
     Args:
-        source: Source value category that could not be converted.
-        dest_type: Requested Variable value type.
-        value: Value that failed conversion.
+        source (str): Source value category that could not be converted.
+        dest_type (str): Requested Variable value type.
+        value (object): Value that failed conversion.
 
     Raises:
         ValueError: Always, with the conversion context.
+
+    Returns:
+        This function never returns.
     """
     _LOGGER.debug("Cannot convert %s to %s: %s, returning None", source, dest_type, value)
     raise ValueError(f"Cannot convert {source} to {dest_type}: {value}")
@@ -181,7 +184,7 @@ def _normalize_datetime(value: datetime.datetime) -> datetime.datetime:
     """Attach UTC to naive datetime values while retaining aware values.
 
     Args:
-        value: Datetime value to normalize.
+        value (datetime.datetime): Datetime value to normalize.
 
     Returns:
         The original aware datetime or a UTC-aware replacement for a naive one.
@@ -197,8 +200,8 @@ def _string_to_type(
     """Convert a string to the requested variable value type.
 
     Args:
-        value: String value to convert.
-        dest_type: Requested Variable value type.
+        value (str): String value to convert.
+        dest_type (str | None): Requested Variable value type.
 
     Returns:
         The value converted to the requested type.
@@ -231,8 +234,8 @@ def _number_to_type(
     """Convert a numeric value to the requested variable value type.
 
     Args:
-        value: Numeric value to convert.
-        dest_type: Requested Variable value type.
+        value (float): Numeric value to convert.
+        dest_type (str | None): Requested Variable value type.
 
     Returns:
         The value converted to the requested type.
@@ -263,8 +266,8 @@ def _date_to_type(
     """Convert a date to the requested variable value type.
 
     Args:
-        value: Date value to convert.
-        dest_type: Requested Variable value type.
+        value (datetime.date): Date value to convert.
+        dest_type (str | None): Requested Variable value type.
 
     Returns:
         The value converted to the requested type.
@@ -290,8 +293,8 @@ def _datetime_to_type(
     """Convert a datetime to the requested variable value type.
 
     Args:
-        value: Datetime value to convert.
-        dest_type: Requested Variable value type.
+        value (datetime.datetime): Datetime value to convert.
+        dest_type (str | None): Requested Variable value type.
 
     Returns:
         The value converted to the requested type.
@@ -316,8 +319,8 @@ def value_to_type(
     """Convert a variable value to its configured destination type.
 
     Args:
-        init_val: Initial value supplied by YAML, a service, or a template.
-        dest_type: Requested Variable value type.
+        init_val (Any): Initial value supplied by YAML, a service, or a template.
+        dest_type (str | None): Requested Variable value type.
 
     Returns:
         The converted value, or ``None`` for an empty or unavailable input.
