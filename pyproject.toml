@@ -27,7 +27,7 @@ version = { attr = "custom_components.variable.const.VERSION" }
 [dependency-groups]
 ha = [
     "homeassistant",
-    "iso4217>=1.11.20220401",
+    "iso4217>=1.15",
 ]
 lint = [
     { include-group = "ha" },

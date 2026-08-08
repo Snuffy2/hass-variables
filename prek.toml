@@ -51,7 +51,7 @@ args = ["--config-file=pyproject.toml"]
 pass_filenames = false
 additional_dependencies = [
   "homeassistant-stubs",
-  "iso4217>=1.11.20220401",
+  "iso4217>=1.15",
   "pytest",
   "pytest-asyncio",
   "pytest-cov",
