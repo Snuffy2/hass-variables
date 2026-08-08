@@ -44,6 +44,7 @@ from .const import (
     CONF_YAML_PRESENT,
     CONF_YAML_VARIABLE,
     DEFAULT_REPLACE_ATTRIBUTES,
+    DEFAULT_RESTORE,
     DOMAIN,
     PLATFORMS,
     SERVICE_UPDATE_SENSOR,
@@ -338,6 +339,7 @@ def _yaml_entry_data(variable_id: str, variable_config: Mapping[str, Any]) -> di
         CONF_VARIABLE_ID: variable_id,
         CONF_YAML_VARIABLE: True,
         CONF_ATTRIBUTES: attributes,
+        CONF_RESTORE: DEFAULT_RESTORE,
     }
     for key in (
         CONF_VALUE,
