@@ -341,7 +341,7 @@ class VariableConfigFlow(ConfigFlow, domain=DOMAIN):
             yaml_variable (bool): Whether this flow imports a YAML-defined variable.
 
         Returns:
-            ConfigFlowResult: The next configuration-flow result.
+            ConfigFlowResult: The second sensor page after submission, or the first-page form.
         """
         errors = {} if errors is None else errors
         if user_input is not None:
@@ -598,7 +598,7 @@ class VariableConfigFlow(ConfigFlow, domain=DOMAIN):
             yaml_variable (bool): Whether this flow imports a YAML-defined variable.
 
         Returns:
-            ConfigFlowResult: The next flow result.
+            ConfigFlowResult: A created binary-sensor entry, or its configuration form.
         """
         errors = {} if errors is None else errors
         if user_input is not None:
@@ -634,7 +634,7 @@ class VariableConfigFlow(ConfigFlow, domain=DOMAIN):
             yaml_variable (bool): Whether this flow imports a YAML-defined variable.
 
         Returns:
-            ConfigFlowResult: The next flow result.
+            ConfigFlowResult: A created device-tracker entry, or its configuration form.
         """
         errors = {} if errors is None else errors
         if user_input is not None:
@@ -765,7 +765,7 @@ class VariableOptionsFlowHandler(OptionsFlow):
             errors (dict | None): Validation errors keyed by form field.
 
         Returns:
-            ConfigFlowResult: The next flow result.
+            ConfigFlowResult: An update-confirmation or missing-entity abort, or the value form.
         """
         # user_input can be None; normalize to an empty dict for safe .get()/.update()
         user_input = user_input or {}
@@ -960,7 +960,7 @@ class VariableOptionsFlowHandler(OptionsFlow):
             errors (dict | None): Validation errors keyed by form field.
 
         Returns:
-            ConfigFlowResult: The next flow result.
+            ConfigFlowResult: An update-confirmation or missing-entity abort, or the value form.
         """
         user_input = user_input or {}
         errors = {} if errors is None else errors
@@ -1077,7 +1077,7 @@ class VariableOptionsFlowHandler(OptionsFlow):
             errors (dict | None): Validation errors keyed by form field.
 
         Returns:
-            ConfigFlowResult: The next flow result.
+            ConfigFlowResult: An update-confirmation or missing-entity abort, or the value form.
         """
         user_input = user_input or {}
         errors = {} if errors is None else errors
@@ -1303,7 +1303,7 @@ class VariableOptionsFlowHandler(OptionsFlow):
             errors (dict[str, str] | None): Validation errors keyed by form field.
 
         Returns:
-            ConfigFlowResult: The next options-flow result.
+            ConfigFlowResult: The second sensor options page, or the first-page selector form.
         """
         errors = {} if errors is None else errors
         if user_input is not None:
@@ -1407,7 +1407,7 @@ class VariableOptionsFlowHandler(OptionsFlow):
             errors (dict[str, str] | None): Validation errors keyed by form field.
 
         Returns:
-            ConfigFlowResult: The next flow result.
+            ConfigFlowResult: An updated config entry, or the second sensor options form.
         """
         errors = {} if errors is None else errors
         if user_input is not None:
@@ -1729,7 +1729,7 @@ class VariableOptionsFlowHandler(OptionsFlow):
             errors (dict[str, str] | None): Validation errors keyed by form field.
 
         Returns:
-            ConfigFlowResult: The next flow result.
+            ConfigFlowResult: An updated config entry, or the binary-sensor options form.
         """
         errors = {} if errors is None else errors
         if user_input is not None:
@@ -1857,7 +1857,7 @@ class VariableOptionsFlowHandler(OptionsFlow):
             errors (dict[str, str] | None): Validation errors keyed by form field.
 
         Returns:
-            ConfigFlowResult: The next flow result.
+            ConfigFlowResult: An updated config entry, or the device-tracker options form.
         """
         errors = {} if errors is None else errors
         if user_input is not None:
