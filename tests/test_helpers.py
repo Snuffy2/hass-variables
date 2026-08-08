@@ -443,6 +443,37 @@ def test_value_to_type_converts_datetimes(
     assert value_to_type(initial, destination) == expected
 
 
+@pytest.mark.parametrize(
+    ("destination", "expected"),
+    [
+        pytest.param("date", datetime.date(2026, 7, 24), id="date"),
+        pytest.param(
+            "datetime",
+            datetime.datetime(2026, 7, 24, 12, 30, tzinfo=datetime.UTC),
+            id="datetime-assumes-utc",
+        ),
+        pytest.param(
+            "number",
+            datetime.datetime(2026, 7, 24, 12, 30, tzinfo=datetime.UTC).timestamp(),
+            id="number-uses-utc",
+        ),
+    ],
+)
+def test_value_to_type_normalizes_naive_datetimes(
+    destination: str,
+    expected: float | datetime.date | datetime.datetime,
+) -> None:
+    """Normalize naive datetime input before temporal and numeric conversion.
+
+    Args:
+        destination (str): Requested destination type.
+        expected (float | datetime.date | datetime.datetime): UTC-normalized value.
+    """
+    initial = datetime.datetime.fromisoformat("2026-07-24T12:30:00")
+
+    assert value_to_type(initial, destination) == expected
+
+
 def test_value_to_type_converts_datetime_subclass() -> None:
     """Convert a datetime subclass using the datetime conversion path."""
     initial = DatetimeSubclass(2026, 7, 24, 12, 30, tzinfo=datetime.UTC)

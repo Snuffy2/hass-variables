@@ -304,6 +304,7 @@ def _datetime_to_type(
     """
     if dest_type is None or dest_type == "string":
         return value.isoformat()
+    value = _normalize_datetime(value)
     if dest_type == "date":
         return value.date()
     if dest_type == "datetime":

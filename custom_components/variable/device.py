@@ -46,7 +46,7 @@ async def create_device(hass: HomeAssistant, entry: ConfigEntry) -> None:
         serial_number=entry.data.get(ATTR_SERIAL_NUMBER),
         configuration_url=entry.data.get(ATTR_CONFIGURATION_URL),
     )
-    _LOGGER.debug("(%s) [create_device] device: %s", device.name, device)
+    _LOGGER.debug("(%s) [create_device] device id: %s", device.name, device.id)
     device_entities = er.async_entries_for_device(
         registry=entity_registry, device_id=device.id, include_disabled_entities=True
     )
@@ -116,7 +116,7 @@ async def update_device(
         serial_number=user_input.get(ATTR_SERIAL_NUMBER),
         configuration_url=user_input.get(ATTR_CONFIGURATION_URL),
     )
-    _LOGGER.debug("(%s) [update_device] updated device: %s", device.name or "", device)
+    _LOGGER.debug("(%s) [update_device] updated device id: %s", device.name or "", device.id)
     return True
 
 
@@ -136,7 +136,11 @@ async def remove_device(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entity_registry = er.async_get(hass)
 
     device = device_registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
-    _LOGGER.debug("(%s) [remove_device] device: %s", getattr(device, "name", ""), device)
+    _LOGGER.debug(
+        "(%s) [remove_device] device id: %s",
+        getattr(device, "name", ""),
+        getattr(device, "id", ""),
+    )
     if device is None:
         return True
     entities = er.async_entries_for_device(
