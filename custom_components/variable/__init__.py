@@ -416,8 +416,10 @@ def _yaml_entry_data(variable_id: str, variable_config: Mapping[str, Any]) -> di
     yaml_config = copy.deepcopy(dict(variable_config))
     attributes = yaml_config.pop(CONF_ATTRIBUTES, {})
     icon = attributes.pop(CONF_ICON, None)
-    name = yaml_config.pop(CONF_NAME, attributes.pop(CONF_FRIENDLY_NAME, None))
-    attributes.pop(CONF_FRIENDLY_NAME, None)
+    name = yaml_config.pop(CONF_NAME, None)
+    friendly_name = attributes.pop(CONF_FRIENDLY_NAME, None)
+    if name is None:
+        name = friendly_name
 
     entry_data: dict[str, object] = {
         CONF_ENTITY_PLATFORM: Platform.SENSOR,

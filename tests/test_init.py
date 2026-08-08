@@ -43,6 +43,34 @@ from custom_components.variable.const import (
 from tests.types import ConfigEntryFactory
 
 
+async def test_yaml_explicit_name_precedes_friendly_name_attribute(
+    hass: HomeAssistant,
+) -> None:
+    """Prefer an explicit name and omit the friendly-name attribute.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+    """
+    yaml_config = {
+        DOMAIN: {
+            "named_variable": {
+                CONF_NAME: "Explicit Name",
+                CONF_ATTRIBUTES: {
+                    CONF_FRIENDLY_NAME: "Attribute Name",
+                    "retained": True,
+                },
+            }
+        }
+    }
+
+    assert await async_setup_component(hass, DOMAIN, yaml_config)
+    await hass.async_block_till_done()
+
+    (entry,) = hass.config_entries.async_entries(DOMAIN)
+    assert entry.data[CONF_NAME] == "Explicit Name"
+    assert entry.data[CONF_ATTRIBUTES] == {"retained": True}
+
+
 async def test_yaml_setup_and_reload_manage_config_entries(
     hass: HomeAssistant,
 ) -> None:
