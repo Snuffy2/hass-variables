@@ -313,14 +313,16 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
     # Connection classes in homeassistant/config_entries.py are now deprecated
 
-    async def async_step_user(self, user_input: dict | None = None) -> Any:
+    async def async_step_user(
+        self, user_input: dict | None = None
+    ) -> config_entries.ConfigFlowResult:
         """Show the initial configuration-flow menu.
 
         Args:
             user_input (dict | None): Submitted data for the initial step, if any.
 
         Returns:
-            Any: The menu result for selecting a Variable helper type.
+            config_entries.ConfigFlowResult: The menu result for selecting a Variable helper type.
         """
         platforms_w_device: list = [*PLATFORMS, CONF_DEVICE]
         return self.async_show_menu(
@@ -333,7 +335,7 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         user_input: dict | None = None,
         errors: dict | None = None,
         yaml_variable: bool = False,
-    ) -> Any:
+    ) -> config_entries.ConfigFlowResult:
         """Handle the first page for creating a sensor variable.
 
         Args:
@@ -342,7 +344,7 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             yaml_variable (bool): Whether this flow imports a YAML-defined variable.
 
         Returns:
-            Any: The next configuration-flow result.
+            config_entries.ConfigFlowResult: The next configuration-flow result.
         """
         errors = {} if errors is None else errors
         if user_input is not None:
@@ -366,7 +368,7 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_sensor_page_2(
         self, user_input: dict | None = None, errors: dict | None = None
-    ) -> Any:
+    ) -> config_entries.ConfigFlowResult:
         """Handle the second page for creating a sensor variable.
 
         Args:
@@ -374,7 +376,7 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors (dict | None): Validation errors keyed by form field.
 
         Returns:
-            Any: A created-entry result or the second-page form result.
+            config_entries.ConfigFlowResult: A created-entry result or the second-page form result.
         """
         errors = {} if errors is None else errors
         if user_input is not None or self.add_sensor_input.get(CONF_YAML_VARIABLE) is True:
@@ -590,7 +592,7 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         user_input: dict | None = None,
         errors: dict | None = None,
         yaml_variable: bool = False,
-    ) -> Any:
+    ) -> config_entries.ConfigFlowResult:
         """Handle creation of a binary-sensor variable.
 
         Args:
@@ -599,7 +601,7 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             yaml_variable (bool): Whether this flow imports a YAML-defined variable.
 
         Returns:
-            Any: A created-entry result or the binary-sensor form result.
+            config_entries.ConfigFlowResult: The next flow result.
         """
         errors = {} if errors is None else errors
         if user_input is not None:
@@ -626,7 +628,7 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         user_input: dict | None = None,
         errors: dict | None = None,
         yaml_variable: bool = False,
-    ) -> Any:
+    ) -> config_entries.ConfigFlowResult:
         """Handle creation of a device-tracker variable.
 
         Args:
@@ -635,7 +637,7 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             yaml_variable (bool): Whether this flow imports a YAML-defined variable.
 
         Returns:
-            Any: A created-entry result or the device-tracker form result.
+            config_entries.ConfigFlowResult: The next flow result.
         """
         errors = {} if errors is None else errors
         if user_input is not None:
@@ -662,7 +664,7 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         user_input: dict | None = None,
         errors: dict | None = None,
         yaml_variable: bool = False,
-    ) -> Any:
+    ) -> config_entries.ConfigFlowResult:
         """Handle creation of a device variable.
 
         Args:
@@ -671,7 +673,7 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             yaml_variable (bool): Whether this flow imports a YAML-defined variable.
 
         Returns:
-            Any: A created-entry result or the device form result.
+            config_entries.ConfigFlowResult: A created-entry result or the device form result.
         """
         errors = {} if errors is None else errors
         if user_input is not None:
@@ -700,14 +702,16 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     # this is run to import the configuration.yaml parameters\
-    async def async_step_import(self, import_config: dict | None = None) -> Any:
+    async def async_step_import(
+        self, import_config: dict | None = None
+    ) -> config_entries.ConfigFlowResult:
         """Import a config entry from configuration.yaml.
 
         Args:
             import_config (dict | None): YAML-derived configuration fields, if any.
 
         Returns:
-            Any: The sensor creation flow result for the imported configuration.
+            config_entries.ConfigFlowResult: The imported configuration's flow result.
         """
         # _LOGGER.debug(f"[async_step_import] import_config: {import_config}")
         return await self.async_step_add_sensor(user_input=import_config, yaml_variable=True)
@@ -731,14 +735,16 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class VariableOptionsFlowHandler(config_entries.OptionsFlow):
     """Options for the component."""
 
-    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> Any:
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
         """Show the initial options-flow menu.
 
         Args:
             user_input (dict[str, Any] | None): Submitted data for the initial options step, if any.
 
         Returns:
-            Any: The next options-flow result or an abort result.
+            config_entries.ConfigFlowResult: The next options-flow result or an abort result.
         """
         if self.config_entry.data.get(CONF_YAML_VARIABLE):
             _LOGGER.debug("[YAML] No Options for YAML Created Variables")
@@ -758,7 +764,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
 
     async def async_step_change_sensor_value(
         self, user_input: dict | None = None, errors: dict | None = None
-    ) -> Any:
+    ) -> config_entries.ConfigFlowResult:
         """Handle a sensor value change in the options flow.
 
         Args:
@@ -766,7 +772,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
             errors (dict | None): Validation errors keyed by form field.
 
         Returns:
-            Any: An updated-entry result or the sensor value-change form.
+            config_entries.ConfigFlowResult: The next flow result.
         """
         # user_input can be None; normalize to an empty dict for safe .get()/.update()
         user_input = user_input or {}
@@ -953,7 +959,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
 
     async def async_step_change_binary_sensor_value(
         self, user_input: dict | None = None, errors: dict | None = None
-    ) -> Any:
+    ) -> config_entries.ConfigFlowResult:
         """Handle a binary-sensor value change in the options flow.
 
         Args:
@@ -961,7 +967,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
             errors (dict | None): Validation errors keyed by form field.
 
         Returns:
-            Any: An updated-entry result or the binary-sensor value-change form.
+            config_entries.ConfigFlowResult: The next flow result.
         """
         user_input = user_input or {}
         errors = {} if errors is None else errors
@@ -1070,7 +1076,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
 
     async def async_step_change_device_tracker_value(
         self, user_input: dict | None = None, errors: dict | None = None
-    ) -> Any:
+    ) -> config_entries.ConfigFlowResult:
         """Handle a device-tracker value change in the options flow.
 
         Args:
@@ -1078,7 +1084,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
             errors (dict | None): Validation errors keyed by form field.
 
         Returns:
-            Any: An updated-entry result or the device-tracker value-change form.
+            config_entries.ConfigFlowResult: The next flow result.
         """
         user_input = user_input or {}
         errors = {} if errors is None else errors
@@ -1296,7 +1302,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
         self,
         user_input: dict[str, Any] | None = None,
         errors: dict[str, str] | None = None,
-    ) -> Any:
+    ) -> config_entries.ConfigFlowResult:
         """Handle the first sensor options page.
 
         Args:
@@ -1304,7 +1310,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
             errors (dict[str, str] | None): Validation errors keyed by form field.
 
         Returns:
-            Any: The next options-flow result.
+            config_entries.ConfigFlowResult: The next options-flow result.
         """
         errors = {} if errors is None else errors
         if user_input is not None:
@@ -1400,7 +1406,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
         self,
         user_input: dict[str, Any] | None = None,
         errors: dict[str, str] | None = None,
-    ) -> Any:
+    ) -> config_entries.ConfigFlowResult:
         """Handle the second sensor options page.
 
         Args:
@@ -1408,7 +1414,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
             errors (dict[str, str] | None): Validation errors keyed by form field.
 
         Returns:
-            Any: An updated-entry result or the second sensor options form.
+            config_entries.ConfigFlowResult: The next flow result.
         """
         errors = {} if errors is None else errors
         if user_input is not None:
@@ -1722,7 +1728,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
         self,
         user_input: dict[str, Any] | None = None,
         errors: dict[str, str] | None = None,
-    ) -> Any:
+    ) -> config_entries.ConfigFlowResult:
         """Handle binary-sensor variable options.
 
         Args:
@@ -1730,7 +1736,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
             errors (dict[str, str] | None): Validation errors keyed by form field.
 
         Returns:
-            Any: An updated-entry result or the binary-sensor options form.
+            config_entries.ConfigFlowResult: The next flow result.
         """
         errors = {} if errors is None else errors
         if user_input is not None:
@@ -1850,7 +1856,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
         self,
         user_input: dict[str, Any] | None = None,
         errors: dict[str, str] | None = None,
-    ) -> Any:
+    ) -> config_entries.ConfigFlowResult:
         """Handle device-tracker variable options.
 
         Args:
@@ -1858,7 +1864,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
             errors (dict[str, str] | None): Validation errors keyed by form field.
 
         Returns:
-            Any: An updated-entry result or the device-tracker options form.
+            config_entries.ConfigFlowResult: The next flow result.
         """
         errors = {} if errors is None else errors
         if user_input is not None:
@@ -2057,7 +2063,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
         self,
         user_input: dict[str, Any] | None = None,
         errors: dict[str, str] | None = None,
-    ) -> Any:
+    ) -> config_entries.ConfigFlowResult:
         """Handle device options.
 
         Args:
@@ -2065,7 +2071,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
             errors (dict[str, str] | None): Validation errors keyed by form field.
 
         Returns:
-            Any: An updated-entry result or the device options form.
+            config_entries.ConfigFlowResult: An updated-entry result or the device options form.
         """
         errors = {} if errors is None else errors
         if user_input is not None:
