@@ -115,10 +115,6 @@ async def async_setup_entry(
 
     config = hass.data.get(DOMAIN, {}).get(config_entry.entry_id, {})
     unique_id = config_entry.entry_id
-    # _LOGGER.debug(f"[async_setup_entry] config_entry: {config_entry.as_dict()}")
-    # _LOGGER.debug(f"[async_setup_entry] config: {config}")
-    # _LOGGER.debug(f"[async_setup_entry] unique_id: {unique_id}")
-
     if config.get(CONF_EXCLUDE_FROM_RECORDER, DEFAULT_EXCLUDE_FROM_RECORDER):
         _LOGGER.debug(
             "(%s) Excluding from Recorder.",

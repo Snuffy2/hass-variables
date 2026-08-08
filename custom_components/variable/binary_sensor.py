@@ -111,10 +111,6 @@ async def async_setup_entry(
 
     config = hass.data.get(DOMAIN, {}).get(config_entry.entry_id, {})
     unique_id = config_entry.entry_id
-    # _LOGGER.debug(f"[async_setup_entry] config_entry: {config_entry.as_dict()}")
-    # _LOGGER.debug(f"[async_setup_entry] config: {config}")
-    # _LOGGER.debug(f"[async_setup_entry] unique_id: {unique_id}")
-
     if config.get(CONF_EXCLUDE_FROM_RECORDER, DEFAULT_EXCLUDE_FROM_RECORDER):
         _LOGGER.debug(
             "(%s) Excluding from Recorder",
@@ -205,7 +201,6 @@ class Variable(BinarySensorEntity, RestoreEntity):
             _LOGGER.info("(%s) Restoring after Reboot", self._attr_name)
             state = await self.async_get_last_state()
             if state:
-                # _LOGGER.debug(f"({self._attr_name}) Restored last state: {state.as_dict()}")
                 if (
                     hasattr(state, "attributes")
                     and state.attributes

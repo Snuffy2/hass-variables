@@ -29,8 +29,6 @@ async def create_device(hass: HomeAssistant, entry: ConfigEntry) -> None:
         hass (HomeAssistant): Home Assistant instance hosting the integration.
         entry (ConfigEntry): Variable config entry that defines the helper device.
     """
-    # _LOGGER.debug(f"({entry.title}) [create_device] entry: {entry}")
-
     device_registry = dr.async_get(hass)
     entity_registry = er.async_get(hass)
 
@@ -50,19 +48,13 @@ async def create_device(hass: HomeAssistant, entry: ConfigEntry) -> None:
     device_entities = er.async_entries_for_device(
         registry=entity_registry, device_id=device.id, include_disabled_entities=True
     )
-    # _LOGGER.debug(f"({device.name}) [create_device] device entities: {device_entities}")
-
     domain_entries = hass.config_entries.async_loaded_entries(DOMAIN)
-    # _LOGGER.debug(f"({device.name}) [create_device] domain_entries: {domain_entries}")
     domain_entities: list = []
     for domain_entry in domain_entries:
-        # _LOGGER.debug(f"({device.name}) [create_device] domain_entry: {entry}")
-        # _LOGGER.debug(f"({device.name}) [create_device] domain_entry data: {entry.data}")
         if not domain_entry.data.get(CONF_YAML_VARIABLE, False):
             domain_entities = domain_entities + er.async_entries_for_config_entry(
                 registry=entity_registry, config_entry_id=domain_entry.entry_id
             )
-    # _LOGGER.debug(f"({device.name}) [create_device] domain entities: {domain_entities}")
     domain_reload_entities = [entity for entity in domain_entities if entity.device_id == device.id]
     reload_entities = device_entities + domain_reload_entities
     if len(reload_entities) > 0:
@@ -97,11 +89,8 @@ async def update_device(
     Returns:
         bool: True when the device was updated; False when no matching device exists.
     """
-    # _LOGGER.debug(f"({entry.title}) [update_device] entry: {entry}")
-    # _LOGGER.debug(f"({entry.title}) [update_device] user_input: {user_input}")
     device_registry = dr.async_get(hass)
     device = device_registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
-    # _LOGGER.debug(f"({device.name}) [update_device] device: {device}")
     if device is None:
         _LOGGER.debug("No device found to update")
         return False
@@ -130,8 +119,6 @@ async def remove_device(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     Returns:
         bool: True after the matching device is removed or when none exists.
     """
-    # _LOGGER.debug(f"({entry.title}) [remove_device] entry: {entry}")
-
     device_registry = dr.async_get(hass)
     entity_registry = er.async_get(hass)
 

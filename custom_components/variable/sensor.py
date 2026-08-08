@@ -246,7 +246,6 @@ class Variable(RestoreSensor):
                             "identifiers",
                         )
                     )
-                    # _LOGGER.debug(f"({self._attr_name}) [restored] device: {device}")
                     # Ensure static checker and runtime know _attr_name is a string.
                     # Avoid `assert` (flagged by bandit) and coerce to empty
                     # string if it's unexpectedly None or not a str.

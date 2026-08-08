@@ -708,7 +708,6 @@ class VariableConfigFlow(ConfigFlow, domain=DOMAIN):
         Returns:
             ConfigFlowResult: A sensor creation result populated from YAML fields.
         """
-        # _LOGGER.debug(f"[async_step_import] import_config: {import_config}")
         return await self.async_step_add_sensor(user_input=import_config, yaml_variable=True)
 
     @staticmethod

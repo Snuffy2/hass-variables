@@ -185,10 +185,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         Args:
             call (ServiceCall): Legacy service call containing a variable identifier and updates.
         """
-        # _LOGGER.debug(f"[async_set_variable_legacy_service] Pre call data: {call.data}")
         entity_id_format = Platform.SENSOR + ".{}"
         var_ent = entity_id_format.format(call.data.get(ATTR_VARIABLE))
-        # _LOGGER.debug(f"[async_set_variable_legacy_service] Post call data: {call.data}")
         await _async_set_legacy_service(call, var_ent)
 
     async def async_set_entity_legacy_service(call: ServiceCall) -> None:
@@ -197,7 +195,6 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         Args:
             call (ServiceCall): Legacy service call containing an entity identifier and updates.
         """
-        # _LOGGER.debug(f"[async_set_entity_legacy_service] call data: {call.data}")
         entity = call.data.get(ATTR_ENTITY)
         if not entity or not isinstance(entity, str):
             _LOGGER.error("set_entity legacy service called without valid 'entity' string")
@@ -211,7 +208,6 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             call (ServiceCall): Legacy service call containing the requested updates.
             var_ent (str): Entity identifier to update.
         """
-        # _LOGGER.debug(f"[async_set_legacy_service] call data: {call.data}")
         update_sensor_data = {
             CONF_ENTITY_ID: [var_ent],
             ATTR_REPLACE_ATTRIBUTES: call.data.get(ATTR_REPLACE_ATTRIBUTES, False),
@@ -319,14 +315,10 @@ async def _async_process_yaml(hass: HomeAssistant, config: ConfigType) -> bool:
                         entry = ent
                         entry_id = ent.entry_id
                         break
-                # _LOGGER.debug(f"[YAML] entry_id: {entry_id}")
                 if entry_id and entry is not None:
-                    # _LOGGER.debug(f"[YAML] entry before: {entry.as_dict()}")
-
                     for m in dict(entry.data):
                         var_fields.setdefault(m, entry.data[m])
                     var_fields.update({CONF_YAML_PRESENT: True})
-                    # _LOGGER.debug(f"[YAML] Updated var_fields: {var_fields}")
                     hass.config_entries.async_update_entry(entry, data=var_fields, options={})
 
                     hass.async_create_task(hass.config_entries.async_reload(entry_id))
@@ -363,7 +355,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     Returns:
         bool: True when the platform or device setup completes successfully.
     """
-    # _LOGGER.debug(f"[init async_setup_entry] entry: {entry.data}")
     if entry.data.get(CONF_YAML_PRESENT) is True:
         yaml_data = copy.deepcopy(dict(entry.data))
         yaml_data.pop(CONF_YAML_PRESENT, None)
@@ -417,7 +408,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.entry_id,
         sorted(entry.data),
     )
-    # _LOGGER.debug(f"[init async_unload_entry] entry: {entry}")
     hass_data = dict(entry.data)
     unload_ok = False
     platform = hass_data.get(CONF_ENTITY_PLATFORM)
