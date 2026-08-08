@@ -1,5 +1,6 @@
 """Variable implementation for Home Assistant."""
 
+import asyncio
 from collections.abc import Mapping
 import contextlib
 import copy
@@ -82,6 +83,7 @@ _LOGGER = logging.getLogger(__name__)
 
 SERVICE_SET_VARIABLE_LEGACY = "set_variable"
 SERVICE_SET_ENTITY_LEGACY = "set_entity"
+_YAML_RECONCILE_LOCK = f"{DOMAIN}_yaml_reconcile_lock"
 
 SERVICE_SET_VARIABLE_LEGACY_SCHEMA = vol.Schema(
     {
@@ -208,6 +210,27 @@ async def _async_process_yaml(
 
     Returns:
         True after all YAML imports, updates, and removals have completed.
+    """
+    reconcile_lock: asyncio.Lock = hass.data.setdefault(_YAML_RECONCILE_LOCK, asyncio.Lock())
+    async with reconcile_lock:
+        return await _async_reconcile_yaml(hass, config, wait_for_completion)
+
+
+async def _async_reconcile_yaml(
+    hass: HomeAssistant,
+    config: ConfigType,
+    wait_for_completion: bool,
+) -> bool:
+    """Reconcile YAML while the per-instance reconciliation lock is held.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config: Complete Home Assistant configuration containing this domain.
+        wait_for_completion: Whether to wait for config-entry lifecycle work.
+
+    Returns:
+        True after the requested YAML reconciliation work has been dispatched
+        or completed.
     """
     variables = copy.deepcopy(config.get(DOMAIN, {}))
     entries_by_variable_id: dict[str, list[ConfigEntry]] = {}
