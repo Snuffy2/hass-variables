@@ -85,6 +85,44 @@ async def test_device_tracker_restore_cache_is_applied_during_config_entry_setup
         assert state.attributes[attribute] == restored_attributes[attribute]
 
 
+async def test_device_tracker_empty_restore_uses_config_attributes(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Apply configured custom and special attributes when the restore cache is empty.
+
+    Args:
+        hass: Home Assistant test instance.
+        config_entry_factory: Factory for test configuration entries.
+    """
+    entity_id = "device_tracker.empty_restored_tracker"
+    mock_restore_cache(hass, [State(entity_id, STATE_UNKNOWN, {})])
+    configured_location_name = "Config Location"
+    configured_battery_level = 80
+    configured_attributes = {
+        ATTR_BATTERY_LEVEL: configured_battery_level,
+        ATTR_LOCATION_NAME: configured_location_name,
+    }
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.DEVICE_TRACKER,
+            CONF_VARIABLE_ID: "empty_restored_tracker",
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: True,
+            CONF_FORCE_UPDATE: False,
+            CONF_ATTRIBUTES: configured_attributes,
+        }
+    )
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.attributes[ATTR_LOCATION_NAME] == configured_location_name
+    assert state.attributes[ATTR_BATTERY_LEVEL] == configured_battery_level
+
+
 async def test_updated_device_tracker_discards_reserved_restored_attributes(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,

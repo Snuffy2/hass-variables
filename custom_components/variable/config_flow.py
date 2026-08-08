@@ -71,24 +71,42 @@ from .device import update_device
 from .helpers import value_to_type
 
 
-def _get_currency_units() -> list[str]:
-    """Return a list of currency codes suitable for selectors."""
-    units: list[str] = []
-    try:
-        units.extend(
-            str(currency.code) for currency in Currency if currency.code not in ["XTS", "XXX"]
-        )
-    except AttributeError, TypeError, ValueError:
-        # Be conservative and return empty list on any error
-        return []
-    return units
+def _normalize_sensor_device_class(
+    device_class: sensor.SensorDeviceClass | str | None,
+) -> sensor.SensorDeviceClass | None:
+    """Normalize a sensor device class supplied as an enum, value, or name."""
+    if isinstance(device_class, sensor.SensorDeviceClass):
+        return device_class
+    if not isinstance(device_class, str) or device_class.lower() == "none":
+        return None
+    return next(
+        (
+            member
+            for member in sensor.SensorDeviceClass
+            if device_class in (member.value, member.name)
+        ),
+        None,
+    )
 
 
-def _get_device_class_units(device_class: str | None) -> list[str]:
-    """Return units for a given device class using sensor.DEVICE_CLASS_UNITS safely."""
-    if not device_class:
-        return []
-    return list(getattr(sensor, "DEVICE_CLASS_UNITS", {}).get(device_class, []))
+def _sensor_unit_options(
+    device_class: sensor.SensorDeviceClass,
+) -> list[selector.SelectOptionDict]:
+    """Build unit selector options for a normalized sensor device class."""
+    if device_class == sensor.SensorDeviceClass.MONETARY:
+        return [
+            selector.SelectOptionDict(
+                label=f"{currency.currency_name} [{currency.code}]",
+                value=str(currency.code),
+            )
+            for currency in Currency
+            if currency.code not in ["XTS", "XXX"]
+        ]
+    return [
+        selector.SelectOptionDict(label=str(unit), value=str(unit))
+        for unit in getattr(sensor, "DEVICE_CLASS_UNITS", {}).get(device_class, [])
+        if unit is not None and unit != "None"
+    ]
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -419,17 +437,9 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self.add_sensor_input.get(CONF_DEVICE_CLASS) is not None
             and str(self.add_sensor_input.get(CONF_DEVICE_CLASS)).lower() != "none"
         ):
-            # Normalize the possibly-string device class back to the SensorDeviceClass
-            device_class_key = self.add_sensor_input.get(CONF_DEVICE_CLASS)
-            normalized_device_class = None
-            if isinstance(device_class_key, sensor.SensorDeviceClass):
-                normalized_device_class = device_class_key
-            elif isinstance(device_class_key, str):
-                # Try to match by enum name or enum value string
-                for m in sensor.SensorDeviceClass:
-                    if str(m.value) == device_class_key or m.name == device_class_key:
-                        normalized_device_class = m
-                        break
+            normalized_device_class = _normalize_sensor_device_class(
+                self.add_sensor_input.get(CONF_DEVICE_CLASS)
+            )
 
             if normalized_device_class is None:
                 classes: set[sensor.SensorStateClass] = set()
@@ -438,23 +448,8 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             sensor_state_class_select_list.extend(
                 selector.SelectOptionDict(label=str(el.name), value=str(el.value)) for el in classes
             )
-            if normalized_device_class == sensor.SensorDeviceClass.MONETARY:
-                sensor_units_select_list.extend(
-                    selector.SelectOptionDict(
-                        label=f"{currency.currency_name} [{currency.code}]",
-                        value=str(currency.code),
-                    )
-                    for currency in Currency
-                    if currency.code not in ["XTS", "XXX"]
-                )
-            else:
-                sensor_units_select_list.extend(
-                    selector.SelectOptionDict(label=str(el), value=str(el))
-                    for el in getattr(sensor, "DEVICE_CLASS_UNITS", {}).get(
-                        normalized_device_class, []
-                    )
-                    if el is not None and el != "None"
-                )
+            if normalized_device_class is not None:
+                sensor_units_select_list.extend(_sensor_unit_options(normalized_device_class))
             if normalized_device_class == sensor.SensorDeviceClass.DATE:
                 sensor_page_2_schema = sensor_page_2_schema.extend(
                     {vol.Optional(CONF_VALUE): selector.DateSelector(selector.DateSelectorConfig())}
@@ -1356,19 +1351,9 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
             self.sensor_options_page_1.get(CONF_DEVICE_CLASS),
             type(self.sensor_options_page_1.get(CONF_DEVICE_CLASS)),
         )
-        selected_device_class = self.sensor_options_page_1.get(CONF_DEVICE_CLASS)
-        device_class = None
-        if isinstance(selected_device_class, sensor.SensorDeviceClass):
-            device_class = selected_device_class
-        elif isinstance(selected_device_class, str) and selected_device_class.lower() != "none":
-            device_class = next(
-                (
-                    member
-                    for member in sensor.SensorDeviceClass
-                    if selected_device_class in (member.value, member.name)
-                ),
-                None,
-            )
+        device_class = _normalize_sensor_device_class(
+            self.sensor_options_page_1.get(CONF_DEVICE_CLASS)
+        )
         val_default, val_default_value = self.check_value_default(device_class)
 
         sensor_options_page_2_schema = vol.Schema({})
@@ -1378,18 +1363,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
                 selector.SelectOptionDict(label=str(state_class.name), value=str(state_class.value))
                 for state_class in state_classes
             )
-            # Populate units list from either currency list or sensor.DEVICE_CLASS_UNITS
-            units: list[str] = []
-            if device_class == sensor.SensorDeviceClass.MONETARY:
-                units = _get_currency_units()
-            else:
-                units = _get_device_class_units(device_class)
-
-            sensor_units_select_list.extend(
-                selector.SelectOptionDict(label=unit, value=unit)
-                for unit in units
-                if unit != "None"
-            )
+            sensor_units_select_list.extend(_sensor_unit_options(device_class))
 
             if device_class == sensor.SensorDeviceClass.DATE:
                 value_type = "date"

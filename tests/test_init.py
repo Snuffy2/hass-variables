@@ -1,5 +1,6 @@
 """End-to-end setup orchestration tests for the Variable integration."""
 
+from datetime import date
 import importlib
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -98,6 +99,33 @@ async def test_yaml_setup_and_reload_manage_config_entries(
     assert hass.config_entries.async_get_entry(removed_entry.entry_id) is None
     assert hass.states.get("sensor.yaml_removed") is None
     assert er.async_get(hass).async_get("sensor.yaml_removed") is None
+
+
+async def test_yaml_setup_preserves_native_date(hass: HomeAssistant) -> None:
+    """Preserve a YAML-native date through config-entry import.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+    """
+    native_date = date(2026, 8, 8)
+
+    assert await async_setup_component(
+        hass,
+        DOMAIN,
+        {DOMAIN: {"yaml_date": {CONF_VALUE: native_date}}},
+    )
+    await hass.async_block_till_done()
+
+    entry = next(
+        entry
+        for entry in hass.config_entries.async_entries(DOMAIN)
+        if entry.data[CONF_VARIABLE_ID] == "yaml_date"
+    )
+    assert entry.data[CONF_VALUE] == native_date
+    assert entry.data[CONF_YAML_VARIABLE] is True
+    state = hass.states.get("sensor.yaml_date")
+    assert state is not None
+    assert state.state == native_date.isoformat()
 
 
 @pytest.mark.parametrize(

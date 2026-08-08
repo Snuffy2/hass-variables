@@ -3,7 +3,6 @@
 from collections.abc import Callable
 import contextlib
 import copy
-import json
 import logging
 
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
@@ -165,10 +164,22 @@ async def _async_exclude_entity_from_recorder(hass: HomeAssistant, entity_id: st
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Set up the Variable services."""
+    """Set up the Variable services.
+
+    Args:
+        hass: Home Assistant instance hosting the integration.
+        config: Validated Home Assistant configuration.
+
+    Returns:
+        True when setup and YAML processing complete successfully.
+    """
 
     async def async_set_variable_legacy_service(call: ServiceCall) -> None:
-        """Handle calls to the set_variable legacy service."""
+        """Handle calls to the set_variable legacy service.
+
+        Args:
+            call: Legacy service call containing a variable identifier and updates.
+        """
         # _LOGGER.debug(f"[async_set_variable_legacy_service] Pre call data: {call.data}")
         entity_id_format = Platform.SENSOR + ".{}"
         var_ent = entity_id_format.format(call.data.get(ATTR_VARIABLE))
@@ -176,7 +187,11 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         await _async_set_legacy_service(call, var_ent)
 
     async def async_set_entity_legacy_service(call: ServiceCall) -> None:
-        """Handle calls to the set_entity legacy service."""
+        """Handle calls to the set_entity legacy service.
+
+        Args:
+            call: Legacy service call containing an entity identifier and updates.
+        """
         # _LOGGER.debug(f"[async_set_entity_legacy_service] call data: {call.data}")
         entity = call.data.get(ATTR_ENTITY)
         if not entity or not isinstance(entity, str):
@@ -185,7 +200,12 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         await _async_set_legacy_service(call, entity)
 
     async def _async_set_legacy_service(call: ServiceCall, var_ent: str) -> None:
-        """Shared function for both set_entity and set_variable legacy services."""
+        """Forward a legacy service call to the update sensor service.
+
+        Args:
+            call: Legacy service call containing the requested updates.
+            var_ent: Entity identifier to update.
+        """
         # _LOGGER.debug(f"[async_set_legacy_service] call data: {call.data}")
         update_sensor_data = {
             CONF_ENTITY_ID: [var_ent],
@@ -205,7 +225,11 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         )
 
     async def _async_reload_service_handler(service: ServiceCall) -> None:
-        """Handle reload service call."""
+        """Handle a reload service call.
+
+        Args:
+            service: Reload service call that triggered YAML processing.
+        """
         _LOGGER.info("Service %s.reload called: reloading YAML integration", DOMAIN)
         reload_config = None
         with contextlib.suppress(HomeAssistantError):
@@ -243,7 +267,7 @@ async def _async_process_yaml(hass: HomeAssistant, config: ConfigType) -> bool:
     Returns:
         True when YAML variable processing completes successfully.
     """
-    variables = json.loads(json.dumps(config.get(DOMAIN, {})))
+    variables = copy.deepcopy(config.get(DOMAIN, {}))
 
     for var, var_fields in variables.items():
         if var is not None:

@@ -202,27 +202,27 @@ class Variable(RestoreEntity, TrackerEntity):
                         self._attr_name,
                         self._attr_extra_state_attributes,
                     )
-                    # If there were no attributes restored from state, apply attributes from config
-                    if (
-                        not getattr(self, "_attr_extra_state_attributes", None)
-                        or self._attr_extra_state_attributes == {}
-                    ) and self._config.get(CONF_ATTRIBUTES):
-                        self._attr_extra_state_attributes = self._update_attr_settings(
-                            self._config.get(CONF_ATTRIBUTES)
-                        )
-                        _LOGGER.debug(
-                            "(%s) [restored] applied config attributes: %s",
-                            self._attr_name,
-                            self._attr_extra_state_attributes,
-                        )
-                        try:
-                            self.async_write_ha_state()
-                        except RuntimeError as err:
-                            _LOGGER.debug(
-                                "(%s) async_write_ha_state failed during restore: %s",
-                                self._attr_name,
-                                err,
-                            )
+            # If there were no attributes restored from state, apply attributes from config
+            if (
+                not getattr(self, "_attr_extra_state_attributes", None)
+                or self._attr_extra_state_attributes == {}
+            ) and self._config.get(CONF_ATTRIBUTES):
+                self._attr_extra_state_attributes = self._update_attr_settings(
+                    self._config.get(CONF_ATTRIBUTES)
+                )
+                _LOGGER.debug(
+                    "(%s) [restored] applied config attributes: %s",
+                    self._attr_name,
+                    self._attr_extra_state_attributes,
+                )
+            try:
+                self.async_write_ha_state()
+            except RuntimeError as err:
+                _LOGGER.debug(
+                    "(%s) async_write_ha_state failed during restore: %s",
+                    self._attr_name,
+                    err,
+                )
         if self._config.get(CONF_UPDATED, True):
             self._config.update({CONF_UPDATED: False})
             self._hass.config_entries.async_update_entry(
