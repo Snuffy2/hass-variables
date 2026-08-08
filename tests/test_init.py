@@ -1,5 +1,6 @@
 """End-to-end setup orchestration tests for the Variable integration."""
 
+import asyncio
 import datetime
 import importlib
 from typing import Any
@@ -263,6 +264,65 @@ async def test_yaml_reload_creates_entities_before_service_returns(
     state = hass.states.get(entity_id)
     assert state is not None
     assert state.state == expected_state
+
+
+async def test_concurrent_yaml_reloads_create_one_entry(
+    hass: HomeAssistant,
+) -> None:
+    """Serialize concurrent reloads before they snapshot config entries.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+    """
+    assert await async_setup_component(hass, DOMAIN, {DOMAIN: {}})
+
+    variable_id = "concurrent_yaml"
+    reload_config = {DOMAIN: {variable_id: {CONF_VALUE: "created-once"}}}
+    import_started = asyncio.Event()
+    allow_import = asyncio.Event()
+    original_async_init = hass.config_entries.flow.async_init
+
+    async def blocking_async_init(*args: Any, **kwargs: Any) -> Any:
+        """Pause the first import so the second reload overlaps it."""
+        import_started.set()
+        await allow_import.wait()
+        return await original_async_init(*args, **kwargs)
+
+    with (
+        patch(
+            "custom_components.variable.async_integration_yaml_config",
+            new=AsyncMock(return_value=reload_config),
+        ),
+        patch.object(
+            hass.config_entries.flow,
+            "async_init",
+            new=AsyncMock(side_effect=blocking_async_init),
+        ) as async_init,
+    ):
+        reloads = asyncio.gather(
+            hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True),
+            hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True),
+        )
+        try:
+            await import_started.wait()
+            await asyncio.sleep(0)
+            import_count_during_overlap = async_init.await_count
+        finally:
+            allow_import.set()
+            await reloads
+
+    assert import_count_during_overlap == 1
+
+    entries = [
+        entry
+        for entry in hass.config_entries.async_entries(DOMAIN)
+        if entry.data.get(CONF_VARIABLE_ID) == variable_id
+    ]
+    assert len(entries) == 1
+    assert len(er.async_entries_for_config_entry(er.async_get(hass), entries[0].entry_id)) == 1
+    state = hass.states.get(f"sensor.{variable_id}")
+    assert state is not None
+    assert state.state == "created-once"
 
 
 @pytest.mark.parametrize(
