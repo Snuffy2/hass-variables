@@ -135,7 +135,12 @@ CONFIG_SCHEMA = vol.Schema(
 
 
 async def _async_exclude_entity_from_recorder(hass: HomeAssistant, entity_id: str) -> None:
-    """Exclude an entity from recorder by updating recorder's internal config."""
+    """Exclude an entity from recorder by updating recorder's internal config.
+
+    Args:
+        hass: Home Assistant instance hosting the integration.
+        entity_id: Entity identifier to exclude from recorder history.
+    """
     try:
         recorder_config_getter = getattr(hass.config, "get", None)
         if not callable(recorder_config_getter):
@@ -368,7 +373,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not entry.data.get(CONF_YAML_VARIABLE, False):
 
         async def _async_on_entry_update(hass: HomeAssistant, entry: ConfigEntry) -> None:
-            """Handle config entry update."""
+            """Reload an updated Variable config entry.
+
+            Args:
+                hass: Home Assistant instance hosting the integration.
+                entry: Variable config entry that was updated.
+            """
             _LOGGER.debug("Config entry updated: %s", entry.data.get(CONF_VARIABLE_ID))
             await hass.config_entries.async_reload(entry.entry_id)
 

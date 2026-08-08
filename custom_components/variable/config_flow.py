@@ -698,7 +698,14 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     # this is run to import the configuration.yaml parameters\
     async def async_step_import(self, import_config: dict | None = None) -> Any:
-        """Import a config entry from configuration.yaml."""
+        """Import a config entry from configuration.yaml.
+
+        Args:
+            import_config: YAML-derived configuration fields, if any.
+
+        Returns:
+            The sensor creation flow result for the imported configuration.
+        """
         # _LOGGER.debug(f"[async_step_import] import_config: {import_config}")
         return await self.async_step_add_sensor(user_input=import_config, yaml_variable=True)
 

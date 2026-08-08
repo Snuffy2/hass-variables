@@ -369,12 +369,7 @@ class Variable(BinarySensorEntity, RestoreEntity):
         return None
 
     async def async_update_variable(self, **kwargs) -> None:
-        """Update the Binary Sensor Variable state and attributes.
-
-        Args:
-            **kwargs: Registered update-service fields, including a value,
-                attributes, and the replace-attributes flag.
-        """
+        """Update the Binary Sensor Variable state and attributes."""
         _LOGGER.debug("(%s) [async_update_variable] kwargs: %s", self._attr_name, kwargs)
 
         updated_attributes = None
@@ -460,12 +455,7 @@ class Variable(BinarySensorEntity, RestoreEntity):
         self.async_write_ha_state()
 
     async def async_toggle_variable(self, **kwargs) -> None:
-        """Toggle the Binary Sensor Variable state and update attributes.
-
-        Args:
-            **kwargs: Registered toggle-service fields, including attributes
-                and the replace-attributes flag.
-        """
+        """Toggle the Binary Sensor Variable state and update attributes."""
         _LOGGER.debug("(%s) [async_toggle_variable] kwargs: %s", self._attr_name, kwargs)
 
         updated_attributes = None

@@ -301,12 +301,7 @@ class Variable(RestoreEntity, TrackerEntity):
             self._attr_location_name = location_name
 
     async def async_update_variable(self, **kwargs) -> None:
-        """Update Device Tracker Variable state and attributes.
-
-        Args:
-            **kwargs: Registered update-service fields, including location,
-                attributes, and the replace-attributes flag.
-        """
+        """Update Device Tracker Variable state and attributes."""
         _LOGGER.debug("(%s) [async_update_variable] kwargs: %s", self._attr_name, kwargs)
 
         updated_attributes = None

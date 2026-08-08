@@ -172,6 +172,9 @@ def _raise_conversion_error(source: str, dest_type: str, value: object) -> Never
 
     Raises:
         ValueError: Always, with the conversion context.
+
+    Returns:
+        This function never returns.
     """
     _LOGGER.debug("Cannot convert %s to %s: %s, returning None", source, dest_type, value)
     raise ValueError(f"Cannot convert {source} to {dest_type}: {value}")

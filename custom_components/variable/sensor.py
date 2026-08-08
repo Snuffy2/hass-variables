@@ -370,12 +370,7 @@ class Variable(RestoreSensor):
         return None
 
     async def async_update_variable(self, **kwargs) -> None:
-        """Update Sensor Variable state and attributes.
-
-        Args:
-            **kwargs: Registered update-service fields, including a value,
-                attributes, and the replace-attributes flag.
-        """
+        """Update Sensor Variable state and attributes."""
         _LOGGER.debug("(%s) [async_update_variable] kwargs: %s", self._attr_name, kwargs)
 
         updated_attributes = None
@@ -466,12 +461,7 @@ class Variable(RestoreSensor):
         self.async_write_ha_state()
 
     async def async_increment_variable(self, **kwargs) -> None:
-        """Increment the Sensor Variable's numeric value.
-
-        Args:
-            **kwargs: Registered increment-service fields, including
-                ``value_delta``.
-        """
+        """Increment the Sensor Variable's numeric value."""
         value_delta = kwargs.get(ATTR_VALUE_DELTA, 1)
         _LOGGER.debug(
             "(%s) [async_increment_variable] Incrementing by: %s",
@@ -531,12 +521,7 @@ class Variable(RestoreSensor):
             raise
 
     async def async_decrement_variable(self, **kwargs) -> None:
-        """Decrement the Sensor Variable's numeric value.
-
-        Args:
-            **kwargs: Registered decrement-service fields, including
-                ``value_delta``.
-        """
+        """Decrement the Sensor Variable's numeric value."""
         value_delta = kwargs.get(ATTR_VALUE_DELTA, 1)
         _LOGGER.debug(
             "(%s) [async_decrement_variable] Decrementing by: %s",
