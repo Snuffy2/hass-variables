@@ -11,7 +11,6 @@ from homeassistant.components.device_tracker.const import (
     ATTR_SOURCE_TYPE,
     SourceType,
 )
-from homeassistant.components.device_tracker.legacy import PLATFORM_SCHEMA as LEGACY_PLATFORM_SCHEMA
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_BATTERY_LEVEL,
@@ -69,8 +68,6 @@ SUPPORTS_TRACKER_IN_ZONES = hasattr(TrackerEntity, "in_zones")
 PLATFORM = Platform.DEVICE_TRACKER
 ENTITY_ID_FORMAT = PLATFORM + ".{}"
 SERVICE_UPDATE_VARIABLE = "update_" + PLATFORM
-
-PLATFORM_SCHEMA = LEGACY_PLATFORM_SCHEMA.extend({})
 
 VARIABLE_ATTR_SETTINGS = {
     ATTR_FRIENDLY_NAME: "_attr_name",

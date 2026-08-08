@@ -5,7 +5,7 @@ import copy
 import logging
 from typing import Any
 
-from homeassistant.components.binary_sensor import PLATFORM_SCHEMA, BinarySensorEntity
+from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_FRIENDLY_NAME,
@@ -60,8 +60,6 @@ ENTITY_ID_FORMAT = PLATFORM + ".{}"
 
 SERVICE_UPDATE_VARIABLE = "update_" + PLATFORM
 SERVICE_TOGGLE_VARIABLE = "toggle_" + PLATFORM
-
-PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({})
 
 VARIABLE_ATTR_SETTINGS = {
     ATTR_FRIENDLY_NAME: "_attr_name",

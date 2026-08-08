@@ -7,7 +7,6 @@ import logging
 import re
 from typing import Any
 
-from awesomeversion import AwesomeVersion, AwesomeVersionException
 from homeassistant import config_entries
 from homeassistant.components import binary_sensor, sensor
 from homeassistant.components.device_tracker.const import ATTR_LOCATION_NAME
@@ -33,7 +32,6 @@ from homeassistant.const import (
     STATE_OFF,
     STATE_ON,
     Platform,
-    __version__ as ha_version,
 )
 from homeassistant.core import HomeAssistant, State, callback
 from homeassistant.helpers import config_validation as cv, entity_registry, selector
@@ -634,26 +632,11 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         config_entry: config_entries.ConfigEntry,
     ) -> config_entries.OptionsFlow:
         """Get the options flow."""
-        return VariableOptionsFlowHandler(config_entry)
+        return VariableOptionsFlowHandler()
 
 
 class VariableOptionsFlowHandler(config_entries.OptionsFlow):
     """Options for the component."""
-
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Init object.
-
-        Older Home Assistant versions expect the OptionsFlow handler to keep a
-        reference to the ConfigEntry on the instance. Recent HA versions handle
-        this differently, so only set it for older versions (issue #140).
-        """
-        try:
-            is_legacy_options_flow = AwesomeVersion(ha_version) < "2024.11.99"
-        except AwesomeVersionException:
-            is_legacy_options_flow = True
-        if is_legacy_options_flow:
-            # Keep the config_entry reference for older HA versions.
-            self.__dict__["config_entry"] = config_entry
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> Any:
         """Manage the options."""

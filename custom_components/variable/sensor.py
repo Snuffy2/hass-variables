@@ -5,7 +5,7 @@ import copy
 import logging
 from typing import Any
 
-from homeassistant.components.sensor import CONF_STATE_CLASS, PLATFORM_SCHEMA, RestoreSensor
+from homeassistant.components.sensor import CONF_STATE_CLASS, RestoreSensor
 from homeassistant.components.sensor.const import UNIT_CONVERTERS
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -46,10 +46,7 @@ from .const import (
     CONF_VARIABLE_ID,
     CONF_YAML_VARIABLE,
     DEFAULT_EXCLUDE_FROM_RECORDER,
-    DEFAULT_FORCE_UPDATE,
-    DEFAULT_ICON,
     DEFAULT_REPLACE_ATTRIBUTES,
-    DEFAULT_RESTORE,
     DOMAIN,
     SERVICE_DECREMENT_SENSOR,
     SERVICE_INCREMENT_SENSOR,
@@ -60,19 +57,6 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORM = Platform.SENSOR
 ENTITY_ID_FORMAT = PLATFORM + ".{}"
-
-PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
-    {
-        vol.Required(CONF_VARIABLE_ID): cv.string,
-        vol.Optional(CONF_NAME): cv.string,
-        vol.Optional(CONF_ICON, default=DEFAULT_ICON): cv.string,
-        vol.Optional(CONF_VALUE): cv.match_all,
-        vol.Optional(CONF_ATTRIBUTES): dict,
-        vol.Optional(CONF_RESTORE, default=DEFAULT_RESTORE): cv.boolean,
-        vol.Optional(CONF_FORCE_UPDATE, default=DEFAULT_FORCE_UPDATE): cv.boolean,
-        vol.Optional(CONF_EXCLUDE_FROM_RECORDER, default=DEFAULT_EXCLUDE_FROM_RECORDER): cv.boolean,
-    }
-)
 
 SERVICE_UPDATE_VARIABLE = "update_" + PLATFORM
 
