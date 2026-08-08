@@ -440,7 +440,7 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             sensor_state_class_select_list.extend(
                 selector.SelectOptionDict(label=str(el.name), value=str(el.value)) for el in classes
             )
-            if self.add_sensor_input.get(CONF_DEVICE_CLASS) == sensor.SensorDeviceClass.MONETARY:
+            if normalized_device_class == sensor.SensorDeviceClass.MONETARY:
                 sensor_units_select_list.extend(
                     selector.SelectOptionDict(
                         label=f"{currency.currency_name} [{currency.code}]",
@@ -453,16 +453,16 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 sensor_units_select_list.extend(
                     selector.SelectOptionDict(label=str(el), value=str(el))
                     for el in getattr(sensor, "DEVICE_CLASS_UNITS", {}).get(
-                        self.add_sensor_input.get(CONF_DEVICE_CLASS), []
+                        normalized_device_class, []
                     )
                     if el is not None and el != "None"
                 )
-            if self.add_sensor_input.get(CONF_DEVICE_CLASS) == sensor.SensorDeviceClass.DATE:
+            if normalized_device_class == sensor.SensorDeviceClass.DATE:
                 sensor_page_2_schema = sensor_page_2_schema.extend(
                     {vol.Optional(CONF_VALUE): selector.DateSelector(selector.DateSelectorConfig())}
                 )
                 value_type = "date"
-            elif self.add_sensor_input.get(CONF_DEVICE_CLASS) == sensor.SensorDeviceClass.TIMESTAMP:
+            elif normalized_device_class == sensor.SensorDeviceClass.TIMESTAMP:
                 default_tzoffset = datetime.datetime.now(
                     dt_util.get_time_zone(self.hass.config.time_zone)
                 ).strftime("%z")
@@ -544,17 +544,13 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle creation of a binary-sensor variable."""
         errors = {} if errors is None else errors
         if user_input is not None:
-            try:
-                user_input.update({CONF_ENTITY_PLATFORM: Platform.BINARY_SENSOR})
-                user_input.update({CONF_YAML_VARIABLE: yaml_variable})
-                if yaml_variable:
-                    user_input.update({CONF_YAML_PRESENT: True})
-                info = await validate_sensor_input(self.hass, user_input)
-                _LOGGER.debug("[New Binary Sensor] updated user_input: %s", user_input)
-                return self.async_create_entry(title=info.get("title", ""), data=user_input)
-            except Exception:
-                _LOGGER.exception("[config_flow async_step_add_binary_sensor] Unexpected exception")
-                errors["base"] = "unknown"
+            user_input.update({CONF_ENTITY_PLATFORM: Platform.BINARY_SENSOR})
+            user_input.update({CONF_YAML_VARIABLE: yaml_variable})
+            if yaml_variable:
+                user_input.update({CONF_YAML_PRESENT: True})
+            info = await validate_sensor_input(self.hass, user_input)
+            _LOGGER.debug("[New Binary Sensor] updated user_input: %s", user_input)
+            return self.async_create_entry(title=info.get("title", ""), data=user_input)
 
         # Show the form again, including any errors found with the input.
         return self.async_show_form(
@@ -575,19 +571,13 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle creation of a device-tracker variable."""
         errors = {} if errors is None else errors
         if user_input is not None:
-            try:
-                user_input.update({CONF_ENTITY_PLATFORM: Platform.DEVICE_TRACKER})
-                user_input.update({CONF_YAML_VARIABLE: yaml_variable})
-                if yaml_variable:
-                    user_input.update({CONF_YAML_PRESENT: True})
-                info = await validate_sensor_input(self.hass, user_input)
-                _LOGGER.debug("[New Device Tracker] updated user_input: %s", user_input)
-                return self.async_create_entry(title=info.get("title", ""), data=user_input)
-            except Exception:
-                _LOGGER.exception(
-                    "[config_flow async_step_add_device_tracker] Unexpected exception"
-                )
-                errors["base"] = "unknown"
+            user_input.update({CONF_ENTITY_PLATFORM: Platform.DEVICE_TRACKER})
+            user_input.update({CONF_YAML_VARIABLE: yaml_variable})
+            if yaml_variable:
+                user_input.update({CONF_YAML_PRESENT: True})
+            info = await validate_sensor_input(self.hass, user_input)
+            _LOGGER.debug("[New Device Tracker] updated user_input: %s", user_input)
+            return self.async_create_entry(title=info.get("title", ""), data=user_input)
 
         # Show the form again, including any errors found with the input.
         return self.async_show_form(
@@ -621,9 +611,6 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return self.async_create_entry(title=info.get("title", ""), data=user_input)
             except vol.Invalid:
                 errors["base"] = "invalid_url"
-            except Exception:
-                _LOGGER.exception("Unexpected exception while adding a device")
-                errors["base"] = "unknown"
 
         # Show the form again, including any errors found with the input.
         return self.async_show_form(
@@ -684,7 +671,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
             )
         if self.config_entry.data.get(CONF_ENTITY_PLATFORM) == CONF_DEVICE:
             return await self.async_step_device_options()
-        return False
+        return self.async_abort(reason="unknown")
 
     async def async_step_change_sensor_value(
         self, user_input: dict | None = None, errors: dict | None = None
@@ -1928,9 +1915,6 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
                 _LOGGER.debug("[Device Options] updated user_input: %s", user_input)
             except vol.Invalid:
                 errors["base"] = "invalid_url"
-            except Exception:
-                _LOGGER.exception("Unexpected exception while updating device options")
-                errors["base"] = "unknown"
             else:
                 self.hass.config_entries.async_update_entry(
                     self.config_entry,

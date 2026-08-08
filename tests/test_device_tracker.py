@@ -485,10 +485,10 @@ def test_tracker_entity_is_imported_from_public_module(
     assert tracker_imports == ["homeassistant.components.device_tracker"]
 
 
-def test_variable_does_not_override_location_name(
+def test_variable_does_not_override_final_tracker_properties(
     device_tracker_ast: tuple[ast.Module, ast.ClassDef],
 ) -> None:
-    """Variable should not override the deprecated location_name property."""
+    """Variable should not override deprecated or final tracker properties."""
     _, variable_class = device_tracker_ast
     method_names = {
         node.name
@@ -496,7 +496,7 @@ def test_variable_does_not_override_location_name(
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
     }
 
-    assert "location_name" not in method_names
+    assert {"location_name", "state_attributes"}.isdisjoint(method_names)
 
 
 def test_legacy_location_name_attribute_is_capability_gated(

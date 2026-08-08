@@ -305,7 +305,16 @@ class Variable(BinarySensorEntity, RestoreEntity):
     def _update_attr_settings(
         self, new_attributes: Any = None, just_pop: bool = False
     ) -> dict[str, Any] | None:
-        """Apply special entity attributes and return remaining attributes."""
+        """Apply special entity settings and return unconsumed attributes.
+
+        Args:
+            new_attributes: Dynamic attribute payload to process.
+            just_pop: Remove special attributes without applying their values.
+
+        Returns:
+            A copy of the remaining attributes or ``None`` when no supported
+            attributes were provided.
+        """
         if new_attributes is not None:
             _LOGGER.debug(
                 "(%s) [update_attr_settings] updating special attributes; incoming: %s (type: %s)",

@@ -1,5 +1,7 @@
 """Integration tests for Variable sensor restore and service behavior."""
 
+from datetime import date
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_FRIENDLY_NAME, CONF_DEVICE, CONF_DEVICE_ID, CONF_NAME, Platform
 from homeassistant.core import HomeAssistant, State
@@ -23,7 +25,43 @@ from custom_components.variable.const import (
     SERVICE_INCREMENT_SENSOR,
     SERVICE_UPDATE_SENSOR,
 )
+from custom_components.variable.sensor import Variable
 from tests.types import ConfigEntryFactory
+
+
+@pytest.mark.parametrize(
+    ("method_name", "operation"),
+    [
+        pytest.param("async_increment_variable", "increment", id="increment"),
+        pytest.param("async_decrement_variable", "decrement", id="decrement"),
+    ],
+)
+async def test_numeric_services_reject_temporal_native_value(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+    method_name: str,
+    operation: str,
+) -> None:
+    """Reject temporal values before attempting numeric arithmetic.
+
+    Args:
+        hass: Home Assistant test instance.
+        config_entry_factory: Factory for test configuration entries.
+        method_name: Numeric entity method to invoke.
+        operation: Operation name expected in the user-facing error.
+    """
+    entry = config_entry_factory(
+        {
+            CONF_VARIABLE_ID: "temporal_value",
+            CONF_VALUE: 1,
+            "value_type": "number",
+        }
+    )
+    sensor = Variable(hass, dict(entry.data), entry, entry.entry_id)
+    sensor._attr_native_value = date(2026, 8, 8)
+
+    with pytest.raises(TypeError, match=rf"Cannot {operation} non-numeric value"):
+        await getattr(sensor, method_name)()
 
 
 async def test_sensor_restore_cache_is_applied_during_config_entry_setup(

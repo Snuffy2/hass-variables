@@ -18,6 +18,20 @@ class _AttributePathTypeError(TypeError, ValueError):
 
 
 def _parse_attribute_path(path: str) -> list[str | int]:
+    """Tokenize an attribute path into mapping keys and list indexes.
+
+    Dot-delimited path components become string tokens, while numeric components
+    enclosed in brackets become integer tokens.
+
+    Args:
+        path: Attribute path to tokenize.
+
+    Returns:
+        The ordered mapping-key and list-index tokens from the path.
+
+    Raises:
+        ValueError: If a bracket is unclosed or contains a non-numeric index.
+    """
     tokens: list[str | int] = []
     buffer = ""
     index = 0

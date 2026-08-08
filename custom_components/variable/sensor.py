@@ -333,6 +333,16 @@ class Variable(RestoreSensor):
         return bool(self._force_update)
 
     def _update_attr_settings(self, new_attributes: Any = None, just_pop: bool = False) -> Any:
+        """Apply special entity settings and return unconsumed attributes.
+
+        Args:
+            new_attributes: Dynamic attribute payload to process.
+            just_pop: Remove special attributes without applying their values.
+
+        Returns:
+            A copy of the remaining attributes, the unsupported input unchanged,
+            or ``None`` when no attributes were provided.
+        """
         if new_attributes is not None:
             _LOGGER.debug(
                 "(%s) [update_attr_settings] Updating Special Attributes", self._attr_name
@@ -484,6 +494,11 @@ class Variable(RestoreSensor):
                         f"Cannot convert current value to number: {current_value}"
                     ) from None
 
+            if not isinstance(current_value, int | float):
+                raise TypeError(
+                    f"Cannot increment non-numeric value. Current value: {current_value}"
+                )
+
             new_value = current_value + value_delta
 
             # Convert back to the appropriate type
@@ -496,7 +511,7 @@ class Variable(RestoreSensor):
             self._attr_native_value = new_value
             self.async_write_ha_state()
 
-        except ValueError as err:
+        except (ValueError, TypeError) as err:
             _LOGGER.error("(%s) Increment error: %s", self._attr_name, err)
             raise
 
@@ -539,6 +554,11 @@ class Variable(RestoreSensor):
                         f"Cannot convert current value to number: {current_value}"
                     ) from None
 
+            if not isinstance(current_value, int | float):
+                raise TypeError(
+                    f"Cannot decrement non-numeric value. Current value: {current_value}"
+                )
+
             new_value = current_value - value_delta
 
             # Convert back to the appropriate type
@@ -551,7 +571,7 @@ class Variable(RestoreSensor):
             self._attr_native_value = new_value
             self.async_write_ha_state()
 
-        except ValueError as err:
+        except (ValueError, TypeError) as err:
             _LOGGER.error("(%s) Decrement error: %s", self._attr_name, err)
             raise
 
