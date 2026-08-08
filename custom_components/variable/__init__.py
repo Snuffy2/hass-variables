@@ -230,22 +230,25 @@ async def _async_dispatch_yaml_lifecycle(
     hass: HomeAssistant,
     lifecycle_work: Coroutine[Any, Any, object],
     wait_for_completion: bool,
-) -> None:
+) -> object | None:
     """Await lifecycle work or track it until background completion.
 
     Args:
         hass: Home Assistant instance that hosts the integration.
         lifecycle_work: Config-entry lifecycle operation to dispatch.
         wait_for_completion: Whether to wait for the operation to finish.
+
+    Returns:
+        The lifecycle result when waiting for completion, otherwise None.
     """
     if wait_for_completion:
-        await lifecycle_work
-        return
+        return await lifecycle_work
 
     pending_tasks: set[asyncio.Task[Any]] = hass.data.setdefault(_YAML_LIFECYCLE_TASKS, set())
     task: asyncio.Task[object] = hass.async_create_task(lifecycle_work)
     pending_tasks.add(task)
     task.add_done_callback(pending_tasks.discard)
+    return None
 
 
 async def _async_reconcile_yaml(
@@ -320,9 +323,31 @@ async def _async_reconcile_yaml(
                         wait_for_completion,
                     )
                 yaml_data = _yaml_entry_data(var, var_fields)
+                previous_data = copy.deepcopy(dict(entry.data))
                 hass.config_entries.async_update_entry(entry, data=yaml_data)
                 reload_entry = hass.config_entries.async_reload(entry.entry_id)
-                await _async_dispatch_yaml_lifecycle(hass, reload_entry, wait_for_completion)
+                reload_ok = await _async_dispatch_yaml_lifecycle(
+                    hass, reload_entry, wait_for_completion
+                )
+                if wait_for_completion and reload_ok is False:
+                    hass.config_entries.async_update_entry(entry, data=previous_data)
+                    try:
+                        rollback_ok = await hass.config_entries.async_reload(entry.entry_id)
+                    except HomeAssistantError:
+                        _LOGGER.exception(
+                            "[YAML] Error reloading %s after restoring its prior config-entry data",
+                            var,
+                        )
+                    else:
+                        if rollback_ok is False:
+                            _LOGGER.error(
+                                "[YAML] Reload returned false for %s after restoring its prior "
+                                "config-entry data",
+                                var,
+                            )
+                    raise HomeAssistantError(
+                        f"Failed to reload YAML variable {var}; restored its prior configuration"
+                    )
 
     # Remove any config entries that were originally created from YAML imports
     # but are no longer present in the current YAML configuration.
