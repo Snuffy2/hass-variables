@@ -667,7 +667,7 @@ async def test_options_flow_changes_loaded_sensor_value(
 @pytest.mark.parametrize(
     ("entry_data", "entity_id", "step_id", "user_input"),
     [
-        (
+        pytest.param(
             {
                 CONF_ENTITY_PLATFORM: Platform.SENSOR,
                 CONF_VARIABLE_ID: "missing_sensor",
@@ -678,8 +678,9 @@ async def test_options_flow_changes_loaded_sensor_value(
             "sensor.missing_sensor",
             "change_sensor_value",
             {CONF_VALUE: "24.25"},
+            id="sensor",
         ),
-        (
+        pytest.param(
             {
                 CONF_ENTITY_PLATFORM: Platform.BINARY_SENSOR,
                 CONF_VARIABLE_ID: "missing_binary_sensor",
@@ -689,8 +690,9 @@ async def test_options_flow_changes_loaded_sensor_value(
             "binary_sensor.missing_binary_sensor",
             "change_binary_sensor_value",
             {CONF_VALUE: "false"},
+            id="binary-sensor",
         ),
-        (
+        pytest.param(
             {
                 CONF_ENTITY_PLATFORM: Platform.DEVICE_TRACKER,
                 CONF_VARIABLE_ID: "missing_device_tracker",
@@ -701,6 +703,7 @@ async def test_options_flow_changes_loaded_sensor_value(
             "device_tracker.missing_device_tracker",
             "change_device_tracker_value",
             {ATTR_LATITUDE: 41.5, ATTR_LONGITUDE: -74.5},
+            id="device-tracker",
         ),
     ],
 )
