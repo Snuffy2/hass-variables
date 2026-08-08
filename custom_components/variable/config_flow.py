@@ -292,7 +292,7 @@ ADD_DEVICE_SCHEMA = vol.Schema(
 )
 
 
-async def validate_sensor_input(hass: HomeAssistant, data: dict) -> dict[str, Any]:
+async def validate_sensor_input(hass: HomeAssistant, data: dict) -> dict[str, str]:
     """Validate sensor input and derive a config-entry title.
 
     Args:
@@ -300,11 +300,10 @@ async def validate_sensor_input(hass: HomeAssistant, data: dict) -> dict[str, An
         data (dict): Submitted sensor configuration fields.
 
     Returns:
-        dict[str, Any]: Config-entry metadata containing the derived title.
+        dict[str, str]: Config-entry metadata containing the derived title.
     """
-    if data.get(CONF_NAME):
-        return {"title": data.get(CONF_NAME)}
-    return {"title": data.get(CONF_VARIABLE_ID, "")}
+    title = data.get(CONF_NAME) or data.get(CONF_VARIABLE_ID, "")
+    return {"title": title if isinstance(title, str) else ""}
 
 
 class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -1492,7 +1491,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
 
     def check_value_default(
         self, new_device_class: sensor.SensorDeviceClass | str | None
-    ) -> tuple[bool, Any]:
+    ) -> tuple[bool, object]:
         """Return whether the existing value remains a valid default.
 
         Args:
@@ -1500,7 +1499,7 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
                 device class from the options form.
 
         Returns:
-            tuple[bool, Any]: Whether the current value is valid and the value to
+            tuple[bool, object]: Whether the current value is valid and the value to
                 use as its default.
         """
         _LOGGER.debug(
