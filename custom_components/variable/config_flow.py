@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import datetime
-from enum import Enum
 import logging
 import re
 from typing import Any
 
-from awesomeversion import AwesomeVersion
+from awesomeversion import AwesomeVersion, AwesomeVersionException
 from homeassistant import config_entries
 from homeassistant.components import binary_sensor, sensor
 from homeassistant.components.device_tracker.const import ATTR_LOCATION_NAME
@@ -37,14 +36,8 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv, entity_registry, selector
 import homeassistant.util.dt as dt_util
+from iso4217 import Currency
 import voluptuous as vol
-
-try:
-    # iso4217 is an optional dependency; import if available
-    from iso4217 import Currency  # type: ignore
-except Exception:  # pragma: no cover - optional import
-    # Make Currency an empty list to keep code paths that iterate over it safe
-    Currency = []  # type: ignore
 
 from .const import (
     ATTR_ATTRIBUTES,
@@ -79,16 +72,12 @@ from .helpers import value_to_type
 
 
 def _get_currency_units() -> list[str]:
-    """Return a list of currency codes suitable for selectors.
-
-    If the optional Currency import is unavailable, return an empty list.
-    """
+    """Return a list of currency codes suitable for selectors."""
     units: list[str] = []
     try:
-        if Currency:
-            for el in Currency:
-                if el.code not in ["XTS", "XXX"]:
-                    units.append(str(el.code))
+        for currency in Currency:
+            if currency.code not in ["XTS", "XXX"]:
+                units.append(str(currency.code))
     except Exception:
         # Be conservative and return empty list on any error
         return []
@@ -112,17 +101,22 @@ COMPONENT_CONFIG_URL = "https://github.com/Wibias/hass-variables"
 
 SENSOR_DEVICE_CLASS_SELECT_LIST = []
 SENSOR_DEVICE_CLASS_SELECT_LIST.append(selector.SelectOptionDict(label="None", value="None"))
-for el in sensor.SensorDeviceClass:
-    if el != sensor.SensorDeviceClass.ENUM:
+for sensor_device_class in sensor.SensorDeviceClass:
+    if sensor_device_class != sensor.SensorDeviceClass.ENUM:
         SENSOR_DEVICE_CLASS_SELECT_LIST.append(
-            selector.SelectOptionDict(label=str(el.name), value=str(el.value))
+            selector.SelectOptionDict(
+                label=str(sensor_device_class.name), value=str(sensor_device_class.value)
+            )
         )
 
 BINARY_SENSOR_DEVICE_CLASS_SELECT_LIST = []
 BINARY_SENSOR_DEVICE_CLASS_SELECT_LIST.append(selector.SelectOptionDict(label="None", value="None"))
-for el in binary_sensor.BinarySensorDeviceClass:
+for binary_sensor_device_class in binary_sensor.BinarySensorDeviceClass:
     BINARY_SENSOR_DEVICE_CLASS_SELECT_LIST.append(
-        selector.SelectOptionDict(label=str(el.name), value=str(el.value))
+        selector.SelectOptionDict(
+            label=str(binary_sensor_device_class.name),
+            value=str(binary_sensor_device_class.value),
+        )
     )
 
 ADD_SENSOR_SCHEMA = vol.Schema(
@@ -325,9 +319,10 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ign
                 self.add_sensor_input.update({CONF_VALUE_TYPE: yaml_value_type})
             # normalize user_input to dict to make .get/.update safe for type checkers
             user_input = user_input or {}
+            val: Any = user_input.get(CONF_VALUE)
             if (
-                user_input.get(CONF_VALUE) is not None
-                and isinstance(user_input.get(CONF_VALUE), str)
+                val is not None
+                and isinstance(val, str)
                 and self.add_sensor_input.get(CONF_VALUE_TYPE) == "datetime"
             ):
                 if (
@@ -335,11 +330,9 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ign
                     and re.match(r"^[+-]?\d\d\:?\d\d\s*$", str(user_input.get(CONF_TZOFFSET)))
                     is not None
                 ):
-                    val = str(user_input.get(CONF_VALUE)) + str(user_input.get(CONF_TZOFFSET))
+                    val = val + str(user_input.get(CONF_TZOFFSET))
                 else:
-                    val = str(user_input.get(CONF_VALUE)) + "+0000"
-            else:
-                val = user_input.get(CONF_VALUE)
+                    val += "+0000"
             _LOGGER.debug(f"[New Sensor Page 2] val: {val}")
             try:
                 newval = value_to_type(
@@ -430,23 +423,22 @@ class VariableConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ign
                         break
 
             if normalized_device_class is None:
-                classes = []
+                classes: set[sensor.SensorStateClass] = set()
             else:
-                classes = sensor.DEVICE_CLASS_STATE_CLASSES.get(normalized_device_class, [])
+                classes = sensor.DEVICE_CLASS_STATE_CLASSES.get(normalized_device_class, set())
             for el in classes:
                 SENSOR_STATE_CLASS_SELECT_LIST.append(
                     selector.SelectOptionDict(label=str(el.name), value=str(el.value))
                 )
             if self.add_sensor_input.get(CONF_DEVICE_CLASS) == sensor.SensorDeviceClass.MONETARY:
-                if Currency is not None:
-                    for el in Currency:
-                        if el.code not in ["XTS", "XXX"]:
-                            SENSOR_UNITS_SELECT_LIST.append(
-                                selector.SelectOptionDict(
-                                    label=f"{el.currency_name} [{el.code}]",
-                                    value=str(el.code),
-                                )
+                for currency in Currency:
+                    if currency.code not in ["XTS", "XXX"]:
+                        SENSOR_UNITS_SELECT_LIST.append(
+                            selector.SelectOptionDict(
+                                label=f"{currency.currency_name} [{currency.code}]",
+                                value=str(currency.code),
                             )
+                        )
             else:
                 for el in getattr(sensor, "DEVICE_CLASS_UNITS", {}).get(
                     self.add_sensor_input.get(CONF_DEVICE_CLASS), []
@@ -661,12 +653,12 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
         this differently, so only set it for older versions (issue #140).
         """
         try:
-            if AwesomeVersion(HAVERSION) < "2024.11.99":
-                # Keep the config_entry reference for older HA versions
-                self.config_entry = config_entry
-        except Exception:
-            # If version parsing fails, be conservative and keep the reference
-            self.config_entry = config_entry
+            is_legacy_options_flow = AwesomeVersion(HAVERSION) < "2024.11.99"
+        except AwesomeVersionException:
+            is_legacy_options_flow = True
+        if is_legacy_options_flow:
+            # Keep the config_entry reference for older HA versions.
+            self.__dict__["config_entry"] = config_entry
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
         """Manage the options."""
@@ -707,9 +699,10 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
         _LOGGER.debug(f"[Change Sensor Value] state: {state}")
         if user_input:
             _LOGGER.debug(f"[Change Sensor Value] user_input: {user_input}")
+            val: Any = user_input.get(CONF_VALUE)
             if (
-                user_input.get(CONF_VALUE) is not None
-                and isinstance(user_input.get(CONF_VALUE), str)
+                val is not None
+                and isinstance(val, str)
                 and self.config_entry.data.get(CONF_VALUE_TYPE) == "datetime"
             ):
                 if (
@@ -717,11 +710,9 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
                     and re.match(r"^[+-]?\d\d\:?\d\d\s*$", str(user_input.get(CONF_TZOFFSET)))
                     is not None
                 ):
-                    val = str(user_input.get(CONF_VALUE)) + str(user_input.get(CONF_TZOFFSET))
+                    val = val + str(user_input.get(CONF_TZOFFSET))
                 else:
-                    val = str(user_input.get(CONF_VALUE)) + "+0000"
-            else:
-                val = user_input.get(CONF_VALUE)
+                    val += "+0000"
             _LOGGER.debug(f"[Change Sensor Value] val: {val}")
             try:
                 newval = value_to_type(
@@ -1352,14 +1343,16 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
             self.sensor_options_page_1.get(CONF_DEVICE_CLASS) is not None
             and self.sensor_options_page_1.get(CONF_DEVICE_CLASS).lower() != "none"
         ):
-            for el in sensor.DEVICE_CLASS_STATE_CLASSES.get(
-                self.sensor_options_page_1.get(CONF_DEVICE_CLASS), Enum
+            for state_class in sensor.DEVICE_CLASS_STATE_CLASSES.get(
+                self.sensor_options_page_1.get(CONF_DEVICE_CLASS), set()
             ):
                 SENSOR_STATE_CLASS_SELECT_LIST.append(
-                    selector.SelectOptionDict(label=str(el.name), value=str(el.value))
+                    selector.SelectOptionDict(
+                        label=str(state_class.name), value=str(state_class.value)
+                    )
                 )
             # Populate units list from either currency list or sensor.DEVICE_CLASS_UNITS
-            units = []
+            units: list[str] = []
             if (
                 self.sensor_options_page_1.get(CONF_DEVICE_CLASS)
                 == sensor.SensorDeviceClass.MONETARY
@@ -1368,10 +1361,10 @@ class VariableOptionsFlowHandler(config_entries.OptionsFlow):
             else:
                 units = _get_device_class_units(self.sensor_options_page_1.get(CONF_DEVICE_CLASS))
 
-            for el in units:
-                if el is not None and el != "None":
+            for unit in units:
+                if unit != "None":
                     SENSOR_UNITS_SELECT_LIST.append(
-                        selector.SelectOptionDict(label=str(el), value=str(el))
+                        selector.SelectOptionDict(label=unit, value=unit)
                     )
 
             if self.sensor_options_page_1.get(CONF_DEVICE_CLASS) in [sensor.SensorDeviceClass.DATE]:

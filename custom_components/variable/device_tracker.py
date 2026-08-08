@@ -1,7 +1,7 @@
 from collections.abc import MutableMapping
 import copy
 import logging
-from typing import cast, final
+from typing import cast
 
 from homeassistant.components.device_tracker import TrackerEntity
 from homeassistant.components.device_tracker.const import (
@@ -9,7 +9,7 @@ from homeassistant.components.device_tracker.const import (
     ATTR_SOURCE_TYPE,
     SourceType,
 )
-from homeassistant.components.device_tracker.legacy import PLATFORM_SCHEMA
+from homeassistant.components.device_tracker.legacy import PLATFORM_SCHEMA as LEGACY_PLATFORM_SCHEMA
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_BATTERY_LEVEL,
@@ -68,7 +68,7 @@ PLATFORM = Platform.DEVICE_TRACKER
 ENTITY_ID_FORMAT = PLATFORM + ".{}"
 SERVICE_UPDATE_VARIABLE = "update_" + PLATFORM
 
-PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({})  # type: ignore[assignment]
+PLATFORM_SCHEMA = LEGACY_PLATFORM_SCHEMA.extend({})
 
 VARIABLE_ATTR_SETTINGS = {
     ATTR_FRIENDLY_NAME: "_attr_name",
@@ -369,8 +369,7 @@ class Variable(RestoreEntity, TrackerEntity):
         """
         return self._attr_gps_accuracy if self._attr_gps_accuracy is not None else 0
 
-    @final
-    @property
+    @property  # type: ignore[misc]
     def state_attributes(self) -> dict[str, StateType]:  # type: ignore[override]
         """Return the device state attributes."""
         attr: dict[str, StateType] = {}

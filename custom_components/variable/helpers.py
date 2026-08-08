@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import MutableMapping
+from collections.abc import Mapping, MutableMapping
 import copy
 import datetime
 import logging
@@ -11,8 +11,8 @@ import homeassistant.util.dt as dt_util
 _LOGGER = logging.getLogger(__name__)
 
 
-def _parse_attribute_path(path: str) -> list:
-    tokens: list = []
+def _parse_attribute_path(path: str) -> list[str | int]:
+    tokens: list[str | int] = []
     buffer = ""
     index = 0
     while index < len(path):
@@ -51,12 +51,12 @@ def looks_like_attribute_path(path: str) -> bool:
     return False
 
 
-def set_nested_attribute(target: MutableMapping, path: str, value) -> None:
+def set_nested_attribute(target: MutableMapping[str, Any], path: str, value: Any) -> None:
     tokens = _parse_attribute_path(path)
     if not tokens:
         raise ValueError("Attribute path cannot be empty")
 
-    current = target
+    current: MutableMapping[str, Any] | list[Any] = target
     for idx, token in enumerate(tokens):
         is_last = idx == len(tokens) - 1
         if isinstance(token, str):
@@ -78,18 +78,18 @@ def set_nested_attribute(target: MutableMapping, path: str, value) -> None:
         else:
             if not isinstance(current, list):
                 raise ValueError(f"Expected list while navigating attribute path: {path}")
-            next_token = tokens[idx + 1] if not is_last else None
+            list_next_token = tokens[idx + 1] if not is_last else None
             if is_last:
                 while len(current) <= token:
                     current.append(None)
                 current[token] = copy.deepcopy(value)
             else:
                 next_container: list[Any] | MutableMapping[str, Any] = (
-                    [] if isinstance(next_token, int) else {}
+                    [] if isinstance(list_next_token, int) else {}
                 )
                 while len(current) <= token:
                     current.append(copy.deepcopy(next_container))
-                if isinstance(next_token, int):
+                if isinstance(list_next_token, int):
                     if not isinstance(current[token], list):
                         current[token] = []
                 else:
@@ -99,9 +99,9 @@ def set_nested_attribute(target: MutableMapping, path: str, value) -> None:
 
 
 def merge_attribute_dict(
-    existing: MutableMapping | None, updates: MutableMapping
-) -> MutableMapping:
-    merged: MutableMapping = copy.deepcopy(existing) if existing is not None else {}
+    existing: Mapping[str, Any] | None, updates: Mapping[str, Any]
+) -> dict[str, Any]:
+    merged = copy.deepcopy(dict(existing)) if existing is not None else {}
     for attr, value in updates.items():
         if isinstance(attr, str) and looks_like_attribute_path(attr):
             set_nested_attribute(merged, attr, value)

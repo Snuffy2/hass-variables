@@ -1,5 +1,6 @@
 """Variable implementation for Home Assistant."""
 
+from collections.abc import Collection
 import contextlib
 import copy
 import json
@@ -49,9 +50,7 @@ from .device import create_device, remove_device
 try:
     from homeassistant.helpers.helper_integration import async_remove_helper_devices
 except ImportError:
-    from homeassistant.helpers.device import (
-        async_remove_stale_devices_links_keep_current_device,
-    )
+    from homeassistant.helpers.device import async_remove_stale_devices_links_keep_current_device
 
     def async_remove_helper_devices(
         hass: HomeAssistant,
@@ -59,6 +58,7 @@ except ImportError:
         helper_config_entry_id: str,
         source_device_id: str | None,
         remove_all_devices: bool = False,
+        keep_device_ids: Collection[str] = (),
     ) -> None:
         """Remove stale helper device links on Home Assistant releases before 2026.8.
 
@@ -67,6 +67,7 @@ except ImportError:
             helper_config_entry_id: Config entry identifier for the helper.
             source_device_id: Device identifier that should remain linked.
             remove_all_devices: Ignored on legacy Home Assistant releases.
+            keep_device_ids: Ignored on legacy Home Assistant releases.
         """
         async_remove_stale_devices_links_keep_current_device(
             hass,
@@ -124,7 +125,7 @@ async def _async_exclude_entity_from_recorder(hass: HomeAssistant, entity_id: st
     """Exclude an entity from recorder by updating recorder's internal config."""
     try:
         # Get current recorder config
-        recorder_config = hass.config.get("recorder", {})
+        recorder_config = hass.config.get("recorder", {})  # type: ignore[attr-defined]
         exclude_entities = list(recorder_config.get("exclude_entities", []))
 
         # Add entity if not already in list
