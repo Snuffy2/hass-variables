@@ -35,6 +35,7 @@ from custom_components.variable.const import (
     CONF_VARIABLE_ID,
     CONF_YAML_PRESENT,
     CONF_YAML_VARIABLE,
+    DEFAULT_RESTORE,
     DOMAIN,
 )
 from tests.types import ConfigEntryFactory
@@ -84,6 +85,7 @@ async def test_yaml_setup_and_reload_manage_config_entries(
         DOMAIN: {
             "yaml_temperature": {
                 CONF_VALUE: 24,
+                CONF_RESTORE: False,
                 "attributes": {"source": "reload"},
             }
         }
@@ -152,6 +154,7 @@ async def test_yaml_reload_removes_duplicate_yaml_entries(
                 DOMAIN: {
                     "duplicate_yaml": {
                         CONF_VALUE: "updated",
+                        CONF_RESTORE: False,
                         CONF_ATTRIBUTES: {"source": "reload"},
                     }
                 }
@@ -266,7 +269,6 @@ async def test_yaml_reload_creates_entities_before_service_returns(
     ("initial_config", "removed_key", "removed_attribute"),
     [
         pytest.param({CONF_VALUE: 12}, CONF_VALUE, None, id="value"),
-        pytest.param({CONF_RESTORE: False}, CONF_RESTORE, None, id="restore"),
         pytest.param({CONF_FORCE_UPDATE: True}, CONF_FORCE_UPDATE, None, id="force-update"),
         pytest.param(
             {CONF_EXCLUDE_FROM_RECORDER: True},
@@ -320,7 +322,7 @@ async def test_yaml_reload_removes_omitted_settings(
 
     with patch(
         "custom_components.variable.async_integration_yaml_config",
-        new=AsyncMock(return_value={DOMAIN: {variable_id: {}}}),
+        new=AsyncMock(return_value={DOMAIN: {variable_id: {CONF_RESTORE: False}}}),
     ):
         await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
 
@@ -335,6 +337,44 @@ async def test_yaml_reload_removes_omitted_settings(
         state = hass.states.get(f"sensor.{variable_id}")
         assert state is not None
         assert removed_attribute not in state.attributes
+
+
+async def test_yaml_reload_restores_default_when_restore_is_omitted(
+    hass: HomeAssistant,
+) -> None:
+    """Enable state restoration when reloaded YAML omits the restore setting.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+    """
+    variable_id = "yaml_restore_default"
+    assert await async_setup_component(
+        hass,
+        DOMAIN,
+        {DOMAIN: {variable_id: {CONF_RESTORE: False}}},
+    )
+    await hass.async_block_till_done()
+
+    restore_lookup = AsyncMock(return_value=None)
+    with (
+        patch(
+            "custom_components.variable.async_integration_yaml_config",
+            new=AsyncMock(return_value={DOMAIN: {variable_id: {}}}),
+        ),
+        patch(
+            "custom_components.variable.sensor.Variable.async_get_last_sensor_data",
+            new=restore_lookup,
+        ),
+    ):
+        await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
+
+    entry = next(
+        entry
+        for entry in hass.config_entries.async_entries(DOMAIN)
+        if entry.data.get(CONF_VARIABLE_ID) == variable_id
+    )
+    assert entry.data[CONF_RESTORE] is DEFAULT_RESTORE
+    restore_lookup.assert_awaited_once_with()
 
 
 @pytest.mark.parametrize("yaml_entry_present", [False, True], ids=["ui-only", "with-yaml"])
