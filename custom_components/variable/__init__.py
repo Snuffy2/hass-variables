@@ -220,6 +220,15 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 async def _async_process_yaml(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Process YAML variable configuration.
+
+    Args:
+        hass: Home Assistant instance.
+        config: Validated Home Assistant configuration.
+
+    Returns:
+        True when YAML variable processing completes successfully.
+    """
     variables = json.loads(json.dumps(config.get(DOMAIN, {})))
 
     for var, var_fields in variables.items():

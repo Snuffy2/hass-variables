@@ -494,7 +494,7 @@ class Variable(RestoreSensor):
                         f"Cannot convert current value to number: {current_value}"
                     ) from None
 
-            if not isinstance(current_value, int | float):
+            if isinstance(current_value, bool) or not isinstance(current_value, int | float):
                 raise TypeError(
                     f"Cannot increment non-numeric value. Current value: {current_value}"
                 )
@@ -554,7 +554,7 @@ class Variable(RestoreSensor):
                         f"Cannot convert current value to number: {current_value}"
                     ) from None
 
-            if not isinstance(current_value, int | float):
+            if isinstance(current_value, bool) or not isinstance(current_value, int | float):
                 raise TypeError(
                     f"Cannot decrement non-numeric value. Current value: {current_value}"
                 )

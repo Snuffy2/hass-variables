@@ -36,19 +36,29 @@ from tests.types import ConfigEntryFactory
         pytest.param("async_decrement_variable", "decrement", id="decrement"),
     ],
 )
-async def test_numeric_services_reject_temporal_native_value(
+@pytest.mark.parametrize(
+    "current_value",
+    [
+        pytest.param(date(2026, 8, 8), id="date"),
+        pytest.param(True, id="true"),
+        pytest.param(False, id="false"),
+    ],
+)
+async def test_numeric_services_reject_non_numeric_native_value(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,
     method_name: str,
     operation: str,
+    current_value: date | bool,
 ) -> None:
-    """Reject temporal values before attempting numeric arithmetic.
+    """Reject non-numeric values before attempting numeric arithmetic.
 
     Args:
         hass: Home Assistant test instance.
         config_entry_factory: Factory for test configuration entries.
         method_name: Numeric entity method to invoke.
         operation: Operation name expected in the user-facing error.
+        current_value: Native value that arithmetic must reject.
     """
     entry = config_entry_factory(
         {
@@ -58,10 +68,14 @@ async def test_numeric_services_reject_temporal_native_value(
         }
     )
     sensor = Variable(hass, dict(entry.data), entry, entry.entry_id)
-    sensor._attr_native_value = date(2026, 8, 8)
+    sensor._attr_native_value = current_value
 
-    with pytest.raises(TypeError, match=rf"Cannot {operation} non-numeric value"):
+    with pytest.raises(TypeError) as exc_info:
         await getattr(sensor, method_name)()
+
+    assert str(exc_info.value) == (
+        f"Cannot {operation} non-numeric value. Current value: {current_value}"
+    )
 
 
 async def test_sensor_restore_cache_is_applied_during_config_entry_setup(
