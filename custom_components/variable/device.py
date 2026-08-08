@@ -52,8 +52,10 @@ async def create_device(hass: HomeAssistant, entry: ConfigEntry) -> None:
     domain_entities: list = []
     for domain_entry in domain_entries:
         if not domain_entry.data.get(CONF_YAML_VARIABLE, False):
-            domain_entities = domain_entities + er.async_entries_for_config_entry(
-                registry=entity_registry, config_entry_id=domain_entry.entry_id
+            domain_entities.extend(
+                er.async_entries_for_config_entry(
+                    registry=entity_registry, config_entry_id=domain_entry.entry_id
+                )
             )
     domain_reload_entities = [entity for entity in domain_entities if entity.device_id == device.id]
     reload_entities = device_entities + domain_reload_entities
@@ -67,7 +69,6 @@ async def create_device(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
     scheduled_entry_ids: set[str] = set()
     for entity in reload_entities:
-        # May actually want to do this for all entities, will see
         if entity.platform != DOMAIN:
             continue
         _LOGGER.debug("(%s) [create_device] Reloading entity_id: %s", device.name, entity.entity_id)
@@ -137,7 +138,6 @@ async def remove_device(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     device_registry.async_remove_device(device.id)
 
     for entity in entities:
-        # May actually want to do this for all entities, will see
         if entity.platform != DOMAIN:
             continue
         _LOGGER.debug("(%s) [remove_device] Reloading entity_id: %s", device.name, entity.entity_id)
