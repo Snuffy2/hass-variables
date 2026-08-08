@@ -1,9 +1,11 @@
+"""Binary sensor platform for variable entities."""
+
 from collections.abc import MutableMapping
 import copy
 import logging
-from typing import cast
+from typing import Any
 
-from homeassistant.components.binary_sensor import PLATFORM_SCHEMA, BinarySensorEntity
+from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_FRIENDLY_NAME,
@@ -25,6 +27,7 @@ from homeassistant.helpers import (
     selector,
 )
 from homeassistant.helpers.entity import generate_entity_id
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 import homeassistant.helpers.entity_registry as er
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.util import slugify
@@ -58,8 +61,6 @@ ENTITY_ID_FORMAT = PLATFORM + ".{}"
 SERVICE_UPDATE_VARIABLE = "update_" + PLATFORM
 SERVICE_TOGGLE_VARIABLE = "toggle_" + PLATFORM
 
-PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({})
-
 VARIABLE_ATTR_SETTINGS = {
     ATTR_FRIENDLY_NAME: "_attr_name",
     ATTR_ICON: "_attr_icon",
@@ -70,10 +71,15 @@ VARIABLE_ATTR_SETTINGS = {
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
-    async_add_entities,
+    async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Setup the Binary Sensor Variable entity with a config_entry (config_flow)."""
+    """Set up a Binary Sensor Variable config entry.
 
+    Args:
+        hass: Home Assistant instance hosting the integration.
+        config_entry: Config entry that defines the variable.
+        async_add_entities: Callback that adds the created entity.
+    """
     platform = entity_platform.async_get_current_platform()
 
     platform.async_register_entity_service(
@@ -111,50 +117,57 @@ async def async_setup_entry(
 
     if config.get(CONF_EXCLUDE_FROM_RECORDER, DEFAULT_EXCLUDE_FROM_RECORDER):
         _LOGGER.debug(
-            f"({config.get(CONF_NAME, config.get(CONF_VARIABLE_ID, None))}) Excluding from Recorder"
+            "(%s) Excluding from Recorder",
+            config.get(CONF_NAME, config.get(CONF_VARIABLE_ID)),
         )
         async_add_entities([VariableNoRecorder(hass, config, config_entry, unique_id)])
     else:
         async_add_entities([Variable(hass, config, config_entry, unique_id)])
 
-    return None
 
-
-class Variable(BinarySensorEntity, RestoreEntity):  # type: ignore[misc]
+class Variable(BinarySensorEntity, RestoreEntity):
     """Representation of a Binary Sensor Variable."""
 
     def __init__(
         self,
-        hass,
-        config,
-        config_entry,
-        unique_id,
-    ):
-        """Initialize a Binary Sensor Variable."""
-        # _LOGGER.debug(f"({config.get(CONF_NAME, config.get(CONF_VARIABLE_ID))}) [init] config: {config}")
-        if config.get(CONF_VALUE) is None or (
-            isinstance(config.get(CONF_VALUE), str)
-            and config.get(CONF_VALUE).lower() in ["", "none", "unknown", "unavailable"]
+        hass: HomeAssistant,
+        config: dict[str, Any],
+        config_entry: ConfigEntry,
+        unique_id: str,
+    ) -> None:
+        """Initialize a Binary Sensor Variable.
+
+        Args:
+            hass: Home Assistant instance hosting the entity.
+            config: Variable configuration fields.
+            config_entry: Config entry that owns the entity.
+            unique_id: Stable entity unique identifier.
+        """
+        configured_value = config.get(CONF_VALUE)
+        if configured_value is None or (
+            isinstance(configured_value, str)
+            and configured_value.lower() in ["", "none", "unknown", "unavailable"]
         ):
             self._attr_is_on = None
-        elif isinstance(config.get(CONF_VALUE), str):
-            if config.get(CONF_VALUE).lower() in ["true", "1", "t", "y", "yes", "on"]:
+        elif isinstance(configured_value, str):
+            if configured_value.lower() in ["true", "1", "t", "y", "yes", "on"]:
                 self._attr_is_on = True
             else:
                 self._attr_is_on = False
         else:
-            self._attr_is_on = config.get(CONF_VALUE)
+            self._attr_is_on = configured_value
         self._hass = hass
         self._config = config
         self._config_entry = config_entry
         self._attr_has_entity_name = True
-        self._variable_id = slugify(config.get(CONF_VARIABLE_ID).lower())
+        variable_id = str(config.get(CONF_VARIABLE_ID, ""))
+        self._variable_id = slugify(variable_id.lower())
         self._attr_unique_id = unique_id
         self._attr_name = config.get(CONF_NAME, config.get(CONF_VARIABLE_ID, ""))
         self._attr_icon = config.get(CONF_ICON)
         self._attr_device_class = config.get(CONF_DEVICE_CLASS)
         self._restore = config.get(CONF_RESTORE)
-        self._force_update = config.get(CONF_FORCE_UPDATE)
+        self._force_update = bool(config.get(CONF_FORCE_UPDATE))
         self._yaml_variable = config.get(CONF_YAML_VARIABLE)
         self._exclude_from_recorder = config.get(CONF_EXCLUDE_FROM_RECORDER)
         if (device_id := config.get(CONF_DEVICE_ID)) is not None:
@@ -164,12 +177,14 @@ class Variable(BinarySensorEntity, RestoreEntity):  # type: ignore[misc]
             and config.get(CONF_ATTRIBUTES)
             and isinstance(config.get(CONF_ATTRIBUTES), MutableMapping)
         ):
+            attributes = config.get(CONF_ATTRIBUTES)
             _LOGGER.debug(
-                f"({config.get(CONF_NAME, config.get(CONF_VARIABLE_ID))}) [init] config attributes: {config.get(CONF_ATTRIBUTES)} (type: {type(config.get(CONF_ATTRIBUTES))})"
+                "(%s) [init] config attributes: %s (type: %s)",
+                config.get(CONF_NAME, config.get(CONF_VARIABLE_ID)),
+                attributes,
+                type(attributes),
             )
-            self._attr_extra_state_attributes = cast(
-                dict, self._update_attr_settings(config.get(CONF_ATTRIBUTES))
-            )
+            self._attr_extra_state_attributes = self._update_attr_settings(attributes) or {}
         else:
             self._attr_extra_state_attributes = {}
         registry = er.async_get(self._hass)
@@ -180,14 +195,14 @@ class Variable(BinarySensorEntity, RestoreEntity):  # type: ignore[misc]
             self.entity_id = generate_entity_id(
                 ENTITY_ID_FORMAT, self._variable_id, hass=self._hass
             )
-        _LOGGER.debug(f"({self._attr_name}) [init] entity_id: {self.entity_id}")
+        _LOGGER.debug("(%s) [init] entity_id: %s", self._attr_name, self.entity_id)
 
-    async def async_added_to_hass(self):
+    async def async_added_to_hass(self) -> None:
         """Run when entity about to be added."""
         await super().async_added_to_hass()
-        _LOGGER.debug(f"({self._attr_name}) [async_added_to_hass] config at add: {self._config}")
+        _LOGGER.debug("(%s) [async_added_to_hass] config at add: %s", self._attr_name, self._config)
         if self._restore is True:
-            _LOGGER.info(f"({self._attr_name}) Restoring after Reboot")
+            _LOGGER.info("(%s) Restoring after Reboot", self._attr_name)
             state = await self.async_get_last_state()
             if state:
                 # _LOGGER.debug(f"({self._attr_name}) Restored last state: {state.as_dict()}")
@@ -203,12 +218,12 @@ class Variable(BinarySensorEntity, RestoreEntity):  # type: ignore[misc]
                     # would cause the device name to be duplicated on every reboot.
                     restored_attributes = dict(state.attributes)
                     restored_attributes.pop(ATTR_FRIENDLY_NAME, None)
-                    self._attr_extra_state_attributes = cast(
-                        dict,
+                    self._attr_extra_state_attributes = (
                         self._update_attr_settings(
                             restored_attributes,
                             just_pop=self._config.get(CONF_UPDATED, False),
-                        ),
+                        )
+                        or {}
                     )
                 if hasattr(state, "state"):
                     if state.state is None or (
@@ -226,24 +241,28 @@ class Variable(BinarySensorEntity, RestoreEntity):  # type: ignore[misc]
                         self._attr_is_on = None
                 else:
                     self._attr_is_on = None
-            _LOGGER.debug(f"({self._attr_name}) [restored] _attr_is_on: {self._attr_is_on}")
+            _LOGGER.debug("(%s) [restored] _attr_is_on: %s", self._attr_name, self._attr_is_on)
             _LOGGER.debug(
-                f"({self._attr_name}) [restored] attributes: {getattr(self, '_attr_extra_state_attributes', {})}"
+                "(%s) [restored] attributes: %s",
+                self._attr_name,
+                getattr(self, "_attr_extra_state_attributes", {}),
             )
             # If there were no attributes restored from state, apply attributes from config
             if (
                 not getattr(self, "_attr_extra_state_attributes", None)
                 or self._attr_extra_state_attributes == {}
             ) and self._config.get(CONF_ATTRIBUTES):
-                self._attr_extra_state_attributes = cast(
-                    dict, self._update_attr_settings(self._config.get(CONF_ATTRIBUTES))
+                self._attr_extra_state_attributes = (
+                    self._update_attr_settings(self._config.get(CONF_ATTRIBUTES)) or {}
                 )
                 _LOGGER.debug(
-                    f"({self._attr_name}) [restored] applied config attributes: {getattr(self, '_attr_extra_state_attributes', {})}"
+                    "(%s) [restored] applied config attributes: %s",
+                    self._attr_name,
+                    getattr(self, "_attr_extra_state_attributes", {}),
                 )
             try:
                 self.async_write_ha_state()
-            except Exception as err:
+            except (RuntimeError, ValueError) as err:
                 _LOGGER.debug(
                     "(%s) async_write_ha_state failed during restore: %s",
                     self._attr_name,
@@ -255,15 +274,17 @@ class Variable(BinarySensorEntity, RestoreEntity):  # type: ignore[misc]
                 not getattr(self, "_attr_extra_state_attributes", None)
                 or self._attr_extra_state_attributes == {}
             ) and self._config.get(CONF_ATTRIBUTES):
-                self._attr_extra_state_attributes = cast(
-                    dict, self._update_attr_settings(self._config.get(CONF_ATTRIBUTES))
+                self._attr_extra_state_attributes = (
+                    self._update_attr_settings(self._config.get(CONF_ATTRIBUTES)) or {}
                 )
                 _LOGGER.debug(
-                    f"({self._attr_name}) [added] applied config attributes: {getattr(self, '_attr_extra_state_attributes', {})}"
+                    "(%s) [added] applied config attributes: %s",
+                    self._attr_name,
+                    getattr(self, "_attr_extra_state_attributes", {}),
                 )
             try:
                 self.async_write_ha_state()
-            except Exception as err:
+            except (RuntimeError, ValueError) as err:
                 _LOGGER.debug(
                     "(%s) async_write_ha_state failed during add: %s",
                     self._attr_name,
@@ -277,60 +298,87 @@ class Variable(BinarySensorEntity, RestoreEntity):  # type: ignore[misc]
                 options={},
             )
             _LOGGER.debug(
-                f"({self._attr_name}) Updated config_updated: "
-                + f"{self._config_entry.data.get(CONF_UPDATED)}"
+                "(%s) Updated config_updated: %s",
+                self._attr_name,
+                self._config_entry.data.get(CONF_UPDATED),
             )
 
     @property
-    def should_poll(self):  # type: ignore[override]
-        """If entity should be polled."""
+    def should_poll(self) -> bool:
+        """Return whether Home Assistant should poll the entity.
+
+        Returns:
+            False because updates are pushed by services and config entry reloads.
+        """
         return False
 
     @property
-    def force_update(self) -> bool:  # type: ignore[override]
-        """Force update status of the entity."""
+    def force_update(self) -> bool:
+        """Return whether state writes should force an update event.
+
+        Returns:
+            Whether the configured force-update option is enabled.
+        """
         return self._force_update
 
-    def _update_attr_settings(self, new_attributes=None, just_pop=False):
+    def _update_attr_settings(
+        self, new_attributes: Any = None, just_pop: bool = False
+    ) -> dict[str, Any] | None:
+        """Apply special entity settings and return unconsumed attributes.
+
+        Args:
+            new_attributes: Dynamic attribute payload to process.
+            just_pop: Remove special attributes without applying their values.
+
+        Returns:
+            A copy of the remaining attributes or ``None`` when no supported
+            attributes were provided.
+        """
         if new_attributes is not None:
             _LOGGER.debug(
-                f"({self._attr_name}) [update_attr_settings] Updating Special Attributes; incoming: {new_attributes} (type: {type(new_attributes)})"
+                "(%s) [update_attr_settings] updating special attributes; incoming: %s (type: %s)",
+                self._attr_name,
+                new_attributes,
+                type(new_attributes),
             )
             if isinstance(new_attributes, MutableMapping):
-                attributes = copy.deepcopy(new_attributes)
+                attributes = dict(copy.deepcopy(new_attributes))
                 _LOGGER.debug(
-                    f"({self._attr_name}) [update_attr_settings] copied attributes: {attributes}"
+                    "(%s) [update_attr_settings] copied attributes: %s",
+                    self._attr_name,
+                    attributes,
                 )
                 for attrib, setting in VARIABLE_ATTR_SETTINGS.items():
-                    if attrib in attributes.keys():
+                    if attrib in attributes:
                         if just_pop:
-                            # _LOGGER.debug(f"({self._attr_name}) [update_attr_settings] just_pop / attrib: {attrib} / value: {attributes.get(attrib)}")
                             attributes.pop(attrib, None)
                         else:
-                            # _LOGGER.debug(f"({self._attr_name}) [update_attr_settings] attrib: {attrib} / setting: {setting} / value: {attributes.get(attrib)}")
                             setattr(self, setting, attributes.pop(attrib, None))
                 _LOGGER.debug(
-                    f"({self._attr_name}) [update_attr_settings] result attributes: {attributes}"
+                    "(%s) [update_attr_settings] result attributes: %s",
+                    self._attr_name,
+                    attributes,
                 )
                 return copy.deepcopy(attributes)
-            else:
-                _LOGGER.error(
-                    f"({self._attr_name}) AttributeError: Attributes must be a dictionary: {new_attributes}"
-                )
-                return new_attributes
-        else:
+            _LOGGER.error(
+                "(%s) AttributeError: Attributes must be a dictionary: %s",
+                self._attr_name,
+                new_attributes,
+            )
             return None
+        return None
 
     async def async_update_variable(self, **kwargs) -> None:
-        """Update Binary Sensor Variable."""
-
-        _LOGGER.debug(f"({self._attr_name}) [async_update_variable] kwargs: {kwargs}")
+        """Update the Binary Sensor Variable state and attributes."""
+        _LOGGER.debug("(%s) [async_update_variable] kwargs: %s", self._attr_name, kwargs)
 
         updated_attributes = None
 
         replace_attributes = kwargs.get(ATTR_REPLACE_ATTRIBUTES, False)
         _LOGGER.debug(
-            f"({self._attr_name}) [async_update_variable] Replace Attributes: {replace_attributes}"
+            "(%s) [async_update_variable] Replace Attributes: %s",
+            self._attr_name,
+            replace_attributes,
         )
 
         if (
@@ -345,12 +393,16 @@ class Variable(BinarySensorEntity, RestoreEntity):  # type: ignore[misc]
             if isinstance(attributes, str):
                 try:
                     attributes = yaml.safe_load(attributes)
-                except Exception as err:
-                    _LOGGER.error(f"({self._attr_name}) Failed to parse attributes string: %s", err)
+                except yaml.YAMLError as err:
+                    _LOGGER.error(
+                        "(%s) Failed to parse attributes string: %s", self._attr_name, err
+                    )
                     attributes = None
             if isinstance(attributes, MutableMapping):
                 _LOGGER.debug(
-                    f"({self._attr_name}) [async_update_variable] New Attributes: {attributes}"
+                    "(%s) [async_update_variable] New Attributes: %s",
+                    self._attr_name,
+                    attributes,
                 )
                 extra_attributes = self._update_attr_settings(attributes)
                 if extra_attributes is not None:
@@ -366,16 +418,20 @@ class Variable(BinarySensorEntity, RestoreEntity):  # type: ignore[misc]
                         )
             else:
                 _LOGGER.error(
-                    f"({self._attr_name}) AttributeError: Attributes must be a dictionary: {attributes}"
+                    "(%s) AttributeError: Attributes must be a dictionary: %s",
+                    self._attr_name,
+                    attributes,
                 )
 
         if updated_attributes is not None:
-            self._attr_extra_state_attributes = cast(dict, copy.deepcopy(updated_attributes))
+            self._attr_extra_state_attributes = copy.deepcopy(updated_attributes)
             _LOGGER.debug(
-                f"({self._attr_name}) [async_update_variable] Final Attributes: {updated_attributes}"
+                "(%s) [async_update_variable] Final Attributes: %s",
+                self._attr_name,
+                updated_attributes,
             )
         else:
-            self._attr_extra_state_attributes = cast(dict, {})
+            self._attr_extra_state_attributes = {}
 
         if ATTR_VALUE in kwargs:
             val = kwargs.get(ATTR_VALUE)
@@ -391,21 +447,24 @@ class Variable(BinarySensorEntity, RestoreEntity):  # type: ignore[misc]
             else:
                 self._attr_is_on = val
             _LOGGER.debug(
-                f"({self._attr_name}) [async_update_variable] New Value: {self._attr_is_on}"
+                "(%s) [async_update_variable] New Value: %s",
+                self._attr_name,
+                self._attr_is_on,
             )
 
         self.async_write_ha_state()
 
     async def async_toggle_variable(self, **kwargs) -> None:
-        """Toggle Binary Sensor Variable."""
-
-        _LOGGER.debug(f"({self._attr_name}) [async_toggle_variable] kwargs: {kwargs}")
+        """Toggle the Binary Sensor Variable state and update attributes."""
+        _LOGGER.debug("(%s) [async_toggle_variable] kwargs: %s", self._attr_name, kwargs)
 
         updated_attributes = None
 
         replace_attributes = kwargs.get(ATTR_REPLACE_ATTRIBUTES, False)
         _LOGGER.debug(
-            f"({self._attr_name}) [async_toggle_variable] Replace Attributes: {replace_attributes}"
+            "(%s) [async_toggle_variable] Replace Attributes: %s",
+            self._attr_name,
+            replace_attributes,
         )
 
         if (
@@ -420,12 +479,16 @@ class Variable(BinarySensorEntity, RestoreEntity):  # type: ignore[misc]
             if isinstance(attributes, str):
                 try:
                     attributes = yaml.safe_load(attributes)
-                except Exception as err:
-                    _LOGGER.error(f"({self._attr_name}) Failed to parse attributes string: %s", err)
+                except yaml.YAMLError as err:
+                    _LOGGER.error(
+                        "(%s) Failed to parse attributes string: %s", self._attr_name, err
+                    )
                     attributes = None
             if isinstance(attributes, MutableMapping):
                 _LOGGER.debug(
-                    f"({self._attr_name}) [async_toggle_variable] New Attributes: {attributes}"
+                    "(%s) [async_toggle_variable] New Attributes: %s",
+                    self._attr_name,
+                    attributes,
                 )
                 extra_attributes = self._update_attr_settings(attributes)
                 if extra_attributes is not None:
@@ -441,25 +504,35 @@ class Variable(BinarySensorEntity, RestoreEntity):  # type: ignore[misc]
                         )
             else:
                 _LOGGER.error(
-                    f"({self._attr_name}) AttributeError: Attributes must be a dictionary: {attributes}"
+                    "(%s) AttributeError: Attributes must be a dictionary: %s",
+                    self._attr_name,
+                    attributes,
                 )
 
         if updated_attributes is not None:
-            self._attr_extra_state_attributes = cast(dict, copy.deepcopy(updated_attributes))
+            self._attr_extra_state_attributes = copy.deepcopy(updated_attributes)
             _LOGGER.debug(
-                f"({self._attr_name}) [async_toggle_variable] Final Attributes: {updated_attributes}"
+                "(%s) [async_toggle_variable] Final Attributes: %s",
+                self._attr_name,
+                updated_attributes,
             )
         else:
-            self._attr_extra_state_attributes = cast(dict, {})
+            self._attr_extra_state_attributes = {}
 
         if self._attr_is_on is not None:
             self._attr_is_on = not self._attr_is_on
-        _LOGGER.debug(f"({self._attr_name}) [async_toggle_variable] New Value: {self._attr_is_on}")
+        _LOGGER.debug(
+            "(%s) [async_toggle_variable] New Value: %s",
+            self._attr_name,
+            self._attr_is_on,
+        )
 
         self.async_write_ha_state()
 
 
 class VariableNoRecorder(Variable):
+    """Binary sensor variable excluded from recorder history."""
+
     _unrecorded_attributes = frozenset({MATCH_ALL})
 
     async def async_added_to_hass(self) -> None:
@@ -469,4 +542,4 @@ class VariableNoRecorder(Variable):
         # Exclude from recorder automatically
         await _async_exclude_entity_from_recorder(self.hass, self.entity_id)
 
-        _LOGGER.debug(f"({self._attr_name}) Excluded from recorder: {self.entity_id}")
+        _LOGGER.debug("(%s) Excluded from recorder: %s", self._attr_name, self.entity_id)

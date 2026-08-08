@@ -31,6 +31,7 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.setup import async_setup_component
 import pytest
 
+from custom_components.variable.config_flow import VariableConfigFlow
 from custom_components.variable.const import (
     CONF_ATTRIBUTES,
     CONF_ENTITY_PLATFORM,
@@ -547,6 +548,36 @@ async def test_device_flow_rejects_invalid_configuration_url(hass: HomeAssistant
     assert result["errors"] == {"base": "invalid_url"}
 
 
+async def test_add_sensor_normalizes_enum_name_device_class(hass: HomeAssistant) -> None:
+    """Build typed state-class and unit choices from a device-class enum name.
+
+    Args:
+        hass: Home Assistant instance that owns the flow.
+    """
+    flow = VariableConfigFlow()
+    flow.hass = hass
+    flow.add_sensor_input = {
+        CONF_VARIABLE_ID: "enum_name_temperature",
+        CONF_DEVICE_CLASS: SensorDeviceClass.TEMPERATURE.name,
+    }
+
+    data_schema = flow.build_add_sensor_page_2()
+    selectors = {getattr(key, "schema", key): value for key, value in data_schema.schema.items()}
+
+    assert selectors[CONF_STATE_CLASS].config["options"] == [
+        {"label": "None", "value": "None"},
+        {"label": "MEASUREMENT", "value": "measurement"},
+    ]
+    assert {
+        option["value"] for option in selectors[CONF_UNIT_OF_MEASUREMENT].config["options"]
+    } == {
+        "None",
+        "K",
+        "°C",
+        "°F",
+    }
+
+
 async def test_yaml_entry_aborts_options_flow(hass: HomeAssistant) -> None:
     """Reject options for a variable managed through YAML.
 
@@ -569,6 +600,30 @@ async def test_yaml_entry_aborts_options_flow(hass: HomeAssistant) -> None:
 
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "yaml_variable"
+
+
+async def test_unsupported_platform_aborts_options_flow(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Abort options cleanly when an entry has an unsupported platform.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config_entry_factory: Factory that creates the unsupported config entry.
+    """
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: "unsupported",
+            CONF_VARIABLE_ID: "unsupported_platform",
+            CONF_YAML_VARIABLE: False,
+        }
+    )
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "unknown"
 
 
 async def test_options_flow_changes_loaded_sensor_value(
@@ -657,6 +712,96 @@ async def test_sensor_options_flow_updates_entry_and_live_entity(
     assert state is not None
     assert state.state == "26.5"
     assert state.attributes["source"] == "sensor-options"
+
+
+async def test_sensor_options_normalizes_string_device_class(
+    hass: HomeAssistant,
+    sensor_entry: ConfigEntry,
+) -> None:
+    """Expose state-class choices for a string-valued sensor device class.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        sensor_entry: Sensor config entry whose options flow is under test.
+    """
+    result = await hass.config_entries.options.async_init(sensor_entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={"next_step_id": "sensor_options"},
+    )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            CONF_DEVICE_CLASS: SensorDeviceClass.TEMPERATURE.value,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+            CONF_EXCLUDE_FROM_RECORDER: False,
+        },
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "sensor_options_page_2"
+    data_schema = result["data_schema"]
+    assert data_schema is not None
+    state_class_selector = next(
+        value
+        for key, value in data_schema.schema.items()
+        if getattr(key, "schema", key) == CONF_STATE_CLASS
+    )
+    assert state_class_selector.config["options"] == [
+        {"label": "None", "value": "None"},
+        {"label": "MEASUREMENT", "value": "measurement"},
+    ]
+
+
+async def test_sensor_pages_use_identical_monetary_unit_options(
+    hass: HomeAssistant,
+    sensor_entry: ConfigEntry,
+) -> None:
+    """Expose the same labeled currency choices in add and options flows.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        sensor_entry: Sensor config entry whose options flow is under test.
+    """
+    add_flow = VariableConfigFlow()
+    add_flow.hass = hass
+    add_flow.add_sensor_input = {
+        CONF_VARIABLE_ID: "monetary_parity",
+        CONF_DEVICE_CLASS: SensorDeviceClass.MONETARY.name,
+    }
+    add_schema = add_flow.build_add_sensor_page_2()
+    add_unit_selector = next(
+        value
+        for key, value in add_schema.schema.items()
+        if getattr(key, "schema", key) == CONF_UNIT_OF_MEASUREMENT
+    )
+
+    result = await hass.config_entries.options.async_init(sensor_entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={"next_step_id": "sensor_options"},
+    )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            CONF_DEVICE_CLASS: SensorDeviceClass.MONETARY.value,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+            CONF_EXCLUDE_FROM_RECORDER: False,
+        },
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    data_schema = result["data_schema"]
+    assert data_schema is not None
+    options_unit_selector = next(
+        value
+        for key, value in data_schema.schema.items()
+        if getattr(key, "schema", key) == CONF_UNIT_OF_MEASUREMENT
+    )
+    assert options_unit_selector.config["options"] == add_unit_selector.config["options"]
+    assert {"label": "US Dollar [USD]", "value": "USD"} in add_unit_selector.config["options"]
 
 
 async def test_binary_sensor_options_update_entry_and_live_entity(

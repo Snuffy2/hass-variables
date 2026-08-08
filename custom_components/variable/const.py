@@ -1,3 +1,5 @@
+"""Constants for the Variable integration."""
+
 from homeassistant.const import Platform
 
 VERSION = "3.5.10"

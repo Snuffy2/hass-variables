@@ -1,8 +1,8 @@
 """Variable implementation for Home Assistant."""
 
+from collections.abc import Callable
 import contextlib
 import copy
-import json
 import logging
 
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
@@ -46,33 +46,47 @@ from .const import (
 )
 from .device import create_device, remove_device
 
+_async_remove_helper_devices: Callable[..., None] | None
+
 try:
-    from homeassistant.helpers.helper_integration import async_remove_helper_devices
-except ImportError:
-    from homeassistant.helpers.device import (
-        async_remove_stale_devices_links_keep_current_device,
+    from homeassistant.helpers.helper_integration import (
+        async_remove_helper_devices as _async_remove_helper_devices,
     )
+except ImportError:
+    from homeassistant.helpers.device import async_remove_stale_devices_links_keep_current_device
 
-    def async_remove_helper_devices(
-        hass: HomeAssistant,
-        *,
-        helper_config_entry_id: str,
-        source_device_id: str | None,
-        remove_all_devices: bool = False,
-    ) -> None:
-        """Remove stale helper device links on Home Assistant releases before 2026.8.
+    _async_remove_helper_devices = None
 
-        Args:
-            hass: Home Assistant instance hosting the helper integration.
-            helper_config_entry_id: Config entry identifier for the helper.
-            source_device_id: Device identifier that should remain linked.
-            remove_all_devices: Ignored on legacy Home Assistant releases.
-        """
-        async_remove_stale_devices_links_keep_current_device(
+
+def async_remove_helper_devices(
+    hass: HomeAssistant,
+    *,
+    helper_config_entry_id: str,
+    source_device_id: str | None,
+    remove_all_devices: bool = False,
+) -> None:
+    """Remove stale helper device links.
+
+    Args:
+        hass: Home Assistant instance hosting the helper integration.
+        helper_config_entry_id: Config entry identifier for the helper.
+        source_device_id: Device identifier that should remain linked.
+        remove_all_devices: Remove all stale helper devices on HA 2026.8 and newer.
+    """
+    if _async_remove_helper_devices is not None:
+        _async_remove_helper_devices(
             hass,
-            helper_config_entry_id,
-            source_device_id,
+            helper_config_entry_id=helper_config_entry_id,
+            source_device_id=source_device_id,
+            remove_all_devices=remove_all_devices,
         )
+        return
+
+    async_remove_stale_devices_links_keep_current_device(
+        hass,
+        helper_config_entry_id,
+        source_device_id,
+    )
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -121,10 +135,22 @@ CONFIG_SCHEMA = vol.Schema(
 
 
 async def _async_exclude_entity_from_recorder(hass: HomeAssistant, entity_id: str) -> None:
-    """Exclude an entity from recorder by updating recorder's internal config."""
+    """Exclude an entity from recorder by updating recorder's internal config.
+
+    Args:
+        hass: Home Assistant instance hosting the integration.
+        entity_id: Entity identifier to exclude from recorder history.
+    """
     try:
-        # Get current recorder config
-        recorder_config = hass.config.get("recorder", {})
+        recorder_config_getter = getattr(hass.config, "get", None)
+        if not callable(recorder_config_getter):
+            _LOGGER.debug("Recorder configuration is unavailable")
+            return
+
+        recorder_config = recorder_config_getter("recorder", {})
+        if not isinstance(recorder_config, dict):
+            _LOGGER.debug("Recorder configuration is not a mapping")
+            return
         exclude_entities = list(recorder_config.get("exclude_entities", []))
 
         # Add entity if not already in list
@@ -137,26 +163,40 @@ async def _async_exclude_entity_from_recorder(hass: HomeAssistant, entity_id: st
                 if isinstance(recorder, dict):
                     recorder["exclude_entities"] = exclude_entities
 
-            _LOGGER.debug(f"Entity excluded from recorder: {entity_id}")
-    except Exception as err:
-        _LOGGER.debug(f"Error excluding entity from recorder: {err}")
+            _LOGGER.debug("Entity excluded from recorder: %s", entity_id)
+    except (AttributeError, TypeError) as err:
+        _LOGGER.debug("Error excluding entity from recorder: %s", err)
 
 
-async def async_setup(hass: HomeAssistant, config: ConfigType):
-    """Set up the Variable services."""
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Set up the Variable services.
+
+    Args:
+        hass: Home Assistant instance hosting the integration.
+        config: Validated Home Assistant configuration.
+
+    Returns:
+        True when setup and YAML processing complete successfully.
+    """
 
     async def async_set_variable_legacy_service(call: ServiceCall) -> None:
-        """Handle calls to the set_variable legacy service."""
+        """Handle calls to the set_variable legacy service.
 
+        Args:
+            call: Legacy service call containing a variable identifier and updates.
+        """
         # _LOGGER.debug(f"[async_set_variable_legacy_service] Pre call data: {call.data}")
-        ENTITY_ID_FORMAT = Platform.SENSOR + ".{}"
-        var_ent = ENTITY_ID_FORMAT.format(call.data.get(ATTR_VARIABLE))
+        entity_id_format = Platform.SENSOR + ".{}"
+        var_ent = entity_id_format.format(call.data.get(ATTR_VARIABLE))
         # _LOGGER.debug(f"[async_set_variable_legacy_service] Post call data: {call.data}")
         await _async_set_legacy_service(call, var_ent)
 
     async def async_set_entity_legacy_service(call: ServiceCall) -> None:
-        """Handle calls to the set_entity legacy service."""
+        """Handle calls to the set_entity legacy service.
 
+        Args:
+            call: Legacy service call containing an entity identifier and updates.
+        """
         # _LOGGER.debug(f"[async_set_entity_legacy_service] call data: {call.data}")
         entity = call.data.get(ATTR_ENTITY)
         if not entity or not isinstance(entity, str):
@@ -164,9 +204,13 @@ async def async_setup(hass: HomeAssistant, config: ConfigType):
             return
         await _async_set_legacy_service(call, entity)
 
-    async def _async_set_legacy_service(call: ServiceCall, var_ent: str):
-        """Shared function for both set_entity and set_variable legacy services."""
+    async def _async_set_legacy_service(call: ServiceCall, var_ent: str) -> None:
+        """Forward a legacy service call to the update sensor service.
 
+        Args:
+            call: Legacy service call containing the requested updates.
+            var_ent: Entity identifier to update.
+        """
         # _LOGGER.debug(f"[async_set_legacy_service] call data: {call.data}")
         update_sensor_data = {
             CONF_ENTITY_ID: [var_ent],
@@ -176,20 +220,28 @@ async def async_setup(hass: HomeAssistant, config: ConfigType):
             update_sensor_data.update({ATTR_VALUE: call.data.get(ATTR_VALUE)})
         if call.data.get(ATTR_ATTRIBUTES):
             update_sensor_data.update({ATTR_ATTRIBUTES: call.data.get(ATTR_ATTRIBUTES)})
-        _LOGGER.debug(f"[async_set_legacy_service] update_sensor_data: {update_sensor_data}")
+        _LOGGER.debug(
+            "[async_set_legacy_service] updating entity %s with fields: %s",
+            var_ent,
+            sorted(update_sensor_data),
+        )
         await hass.services.async_call(
             DOMAIN, SERVICE_UPDATE_SENSOR, service_data=update_sensor_data
         )
 
     async def _async_reload_service_handler(service: ServiceCall) -> None:
-        """Handle reload service call."""
+        """Handle a reload service call.
+
+        Args:
+            service: Reload service call that triggered YAML processing.
+        """
         _LOGGER.info("Service %s.reload called: reloading YAML integration", DOMAIN)
         reload_config = None
         with contextlib.suppress(HomeAssistantError):
             reload_config = await async_integration_yaml_config(hass, DOMAIN)
         if reload_config is None:
             return
-        _LOGGER.debug(f" reload_config: {reload_config}")
+        _LOGGER.debug("Reloaded YAML integration fields: %s", sorted(reload_config))
         await _async_process_yaml(hass, reload_config)
 
     hass.services.async_register(
@@ -211,12 +263,21 @@ async def async_setup(hass: HomeAssistant, config: ConfigType):
 
 
 async def _async_process_yaml(hass: HomeAssistant, config: ConfigType) -> bool:
-    variables = json.loads(json.dumps(config.get(DOMAIN, {})))
+    """Process YAML variable configuration.
+
+    Args:
+        hass: Home Assistant instance.
+        config: Validated Home Assistant configuration.
+
+    Returns:
+        True when YAML variable processing completes successfully.
+    """
+    variables = copy.deepcopy(config.get(DOMAIN, {}))
 
     for var, var_fields in variables.items():
         if var is not None:
-            _LOGGER.debug(f"[YAML] variable_id: {var}")
-            _LOGGER.debug(f"[YAML] var_fields: {var_fields}")
+            _LOGGER.debug("[YAML] variable_id: %s", var)
+            _LOGGER.debug("[YAML] variable fields: %s", sorted(var_fields))
 
             for key_empty, var_empty in var_fields.copy().items():
                 if var_empty is None:
@@ -231,7 +292,7 @@ async def _async_process_yaml(hass: HomeAssistant, config: ConfigType) -> bool:
                 entry.data.get(CONF_VARIABLE_ID)
                 for entry in hass.config_entries.async_entries(DOMAIN)
             }:
-                _LOGGER.warning(f"[YAML] Creating New Sensor Variable: {var}")
+                _LOGGER.warning("[YAML] Creating New Sensor Variable: %s", var)
                 hass.async_create_task(
                     hass.config_entries.flow.async_init(
                         DOMAIN,
@@ -249,7 +310,7 @@ async def _async_process_yaml(hass: HomeAssistant, config: ConfigType) -> bool:
                     )
                 )
             else:
-                _LOGGER.info(f"[YAML] Updating Existing Sensor Variable: {var}")
+                _LOGGER.info("[YAML] Updating Existing Sensor Variable: %s", var)
 
                 entry = None
                 entry_id = None
@@ -262,7 +323,7 @@ async def _async_process_yaml(hass: HomeAssistant, config: ConfigType) -> bool:
                 if entry_id and entry is not None:
                     # _LOGGER.debug(f"[YAML] entry before: {entry.as_dict()}")
 
-                    for m in dict(entry.data).keys():
+                    for m in dict(entry.data):
                         var_fields.setdefault(m, entry.data[m])
                     var_fields.update({CONF_YAML_PRESENT: True})
                     # _LOGGER.debug(f"[YAML] Updated var_fields: {var_fields}")
@@ -271,7 +332,7 @@ async def _async_process_yaml(hass: HomeAssistant, config: ConfigType) -> bool:
                     hass.async_create_task(hass.config_entries.async_reload(entry_id))
 
                 else:
-                    _LOGGER.error(f"[YAML] Update Error. Could not find entry_id for: {var}")
+                    _LOGGER.error("[YAML] Update Error. Could not find entry_id for: %s", var)
 
     # Remove any config entries that were originally created from YAML imports
     # but are no longer present in the current YAML configuration.
@@ -282,18 +343,26 @@ async def _async_process_yaml(hass: HomeAssistant, config: ConfigType) -> bool:
                 var_id = entry.data.get(CONF_VARIABLE_ID)
                 if var_id and var_id not in yaml_variable_ids:
                     _LOGGER.warning(
-                        f"[YAML] YAML Entry no longer exists in configuration, deleting entry: {var_id}"
+                        "[YAML] YAML Entry no longer exists in configuration, deleting entry: %s",
+                        var_id,
                     )
                     hass.async_create_task(hass.config_entries.async_remove(entry.entry_id))
-    except Exception:
+    except AttributeError, TypeError:
         _LOGGER.exception("Error while cleaning up removed YAML variable entries")
 
     return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up from a config entry."""
+    """Set up the Variable integration from a config entry.
 
+    Args:
+        hass: Home Assistant instance hosting the integration.
+        entry: Config entry that defines the Variable helper.
+
+    Returns:
+        True when the platform or device setup completes successfully.
+    """
     # _LOGGER.debug(f"[init async_setup_entry] entry: {entry.data}")
     if entry.data.get(CONF_YAML_PRESENT) is True:
         yaml_data = copy.deepcopy(dict(entry.data))
@@ -304,8 +373,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not entry.data.get(CONF_YAML_VARIABLE, False):
 
         async def _async_on_entry_update(hass: HomeAssistant, entry: ConfigEntry) -> None:
-            """Handle config entry update."""
-            _LOGGER.debug(f"Config entry updated: {entry.data.get(CONF_VARIABLE_ID)}")
+            """Reload an updated Variable config entry.
+
+            Args:
+                hass: Home Assistant instance hosting the integration.
+                entry: Variable config entry that was updated.
+            """
+            _LOGGER.debug("Config entry updated: %s", entry.data.get(CONF_VARIABLE_ID))
             await hass.config_entries.async_reload(entry.entry_id)
 
         entry.async_on_unload(entry.add_update_listener(_async_on_entry_update))
@@ -328,9 +402,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload a config entry."""
+    """Unload a Variable config entry.
 
-    _LOGGER.info(f"Unloading: {entry.data}")
+    Args:
+        hass: Home Assistant instance hosting the integration.
+        entry: Config entry that defines the Variable helper.
+
+    Returns:
+        True when the platform or device unload completes successfully.
+    """
+    _LOGGER.info(
+        "Unloading variable %s (config entry %s) with fields: %s",
+        entry.data.get(CONF_VARIABLE_ID),
+        entry.entry_id,
+        sorted(entry.data),
+    )
     # _LOGGER.debug(f"[init async_unload_entry] entry: {entry}")
     hass_data = dict(entry.data)
     unload_ok = False
@@ -357,6 +443,6 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     entries = er.async_entries_for_config_entry(registry, entry.entry_id)
     for entity_entry in entries:
         _LOGGER.debug(
-            f"Removing entity registry entry for removed config: {entity_entry.entity_id}"
+            "Removing entity registry entry for removed config: %s", entity_entry.entity_id
         )
         registry.async_remove(entity_entry.entity_id)

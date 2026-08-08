@@ -85,6 +85,44 @@ async def test_device_tracker_restore_cache_is_applied_during_config_entry_setup
         assert state.attributes[attribute] == restored_attributes[attribute]
 
 
+async def test_device_tracker_empty_restore_uses_config_attributes(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Apply configured custom and special attributes when the restore cache is empty.
+
+    Args:
+        hass: Home Assistant test instance.
+        config_entry_factory: Factory for test configuration entries.
+    """
+    entity_id = "device_tracker.empty_restored_tracker"
+    mock_restore_cache(hass, [State(entity_id, STATE_UNKNOWN, {})])
+    configured_location_name = "Config Location"
+    configured_battery_level = 80
+    configured_attributes = {
+        ATTR_BATTERY_LEVEL: configured_battery_level,
+        ATTR_LOCATION_NAME: configured_location_name,
+    }
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.DEVICE_TRACKER,
+            CONF_VARIABLE_ID: "empty_restored_tracker",
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: True,
+            CONF_FORCE_UPDATE: False,
+            CONF_ATTRIBUTES: configured_attributes,
+        }
+    )
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.attributes[ATTR_LOCATION_NAME] == configured_location_name
+    assert state.attributes[ATTR_BATTERY_LEVEL] == configured_battery_level
+
+
 async def test_updated_device_tracker_discards_reserved_restored_attributes(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,
@@ -312,7 +350,11 @@ async def test_device_tracker_update_contains_state_write_failure(
     await hass.async_block_till_done()
 
     def raise_write_failure(self: Variable) -> None:
-        """Raise a representative Home Assistant state-write failure."""
+        """Raise a representative Home Assistant state-write failure.
+
+        Args:
+            self: Device tracker entity whose state write is being replaced.
+        """
         raise RuntimeError("state write failed")
 
     monkeypatch.setattr(Variable, "async_write_ha_state", raise_write_failure)
@@ -462,7 +504,11 @@ DEVICE_TRACKER_PATH = (
 
 @pytest.fixture(scope="module")
 def device_tracker_ast() -> tuple[ast.Module, ast.ClassDef]:
-    """Parse the device tracker platform once for all tests."""
+    """Parse the device tracker platform once for all tests.
+
+    Returns:
+        Parsed module and its ``Variable`` entity class.
+    """
     module = ast.parse(DEVICE_TRACKER_PATH.read_text(encoding="utf-8"))
     variable_class = next(
         node for node in module.body if isinstance(node, ast.ClassDef) and node.name == "Variable"
@@ -473,7 +519,11 @@ def device_tracker_ast() -> tuple[ast.Module, ast.ClassDef]:
 def test_tracker_entity_is_imported_from_public_module(
     device_tracker_ast: tuple[ast.Module, ast.ClassDef],
 ) -> None:
-    """TrackerEntity should use Home Assistant's public import path."""
+    """TrackerEntity should use Home Assistant's public import path.
+
+    Args:
+        device_tracker_ast: Parsed device tracker module and entity class.
+    """
     module, _ = device_tracker_ast
     tracker_imports = [
         node.module
@@ -485,10 +535,14 @@ def test_tracker_entity_is_imported_from_public_module(
     assert tracker_imports == ["homeassistant.components.device_tracker"]
 
 
-def test_variable_does_not_override_location_name(
+def test_variable_does_not_override_final_tracker_properties(
     device_tracker_ast: tuple[ast.Module, ast.ClassDef],
 ) -> None:
-    """Variable should not override the deprecated location_name property."""
+    """Variable should not override deprecated or final tracker properties.
+
+    Args:
+        device_tracker_ast: Parsed device tracker module and entity class.
+    """
     _, variable_class = device_tracker_ast
     method_names = {
         node.name
@@ -496,13 +550,17 @@ def test_variable_does_not_override_location_name(
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
     }
 
-    assert "location_name" not in method_names
+    assert {"location_name", "state_attributes"}.isdisjoint(method_names)
 
 
 def test_legacy_location_name_attribute_is_capability_gated(
     device_tracker_ast: tuple[ast.Module, ast.ClassDef],
 ) -> None:
-    """Only the legacy compatibility helper may use the deprecated shorthand."""
+    """Only the legacy compatibility helper may use the deprecated shorthand.
+
+    Args:
+        device_tracker_ast: Parsed device tracker module and entity class.
+    """
     module, variable_class = device_tracker_ast
     legacy_usage_methods = [
         node.name

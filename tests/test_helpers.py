@@ -9,30 +9,11 @@ import datetime
 import pytest
 
 from custom_components.variable.helpers import (
-    looks_like_attribute_path,
     merge_attribute_dict,
     set_nested_attribute,
     to_num,
     value_to_type,
 )
-
-
-@pytest.mark.parametrize(
-    ("path", "expected"),
-    [
-        pytest.param("items[0]", True, id="bracket-notation"),
-        pytest.param("items.value", False, id="dot-notation-is-literal"),
-        pytest.param("items", False, id="plain-key"),
-    ],
-)
-def test_looks_like_attribute_path(path: str, expected: bool) -> None:
-    """Detect only bracket notation as an attribute path.
-
-    Args:
-        path: Candidate attribute key.
-        expected: Whether the key should be treated as an attribute path.
-    """
-    assert looks_like_attribute_path(path) is expected
 
 
 @pytest.mark.parametrize(
@@ -43,7 +24,7 @@ def test_looks_like_attribute_path(path: str, expected: bool) -> None:
         pytest.param("not-a-number", None, id="invalid"),
     ],
 )
-def test_to_num(value: str, expected: int | float | None) -> None:
+def test_to_num(value: str, expected: float | None) -> None:
     """Parse numeric strings without raising for invalid input.
 
     Args:
@@ -218,6 +199,14 @@ class StringWrapper:
         return "wrapped"
 
 
+class DateSubclass(datetime.date):
+    """Represent a concrete date subclass accepted by helper conversion."""
+
+
+class DatetimeSubclass(datetime.datetime):
+    """Represent a concrete datetime subclass accepted by helper conversion."""
+
+
 @pytest.mark.parametrize(
     "initial",
     [
@@ -279,7 +268,7 @@ def test_value_to_type_converts_wrapper_to_string() -> None:
 def test_value_to_type_converts_strings(
     initial: str,
     destination: str | None,
-    expected: str | int | float | datetime.date | datetime.datetime,
+    expected: str | float | datetime.date | datetime.datetime,
 ) -> None:
     """Convert valid strings to the requested public destination type.
 
@@ -346,9 +335,9 @@ def test_value_to_type_rejects_invalid_string_conversions(
     ],
 )
 def test_value_to_type_converts_numbers(
-    initial: int | float,
+    initial: float,
     destination: str | None,
-    expected: str | int | float | datetime.date | datetime.datetime,
+    expected: str | float | datetime.date | datetime.datetime,
 ) -> None:
     """Convert numeric input to supported destination types.
 
@@ -391,14 +380,19 @@ def test_value_to_type_rejects_invalid_numeric_conversions(destination: str, mes
         pytest.param("date", datetime.date(2026, 7, 24), id="date"),
         pytest.param(
             "datetime",
-            datetime.datetime(2026, 7, 24),
+            datetime.datetime(2026, 7, 24, tzinfo=datetime.UTC),
             id="datetime",
+        ),
+        pytest.param(
+            "number",
+            datetime.datetime(2026, 7, 24, tzinfo=datetime.UTC).timestamp(),
+            id="number",
         ),
     ],
 )
 def test_value_to_type_converts_dates(
     destination: str | None,
-    expected: str | datetime.date | datetime.datetime,
+    expected: str | float | datetime.date | datetime.datetime,
 ) -> None:
     """Convert date input to supported destination types.
 
@@ -407,6 +401,13 @@ def test_value_to_type_converts_dates(
         expected: Converted value.
     """
     assert value_to_type(datetime.date(2026, 7, 24), destination) == expected
+
+
+def test_value_to_type_converts_date_subclass() -> None:
+    """Convert a date subclass using the date conversion path."""
+    initial = DateSubclass(2026, 7, 24)
+
+    assert value_to_type(initial, "string") == "2026-07-24"
 
 
 @pytest.mark.parametrize(
@@ -440,6 +441,14 @@ def test_value_to_type_converts_datetimes(
     initial = datetime.datetime(2026, 7, 24, 12, 30, tzinfo=datetime.UTC)
 
     assert value_to_type(initial, destination) == expected
+
+
+def test_value_to_type_converts_datetime_subclass() -> None:
+    """Convert a datetime subclass using the datetime conversion path."""
+    initial = DatetimeSubclass(2026, 7, 24, 12, 30, tzinfo=datetime.UTC)
+
+    assert value_to_type(initial, "date") == datetime.date(2026, 7, 24)
+    assert value_to_type(initial, "datetime") is initial
 
 
 @pytest.mark.parametrize(
