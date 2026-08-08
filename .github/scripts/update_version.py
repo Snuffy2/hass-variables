@@ -1,3 +1,4 @@
+# ruff: noqa: INP001
 """Update the integration version files for a release."""
 
 import json

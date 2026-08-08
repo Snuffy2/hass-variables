@@ -16,7 +16,7 @@ from homeassistant.const import (
     Platform,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import entity_registry as er, helper_integration
 from homeassistant.setup import async_setup_component
 import pytest
 
@@ -251,8 +251,6 @@ def test_async_remove_helper_devices_fallback_maps_keyword_arguments(
         source_device_id: str | None,
     ) -> None:
         stale_calls.append((helper_config_entry_id, source_device_id))
-
-    import homeassistant.helpers.helper_integration as helper_integration
 
     variable_module = importlib.import_module("custom_components.variable")
 

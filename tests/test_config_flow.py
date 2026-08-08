@@ -659,6 +659,38 @@ async def test_sensor_options_flow_updates_entry_and_live_entity(
     assert state.attributes["source"] == "sensor-options"
 
 
+async def test_sensor_options_normalizes_string_device_class(
+    hass: HomeAssistant,
+    sensor_entry: ConfigEntry,
+) -> None:
+    """Expose state-class choices for a string-valued sensor device class.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        sensor_entry: Sensor config entry whose options flow is under test.
+    """
+    result = await hass.config_entries.options.async_init(sensor_entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={"next_step_id": "sensor_options"},
+    )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            CONF_DEVICE_CLASS: SensorDeviceClass.TEMPERATURE.value,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+            CONF_EXCLUDE_FROM_RECORDER: False,
+        },
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "sensor_options_page_2"
+    data_schema = result["data_schema"]
+    assert data_schema is not None
+    assert any(getattr(key, "schema", key) == CONF_STATE_CLASS for key in data_schema.schema)
+
+
 async def test_binary_sensor_options_update_entry_and_live_entity(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,

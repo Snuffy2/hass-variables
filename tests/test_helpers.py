@@ -43,7 +43,7 @@ def test_looks_like_attribute_path(path: str, expected: bool) -> None:
         pytest.param("not-a-number", None, id="invalid"),
     ],
 )
-def test_to_num(value: str, expected: int | float | None) -> None:
+def test_to_num(value: str, expected: float | None) -> None:
     """Parse numeric strings without raising for invalid input.
 
     Args:
@@ -279,7 +279,7 @@ def test_value_to_type_converts_wrapper_to_string() -> None:
 def test_value_to_type_converts_strings(
     initial: str,
     destination: str | None,
-    expected: str | int | float | datetime.date | datetime.datetime,
+    expected: str | float | datetime.date | datetime.datetime,
 ) -> None:
     """Convert valid strings to the requested public destination type.
 
@@ -346,9 +346,9 @@ def test_value_to_type_rejects_invalid_string_conversions(
     ],
 )
 def test_value_to_type_converts_numbers(
-    initial: int | float,
+    initial: float,
     destination: str | None,
-    expected: str | int | float | datetime.date | datetime.datetime,
+    expected: str | float | datetime.date | datetime.datetime,
 ) -> None:
     """Convert numeric input to supported destination types.
 
@@ -391,7 +391,7 @@ def test_value_to_type_rejects_invalid_numeric_conversions(destination: str, mes
         pytest.param("date", datetime.date(2026, 7, 24), id="date"),
         pytest.param(
             "datetime",
-            datetime.datetime(2026, 7, 24),
+            datetime.datetime(2026, 7, 24),  # noqa: DTZ001 - naive input stays naive
             id="datetime",
         ),
     ],

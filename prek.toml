@@ -21,6 +21,18 @@ id = "check-yaml"
 id = "check-toml"
 
 [[repos.hooks]]
+id = "check-json"
+
+[[repos.hooks]]
+id = "check-merge-conflict"
+
+[[repos.hooks]]
+id = "check-case-conflict"
+
+[[repos.hooks]]
+id = "detect-private-key"
+
+[[repos.hooks]]
 id = "check-added-large-files"
 
 [[repos]]
@@ -62,7 +74,7 @@ additional_dependencies = [
 
 [[repos]]
 repo = "https://github.com/astral-sh/ruff-pre-commit"
-rev = "v0.15.21"
+rev = "v0.16.2"
 
 [[repos.hooks]]
 id = "ruff-check"
