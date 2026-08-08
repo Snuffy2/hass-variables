@@ -197,15 +197,15 @@ def _normalize_datetime(value: datetime.datetime) -> datetime.datetime:
 def _string_to_type(
     value: str, dest_type: str | None
 ) -> str | int | float | datetime.date | datetime.datetime:
-    """Convert a string to the requested variable value type.
+    """Convert text to the requested Variable value type.
 
     Args:
         value (str): String value to convert.
         dest_type (str | None): Requested Variable value type.
 
     Returns:
-        str | int | float | datetime.date | datetime.datetime: The value converted
-            to the requested type.
+        str | int | float | datetime.date | datetime.datetime: Parsed text in the
+            requested representation.
 
     Raises:
         ValueError: If the destination type is invalid or conversion fails.
@@ -232,14 +232,15 @@ def _string_to_type(
 def _number_to_type(
     value: float, dest_type: str | None
 ) -> str | float | datetime.date | datetime.datetime:
-    """Convert a numeric value to the requested variable value type.
+    """Format a number or parse it as the requested temporal value type.
 
     Args:
         value (float): Numeric value to convert.
         dest_type (str | None): Requested Variable value type.
 
     Returns:
-        str | float | datetime.date | datetime.datetime: The value converted to the requested type.
+        str | float | datetime.date | datetime.datetime: Formatted number, parsed
+            temporal value, or the original number.
 
     Raises:
         ValueError: If the destination type is invalid or conversion fails.
@@ -264,14 +265,15 @@ def _number_to_type(
 def _date_to_type(
     value: datetime.date, dest_type: str | None
 ) -> str | float | datetime.date | datetime.datetime:
-    """Convert a date to the requested variable value type.
+    """Serialize a date or normalize its midnight for temporal conversions.
 
     Args:
         value (datetime.date): Date value to convert.
         dest_type (str | None): Requested Variable value type.
 
     Returns:
-        str | float | datetime.date | datetime.datetime: The value converted to the requested type.
+        str | float | datetime.date | datetime.datetime: ISO date text, the original
+            date, UTC midnight, or that instant's timestamp.
 
     Raises:
         ValueError: If the destination type is invalid.
@@ -291,14 +293,15 @@ def _date_to_type(
 def _datetime_to_type(
     value: datetime.datetime, dest_type: str | None
 ) -> str | float | datetime.date | datetime.datetime:
-    """Convert a datetime to the requested variable value type.
+    """Serialize a datetime or project it to a date or timestamp.
 
     Args:
         value (datetime.datetime): Datetime value to convert.
         dest_type (str | None): Requested Variable value type.
 
     Returns:
-        str | float | datetime.date | datetime.datetime: The value converted to the requested type.
+        str | float | datetime.date | datetime.datetime: ISO text, normalized
+            datetime, calendar date, or timestamp.
 
     Raises:
         ValueError: If the destination type is invalid.
@@ -318,15 +321,15 @@ def _datetime_to_type(
 def value_to_type(
     init_val: Any, dest_type: str | None
 ) -> str | int | float | datetime.date | datetime.datetime | None:
-    """Convert a variable value to its configured destination type.
+    """Normalize external input and convert it to a Variable value type.
 
     Args:
         init_val (Any): Initial value supplied by YAML, a service, or a template.
         dest_type (str | None): Requested Variable value type.
 
     Returns:
-        str | int | float | datetime.date | datetime.datetime | None: The converted
-            value, or ``None`` for an empty or unavailable input.
+        str | int | float | datetime.date | datetime.datetime | None: A normalized
+            typed value, or ``None`` for empty and unavailable input.
 
     Raises:
         ValueError: If the input or destination type is invalid.

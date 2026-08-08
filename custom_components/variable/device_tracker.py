@@ -1,4 +1,4 @@
-"""Device tracker platform for the Variable integration."""
+"""Device-tracker entity implementation for Variable config entries."""
 
 from collections.abc import Mapping, MutableMapping
 import copy
@@ -87,7 +87,7 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up a Device Tracker Variable config entry.
+    """Instantiate and register a device-tracker entity for a config entry.
 
     Args:
         hass (HomeAssistant): Home Assistant instance hosting the integration.
@@ -130,7 +130,7 @@ async def async_setup_entry(
 
 
 class Variable(RestoreEntity, TrackerEntity):
-    """Class for the device tracker."""
+    """Home Assistant tracker entity backed by Variable configuration."""
 
     def __init__(
         self,
@@ -139,7 +139,7 @@ class Variable(RestoreEntity, TrackerEntity):
         config_entry: ConfigEntry,
         unique_id: str,
     ) -> None:
-        """Initialize a Device Tracker Variable.
+        """Initialize tracker state and entity metadata from a config entry.
 
         Args:
             hass (HomeAssistant): Home Assistant instance hosting the entity.
@@ -190,7 +190,7 @@ class Variable(RestoreEntity, TrackerEntity):
         self._attr_gps_accuracy = config.get(ATTR_GPS_ACCURACY)
 
     async def async_added_to_hass(self) -> None:
-        """Run when entity about to be added."""
+        """Restore saved tracker state and attributes when configured."""
         await super().async_added_to_hass()
         if self._restore is True:
             _LOGGER.info("(%s) Restoring after Reboot", self._attr_name)
@@ -301,10 +301,10 @@ class Variable(RestoreEntity, TrackerEntity):
             self._attr_location_name = location_name
 
     async def async_update_variable(self, **kwargs: Any) -> None:
-        """Update Device Tracker Variable state and attributes.
+        """Apply an update service payload to tracker state and attributes.
 
         Args:
-            kwargs (Any): Registered service fields for the update.
+            kwargs (Any): Payload containing coordinates, attributes, and update flags.
         """
         _LOGGER.debug("(%s) [async_update_variable] kwargs: %s", self._attr_name, kwargs)
 
@@ -394,7 +394,7 @@ class Variable(RestoreEntity, TrackerEntity):
 
     @property
     def force_update(self) -> bool:
-        """Return whether state writes should force an update event.
+        """Report whether state writes should fire force-update events.
 
         Returns:
             bool: Whether the configured force-update option is enabled.
@@ -403,7 +403,7 @@ class Variable(RestoreEntity, TrackerEntity):
 
     @property
     def location_accuracy(self) -> int:
-        """Return the location accuracy of the device.
+        """Expose configured location accuracy in meters.
 
         Returns:
             int: Location accuracy in meters, or zero when no value is configured.
@@ -412,7 +412,7 @@ class Variable(RestoreEntity, TrackerEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, StateType]:
-        """Return custom device-tracker state attributes.
+        """Expose custom attributes configured for the tracker.
 
         Returns:
             dict[str, StateType]: Attributes configured for the device tracker,

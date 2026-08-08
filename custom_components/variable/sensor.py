@@ -1,4 +1,4 @@
-"""Sensor platform for the Variable integration."""
+"""Sensor entity implementation for Variable config entries."""
 
 from collections.abc import MutableMapping
 import copy
@@ -75,7 +75,7 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up a Sensor Variable config entry.
+    """Instantiate and register a sensor entity for a config entry.
 
     Args:
         hass (HomeAssistant): Home Assistant instance hosting the integration.
@@ -124,7 +124,7 @@ async def async_setup_entry(
 
 
 class Variable(RestoreSensor):
-    """Representation of a Sensor Variable."""
+    """Home Assistant sensor entity backed by Variable configuration."""
 
     def __init__(
         self,
@@ -133,7 +133,7 @@ class Variable(RestoreSensor):
         config_entry: ConfigEntry,
         unique_id: str,
     ) -> None:
-        """Initialize a Sensor Variable.
+        """Initialize sensor state and entity metadata from a config entry.
 
         Args:
             hass (HomeAssistant): Home Assistant instance hosting the entity.
@@ -195,7 +195,7 @@ class Variable(RestoreSensor):
             self._attr_suggested_unit_of_measurement = config.get(CONF_UNIT_OF_MEASUREMENT)
 
     async def async_added_to_hass(self) -> None:
-        """Run when entity about to be added."""
+        """Restore saved sensor state and attributes when configured."""
         await super().async_added_to_hass()
         if self._restore is True:
             _LOGGER.info("(%s) Restoring after Reboot", self._attr_name)
@@ -321,7 +321,7 @@ class Variable(RestoreSensor):
 
     @property
     def should_poll(self) -> bool:
-        """Return whether Home Assistant should poll the entity.
+        """Disable polling because services and reloads push updates.
 
         Returns:
             bool: False because updates are pushed by services and config entry reloads.
@@ -330,7 +330,7 @@ class Variable(RestoreSensor):
 
     @property
     def force_update(self) -> bool:
-        """Return whether state writes should force an update event.
+        """Report whether state writes should fire force-update events.
 
         Returns:
             bool: Whether the configured force-update option is enabled.
@@ -370,10 +370,10 @@ class Variable(RestoreSensor):
         return None
 
     async def async_update_variable(self, **kwargs: Any) -> None:
-        """Update Sensor Variable state and attributes.
+        """Apply an update service payload to sensor state and attributes.
 
         Args:
-            kwargs (Any): Registered service fields for the update.
+            kwargs (Any): Payload containing the new value, attributes, and update flags.
 
         Raises:
             ValueError: If the supplied value is incompatible with the variable type.
@@ -468,10 +468,10 @@ class Variable(RestoreSensor):
         self.async_write_ha_state()
 
     async def async_increment_variable(self, **kwargs: Any) -> None:
-        """Increment the Sensor Variable's numeric value.
+        """Increase the numeric sensor value by the service delta.
 
         Args:
-            kwargs (Any): Registered service fields for the increment.
+            kwargs (Any): Payload containing an optional increment amount.
 
         Raises:
             TypeError: If the current value is not numeric.
@@ -536,10 +536,10 @@ class Variable(RestoreSensor):
             raise
 
     async def async_decrement_variable(self, **kwargs: Any) -> None:
-        """Decrement the Sensor Variable's numeric value.
+        """Decrease the numeric sensor value by the service delta.
 
         Args:
-            kwargs (Any): Registered service fields for the decrement.
+            kwargs (Any): Payload containing an optional decrement amount.
 
         Raises:
             TypeError: If the current value is not numeric.

@@ -23,7 +23,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def create_device(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Create or update a Variable helper device.
+    """Create or update a registry device and reload affected Variable entities.
 
     Args:
         hass (HomeAssistant): Home Assistant instance hosting the integration.
@@ -87,7 +87,7 @@ async def create_device(hass: HomeAssistant, entry: ConfigEntry) -> None:
 async def update_device(
     hass: HomeAssistant, entry: ConfigEntry, user_input: dict[str, Any]
 ) -> bool:
-    """Update a Variable helper device.
+    """Update the config entry's registry device metadata.
 
     Args:
         hass (HomeAssistant): Home Assistant instance hosting the integration.
@@ -121,7 +121,7 @@ async def update_device(
 
 
 async def remove_device(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Remove a Variable helper device.
+    """Remove the config entry's registry device and reload linked entities.
 
     Args:
         hass (HomeAssistant): Home Assistant instance hosting the integration.

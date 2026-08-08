@@ -1,4 +1,4 @@
-"""Binary sensor platform for variable entities."""
+"""Binary-sensor entity implementation for Variable config entries."""
 
 from collections.abc import MutableMapping
 import copy
@@ -73,7 +73,7 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up a Binary Sensor Variable config entry.
+    """Instantiate and register a binary-sensor entity for a config entry.
 
     Args:
         hass (HomeAssistant): Home Assistant instance hosting the integration.
@@ -126,7 +126,7 @@ async def async_setup_entry(
 
 
 class Variable(BinarySensorEntity, RestoreEntity):
-    """Representation of a Binary Sensor Variable."""
+    """Home Assistant binary-sensor entity backed by Variable configuration."""
 
     def __init__(
         self,
@@ -135,7 +135,7 @@ class Variable(BinarySensorEntity, RestoreEntity):
         config_entry: ConfigEntry,
         unique_id: str,
     ) -> None:
-        """Initialize a Binary Sensor Variable.
+        """Initialize binary state and entity metadata from a config entry.
 
         Args:
             hass (HomeAssistant): Home Assistant instance hosting the entity.
@@ -198,7 +198,7 @@ class Variable(BinarySensorEntity, RestoreEntity):
         _LOGGER.debug("(%s) [init] entity_id: %s", self._attr_name, self.entity_id)
 
     async def async_added_to_hass(self) -> None:
-        """Run when entity about to be added."""
+        """Restore saved binary state and attributes when configured."""
         await super().async_added_to_hass()
         _LOGGER.debug("(%s) [async_added_to_hass] config at add: %s", self._attr_name, self._config)
         if self._restore is True:
@@ -305,7 +305,7 @@ class Variable(BinarySensorEntity, RestoreEntity):
 
     @property
     def should_poll(self) -> bool:
-        """Return whether Home Assistant should poll the entity.
+        """Disable polling because services and reloads push updates.
 
         Returns:
             bool: False because updates are pushed by services and config entry reloads.
@@ -314,7 +314,7 @@ class Variable(BinarySensorEntity, RestoreEntity):
 
     @property
     def force_update(self) -> bool:
-        """Return whether state writes should force an update event.
+        """Report whether state writes should fire force-update events.
 
         Returns:
             bool: Whether the configured force-update option is enabled.
@@ -369,10 +369,10 @@ class Variable(BinarySensorEntity, RestoreEntity):
         return None
 
     async def async_update_variable(self, **kwargs: Any) -> None:
-        """Update the Binary Sensor Variable state and attributes.
+        """Apply an update service payload to binary state and attributes.
 
         Args:
-            kwargs (Any): Registered service fields for the update.
+            kwargs (Any): Payload containing the new value, attributes, and update flags.
         """
         _LOGGER.debug("(%s) [async_update_variable] kwargs: %s", self._attr_name, kwargs)
 
@@ -459,10 +459,10 @@ class Variable(BinarySensorEntity, RestoreEntity):
         self.async_write_ha_state()
 
     async def async_toggle_variable(self, **kwargs: Any) -> None:
-        """Toggle the Binary Sensor Variable state and update attributes.
+        """Apply a toggle service payload to binary state and attributes.
 
         Args:
-            kwargs (Any): Registered service fields for the toggle.
+            kwargs (Any): Payload containing attributes and toggle-specific update flags.
         """
         _LOGGER.debug("(%s) [async_toggle_variable] kwargs: %s", self._attr_name, kwargs)
 

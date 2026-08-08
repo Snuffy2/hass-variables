@@ -1,4 +1,4 @@
-"""Variable implementation for Home Assistant."""
+"""Variable integration setup, YAML import, and config-entry lifecycle."""
 
 from collections.abc import Callable
 import contextlib
@@ -65,7 +65,7 @@ def async_remove_helper_devices(
     source_device_id: str | None,
     remove_all_devices: bool = False,
 ) -> None:
-    """Remove stale helper device links.
+    """Remove obsolete helper device links during config-entry setup.
 
     Args:
         hass (HomeAssistant): Home Assistant instance hosting the helper integration.
@@ -169,7 +169,7 @@ async def _async_exclude_entity_from_recorder(hass: HomeAssistant, entity_id: st
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Set up the Variable services.
+    """Register Variable services and import YAML-defined helpers.
 
     Args:
         hass (HomeAssistant): Home Assistant instance hosting the integration.
@@ -180,7 +180,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """
 
     async def async_set_variable_legacy_service(call: ServiceCall) -> None:
-        """Handle calls to the set_variable legacy service.
+        """Translate a legacy set_variable call into a sensor update.
 
         Args:
             call (ServiceCall): Legacy service call containing a variable identifier and updates.
@@ -192,7 +192,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         await _async_set_legacy_service(call, var_ent)
 
     async def async_set_entity_legacy_service(call: ServiceCall) -> None:
-        """Handle calls to the set_entity legacy service.
+        """Translate a legacy set_entity call into a sensor update.
 
         Args:
             call (ServiceCall): Legacy service call containing an entity identifier and updates.
@@ -230,7 +230,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         )
 
     async def _async_reload_service_handler(service: ServiceCall) -> None:
-        """Handle a reload service call.
+        """Reprocess YAML-defined Variables after a reload service request.
 
         Args:
             service (ServiceCall): Reload service call that triggered YAML processing.
@@ -263,7 +263,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 async def _async_process_yaml(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Process YAML variable configuration.
+    """Create or update config entries from YAML-defined Variables.
 
     Args:
         hass (HomeAssistant): Home Assistant instance.
@@ -354,7 +354,7 @@ async def _async_process_yaml(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up the Variable integration from a config entry.
+    """Load a Variable entry and set up its platform or virtual device.
 
     Args:
         hass (HomeAssistant): Home Assistant instance hosting the integration.
@@ -373,7 +373,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not entry.data.get(CONF_YAML_VARIABLE, False):
 
         async def _async_on_entry_update(hass: HomeAssistant, entry: ConfigEntry) -> None:
-            """Reload an updated Variable config entry.
+            """Reload a UI-managed Variable entry after an options update.
 
             Args:
                 hass (HomeAssistant): Home Assistant instance hosting the integration.
@@ -402,7 +402,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload a Variable config entry.
+    """Unload a Variable platform or device and clear its runtime data.
 
     Args:
         hass (HomeAssistant): Home Assistant instance hosting the integration.
