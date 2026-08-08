@@ -782,6 +782,8 @@ class VariableOptionsFlowHandler(OptionsFlow):
             _LOGGER.error("Unable to load Variable to Change Value")
         _LOGGER.debug("[Change Sensor Value] entity_id: %s", entity_id)
         _LOGGER.debug("[Change Sensor Value] state: %s", state)
+        if entity_id is None or state is None:
+            return self.async_abort(reason="entity_not_found")
         if user_input:
             _LOGGER.debug("[Change Sensor Value] user_input: %s", user_input)
             val: Any = user_input.get(CONF_VALUE)
@@ -822,8 +824,6 @@ class VariableOptionsFlowHandler(OptionsFlow):
                 )
                 return self.async_abort(reason="value_changed")
 
-        if state is None:
-            return self.async_abort(reason="entity_not_found")
         change_sensor_value_schema = self.build_change_sensor_value(state)
 
         if self.config_entry.data.get(CONF_NAME) is None or self.config_entry.data.get(
@@ -976,6 +976,8 @@ class VariableOptionsFlowHandler(OptionsFlow):
             _LOGGER.error("Unable to load Variable to Change Value")
         _LOGGER.debug("[Change Binary Sensor Value] entity_id: %s", entity_id)
         _LOGGER.debug("[Change Binary Sensor Value] state: %s", state)
+        if entity_id is None or state is None:
+            return self.async_abort(reason="entity_not_found")
         if user_input:
             _LOGGER.debug("[Change Binary Sensor Value] user_input: %s", user_input)
 
@@ -992,8 +994,6 @@ class VariableOptionsFlowHandler(OptionsFlow):
                 )
                 return self.async_abort(reason="value_changed")
 
-        if state is None:
-            return self.async_abort(reason="entity_not_found")
         change_binary_sensor_value_schema = self.build_change_binary_sensor_value(state)
 
         if self.config_entry.data.get(CONF_NAME) is None or self.config_entry.data.get(
@@ -1093,6 +1093,8 @@ class VariableOptionsFlowHandler(OptionsFlow):
             _LOGGER.error("Unable to load Variable to Change Value")
         _LOGGER.debug("[Change Device Tracker Value] entity_id: %s", entity_id)
         _LOGGER.debug("[Change Device Tracker Value] state: %s", state)
+        if entity_id is None or state is None:
+            return self.async_abort(reason="entity_not_found")
         if user_input:
             _LOGGER.debug("[Change Device Tracker Value] user_input: %s", user_input)
 
@@ -1122,8 +1124,6 @@ class VariableOptionsFlowHandler(OptionsFlow):
                 )
                 return self.async_abort(reason="value_changed")
 
-        if state is None:
-            return self.async_abort(reason="entity_not_found")
         change_device_tracker_value_schema = self.build_change_device_tracker_value(state)
 
         if self.config_entry.data.get(CONF_NAME) is None or self.config_entry.data.get(

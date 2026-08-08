@@ -2,6 +2,7 @@
 
 import datetime
 from typing import Any
+from unittest.mock import AsyncMock, patch
 
 from homeassistant import config_entries
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
@@ -661,6 +662,85 @@ async def test_options_flow_changes_loaded_sensor_value(
     assert state is not None
     assert state.state == "24.25"
     assert state.attributes["source"] == "options"
+
+
+@pytest.mark.parametrize(
+    ("entry_data", "entity_id", "step_id", "user_input"),
+    [
+        (
+            {
+                CONF_ENTITY_PLATFORM: Platform.SENSOR,
+                CONF_VARIABLE_ID: "missing_sensor",
+                CONF_YAML_VARIABLE: False,
+                CONF_VALUE: 21.5,
+                CONF_VALUE_TYPE: "number",
+            },
+            "sensor.missing_sensor",
+            "change_sensor_value",
+            {CONF_VALUE: "24.25"},
+        ),
+        (
+            {
+                CONF_ENTITY_PLATFORM: Platform.BINARY_SENSOR,
+                CONF_VARIABLE_ID: "missing_binary_sensor",
+                CONF_YAML_VARIABLE: False,
+                CONF_VALUE: "true",
+            },
+            "binary_sensor.missing_binary_sensor",
+            "change_binary_sensor_value",
+            {CONF_VALUE: "false"},
+        ),
+        (
+            {
+                CONF_ENTITY_PLATFORM: Platform.DEVICE_TRACKER,
+                CONF_VARIABLE_ID: "missing_device_tracker",
+                CONF_YAML_VARIABLE: False,
+                ATTR_LATITUDE: 40.0,
+                ATTR_LONGITUDE: -75.0,
+            },
+            "device_tracker.missing_device_tracker",
+            "change_device_tracker_value",
+            {ATTR_LATITUDE: 41.5, ATTR_LONGITUDE: -74.5},
+        ),
+    ],
+)
+async def test_change_value_submission_aborts_when_runtime_entity_disappears(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+    entry_data: dict[str, Any],
+    entity_id: str,
+    step_id: str,
+    user_input: dict[str, Any],
+) -> None:
+    """Abort submitted value changes when the runtime entity has disappeared.
+
+    Args:
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the config entry.
+        entry_data (dict[str, Any]): Platform-specific config-entry data.
+        entity_id (str): Runtime entity to remove before submission.
+        step_id (str): Platform-specific change-value options step.
+        user_input (dict[str, Any]): Platform-specific submitted value data.
+    """
+    entry = config_entry_factory(entry_data)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={"next_step_id": step_id}
+    )
+    assert result["type"] is FlowResultType.FORM
+
+    hass.states.async_remove(entity_id)
+    with patch.object(type(hass.services), "async_call", new_callable=AsyncMock) as async_call:
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], user_input=user_input
+        )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "entity_not_found"
+    async_call.assert_not_awaited()
 
 
 async def test_sensor_options_flow_updates_entry_and_live_entity(
