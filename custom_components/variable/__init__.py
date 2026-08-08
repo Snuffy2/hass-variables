@@ -269,8 +269,61 @@ async def _async_dispatch_yaml_lifecycle(
     pending_tasks: set[asyncio.Task[Any]] = hass.data.setdefault(_YAML_LIFECYCLE_TASKS, set())
     task: asyncio.Task[object] = hass.async_create_task(lifecycle_work)
     pending_tasks.add(task)
-    task.add_done_callback(pending_tasks.discard)
+
+    def async_log_lifecycle_result(completed_task: asyncio.Task[object]) -> None:
+        """Remove completed work from tracking and log background failures."""
+        pending_tasks.discard(completed_task)
+        if completed_task.cancelled():
+            return
+        if error := completed_task.exception():
+            _LOGGER.error(
+                "[YAML] Background config-entry lifecycle work failed",
+                exc_info=(type(error), error, error.__traceback__),
+            )
+
+    task.add_done_callback(async_log_lifecycle_result)
     return None
+
+
+async def _async_update_yaml_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    variable_id: str,
+    yaml_data: Mapping[str, object],
+) -> None:
+    """Apply YAML data and restore the prior entry when reload is rejected.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        entry: YAML-owned config entry being updated.
+        variable_id: YAML variable identifier used in diagnostics.
+        yaml_data: Complete replacement data built from the current YAML.
+
+    Raises:
+        HomeAssistantError: If Home Assistant rejects the updated entry reload.
+    """
+    previous_data = copy.deepcopy(dict(entry.data))
+    hass.config_entries.async_update_entry(entry, data=yaml_data)
+    if await hass.config_entries.async_reload(entry.entry_id) is not False:
+        return
+
+    hass.config_entries.async_update_entry(entry, data=previous_data)
+    try:
+        rollback_ok = await hass.config_entries.async_reload(entry.entry_id)
+    except HomeAssistantError:
+        _LOGGER.exception(
+            "[YAML] Error reloading %s after restoring its prior config-entry data",
+            variable_id,
+        )
+    else:
+        if rollback_ok is False:
+            _LOGGER.error(
+                "[YAML] Reload returned false for %s after restoring its prior config-entry data",
+                variable_id,
+            )
+    raise HomeAssistantError(
+        f"Failed to reload YAML variable {variable_id}; restored its prior configuration"
+    )
 
 
 async def _async_reconcile_yaml(
@@ -345,31 +398,11 @@ async def _async_reconcile_yaml(
                         wait_for_completion,
                     )
                 yaml_data = _yaml_entry_data(var, var_fields)
-                previous_data = copy.deepcopy(dict(entry.data))
-                hass.config_entries.async_update_entry(entry, data=yaml_data)
-                reload_entry = hass.config_entries.async_reload(entry.entry_id)
-                reload_ok = await _async_dispatch_yaml_lifecycle(
-                    hass, reload_entry, wait_for_completion
+                await _async_dispatch_yaml_lifecycle(
+                    hass,
+                    _async_update_yaml_entry(hass, entry, var, yaml_data),
+                    wait_for_completion,
                 )
-                if wait_for_completion and reload_ok is False:
-                    hass.config_entries.async_update_entry(entry, data=previous_data)
-                    try:
-                        rollback_ok = await hass.config_entries.async_reload(entry.entry_id)
-                    except HomeAssistantError:
-                        _LOGGER.exception(
-                            "[YAML] Error reloading %s after restoring its prior config-entry data",
-                            var,
-                        )
-                    else:
-                        if rollback_ok is False:
-                            _LOGGER.error(
-                                "[YAML] Reload returned false for %s after restoring its prior "
-                                "config-entry data",
-                                var,
-                            )
-                    raise HomeAssistantError(
-                        f"Failed to reload YAML variable {var}; restored its prior configuration"
-                    )
 
     # Remove any config entries that were originally created from YAML imports
     # but are no longer present in the current YAML configuration.

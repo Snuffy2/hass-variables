@@ -201,6 +201,93 @@ async def test_yaml_reload_rolls_back_when_config_entry_reload_fails(
     assert recovered_state.attributes["source"] == "accepted"
 
 
+@pytest.mark.parametrize(
+    ("failed_lifecycle_method", "expected_call_count"),
+    [("async_unload_entry", 1), ("async_setup_entry", 2)],
+    ids=["unload-failure", "setup-failure"],
+)
+async def test_startup_yaml_update_rolls_back_after_background_reload_failure(
+    hass: HomeAssistant,
+    failed_lifecycle_method: str,
+    expected_call_count: int,
+) -> None:
+    """Recover prior entry data and live state after startup reload failure.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        failed_lifecycle_method: Integration lifecycle method that rejects the
+            first background reload.
+        expected_call_count: Lifecycle calls expected after rollback recovery.
+    """
+    variable_id = "startup_yaml_rollback"
+    initial_config = {
+        DOMAIN: {
+            variable_id: {
+                CONF_VALUE: "accepted",
+                CONF_RESTORE: False,
+                CONF_ATTRIBUTES: {"source": "accepted"},
+            }
+        }
+    }
+    assert await async_setup_component(hass, DOMAIN, initial_config)
+    await hass.async_block_till_done()
+
+    entry = next(
+        entry
+        for entry in hass.config_entries.async_entries(DOMAIN)
+        if entry.data.get(CONF_VARIABLE_ID) == variable_id
+    )
+    previous_data = dict(entry.data)
+
+    entity_id = f"sensor.{variable_id}"
+    initial_state = hass.states.get(entity_id)
+    assert initial_state is not None
+    assert initial_state.state == "accepted"
+
+    variable_module = importlib.import_module("custom_components.variable")
+    original_lifecycle_method = getattr(variable_module, failed_lifecycle_method)
+    call_count = 0
+
+    async def fail_first_lifecycle_call(
+        lifecycle_hass: HomeAssistant, lifecycle_entry: ConfigEntry
+    ) -> bool:
+        """Reject the startup update reload, then allow recovery."""
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return False
+        return await original_lifecycle_method(lifecycle_hass, lifecycle_entry)
+
+    rejected_config = {
+        DOMAIN: {
+            variable_id: {
+                CONF_VALUE: "rejected",
+                CONF_RESTORE: False,
+                CONF_ATTRIBUTES: {"source": "rejected"},
+            }
+        }
+    }
+    with patch.object(
+        variable_module,
+        failed_lifecycle_method,
+        new=fail_first_lifecycle_call,
+    ):
+        assert await variable_module._async_process_yaml(
+            hass, rejected_config, wait_for_completion=False
+        )
+        await hass.async_block_till_done()
+
+    assert call_count == expected_call_count
+    current_entry = hass.config_entries.async_get_entry(entry.entry_id)
+    assert current_entry is not None
+    assert current_entry.data == previous_data
+    recovered_state = hass.states.get(entity_id)
+    assert recovered_state is not None
+    assert recovered_state.state == "accepted"
+    assert recovered_state.attributes["source"] == "accepted"
+    assert not hass.data[variable_module._YAML_LIFECYCLE_TASKS]
+
+
 async def test_yaml_reload_removes_duplicate_yaml_entries(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,
