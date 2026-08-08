@@ -64,7 +64,17 @@ def _parse_attribute_path(path: str) -> list[str | int]:
 
 
 def set_nested_attribute(target: MutableMapping[str, Any], path: str, value: Any) -> None:
-    """Set a deeply nested mapping or list value from bracket-path notation."""
+    """Set a deeply nested mapping or list value from bracket-path notation.
+
+    Args:
+        target: Mutable mapping to update in place.
+        path: Dot- and bracket-delimited path to the target value.
+        value: Value to deep-copy into the target path.
+
+    Raises:
+        ValueError: If the path is empty or has invalid bracket notation.
+        TypeError: If an existing container conflicts with the path.
+    """
     tokens = _parse_attribute_path(path)
     if not tokens:
         raise ValueError("Attribute path cannot be empty")
@@ -116,7 +126,15 @@ def set_nested_attribute(target: MutableMapping[str, Any], path: str, value: Any
 def merge_attribute_dict(
     existing: Mapping[str, Any] | None, updates: Mapping[str, Any]
 ) -> dict[str, Any]:
-    """Deep-copy and merge attributes, resolving bracket-path keys."""
+    """Deep-copy and merge attributes, resolving bracket-path keys.
+
+    Args:
+        existing: Existing attributes to preserve, if any.
+        updates: New attributes to merge into the result.
+
+    Returns:
+        A deep-copied attribute mapping containing both inputs.
+    """
     merged = copy.deepcopy(dict(existing)) if existing is not None else {}
     for attr, value in updates.items():
         if isinstance(attr, str) and "[" in attr:
@@ -127,7 +145,14 @@ def merge_attribute_dict(
 
 
 def to_num(s: str) -> int | float | None:
-    """Convert a string to an integer or float when possible."""
+    """Convert a string to an integer or float when possible.
+
+    Args:
+        s: String representation of a numeric value.
+
+    Returns:
+        The parsed integer or float, or ``None`` when the string is not numeric.
+    """
     try:
         return int(s)
     except ValueError:
@@ -138,13 +163,29 @@ def to_num(s: str) -> int | float | None:
 
 
 def _raise_conversion_error(source: str, dest_type: str, value: object) -> Never:
-    """Raise a consistent conversion error after recording debug context."""
+    """Raise a consistent conversion error after recording debug context.
+
+    Args:
+        source: Source value category that could not be converted.
+        dest_type: Requested Variable value type.
+        value: Value that failed conversion.
+
+    Raises:
+        ValueError: Always, with the conversion context.
+    """
     _LOGGER.debug("Cannot convert %s to %s: %s, returning None", source, dest_type, value)
     raise ValueError(f"Cannot convert {source} to {dest_type}: {value}")
 
 
 def _normalize_datetime(value: datetime.datetime) -> datetime.datetime:
-    """Attach UTC to naive datetime values while retaining aware values."""
+    """Attach UTC to naive datetime values while retaining aware values.
+
+    Args:
+        value: Datetime value to normalize.
+
+    Returns:
+        The original aware datetime or a UTC-aware replacement for a naive one.
+    """
     if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
         return value.replace(tzinfo=dt_util.UTC)
     return value
@@ -153,7 +194,18 @@ def _normalize_datetime(value: datetime.datetime) -> datetime.datetime:
 def _string_to_type(
     value: str, dest_type: str | None
 ) -> str | int | float | datetime.date | datetime.datetime:
-    """Convert a string to the requested variable value type."""
+    """Convert a string to the requested variable value type.
+
+    Args:
+        value: String value to convert.
+        dest_type: Requested Variable value type.
+
+    Returns:
+        The value converted to the requested type.
+
+    Raises:
+        ValueError: If the destination type is invalid or conversion fails.
+    """
     if dest_type is None or dest_type == "string":
         return value
     if dest_type == "date":
@@ -176,7 +228,18 @@ def _string_to_type(
 def _number_to_type(
     value: float, dest_type: str | None
 ) -> str | float | datetime.date | datetime.datetime:
-    """Convert a numeric value to the requested variable value type."""
+    """Convert a numeric value to the requested variable value type.
+
+    Args:
+        value: Numeric value to convert.
+        dest_type: Requested Variable value type.
+
+    Returns:
+        The value converted to the requested type.
+
+    Raises:
+        ValueError: If the destination type is invalid or conversion fails.
+    """
     if dest_type is None or dest_type == "string":
         return str(value)
     if dest_type == "date":
@@ -197,7 +260,18 @@ def _number_to_type(
 def _date_to_type(
     value: datetime.date, dest_type: str | None
 ) -> str | float | datetime.date | datetime.datetime:
-    """Convert a date to the requested variable value type."""
+    """Convert a date to the requested variable value type.
+
+    Args:
+        value: Date value to convert.
+        dest_type: Requested Variable value type.
+
+    Returns:
+        The value converted to the requested type.
+
+    Raises:
+        ValueError: If the destination type is invalid.
+    """
     if dest_type is None or dest_type == "string":
         return value.isoformat()
     if dest_type == "date":
@@ -213,7 +287,18 @@ def _date_to_type(
 def _datetime_to_type(
     value: datetime.datetime, dest_type: str | None
 ) -> str | float | datetime.date | datetime.datetime:
-    """Convert a datetime to the requested variable value type."""
+    """Convert a datetime to the requested variable value type.
+
+    Args:
+        value: Datetime value to convert.
+        dest_type: Requested Variable value type.
+
+    Returns:
+        The value converted to the requested type.
+
+    Raises:
+        ValueError: If the destination type is invalid.
+    """
     if dest_type is None or dest_type == "string":
         return value.isoformat()
     if dest_type == "date":
@@ -228,7 +313,18 @@ def _datetime_to_type(
 def value_to_type(
     init_val: Any, dest_type: str | None
 ) -> str | int | float | datetime.date | datetime.datetime | None:
-    """Convert a variable value to its configured destination type."""
+    """Convert a variable value to its configured destination type.
+
+    Args:
+        init_val: Initial value supplied by YAML, a service, or a template.
+        dest_type: Requested Variable value type.
+
+    Returns:
+        The converted value, or ``None`` for an empty or unavailable input.
+
+    Raises:
+        ValueError: If the input or destination type is invalid.
+    """
     if init_val is None or (
         isinstance(init_val, str) and init_val.lower() in ["", "none", "unknown", "unavailable"]
     ):

@@ -349,7 +349,15 @@ async def _async_process_yaml(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up from a config entry."""
+    """Set up the Variable integration from a config entry.
+
+    Args:
+        hass: Home Assistant instance hosting the integration.
+        entry: Config entry that defines the Variable helper.
+
+    Returns:
+        True when the platform or device setup completes successfully.
+    """
     # _LOGGER.debug(f"[init async_setup_entry] entry: {entry.data}")
     if entry.data.get(CONF_YAML_PRESENT) is True:
         yaml_data = copy.deepcopy(dict(entry.data))
@@ -384,7 +392,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload a config entry."""
+    """Unload a Variable config entry.
+
+    Args:
+        hass: Home Assistant instance hosting the integration.
+        entry: Config entry that defines the Variable helper.
+
+    Returns:
+        True when the platform or device unload completes successfully.
+    """
     _LOGGER.info(
         "Unloading variable %s (config entry %s) with fields: %s",
         entry.data.get(CONF_VARIABLE_ID),
