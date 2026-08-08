@@ -325,6 +325,104 @@ async def test_concurrent_yaml_reloads_create_one_entry(
     assert state.state == "created-once"
 
 
+async def test_startup_import_and_reload_create_one_entry(
+    hass: HomeAssistant,
+) -> None:
+    """Wait for a pending startup import before a reload snapshots entries.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+    """
+    variable_id = "startup_overlap"
+    yaml_config = {DOMAIN: {variable_id: {CONF_VALUE: "created-once"}}}
+    import_started = asyncio.Event()
+    allow_import = asyncio.Event()
+    original_async_init = hass.config_entries.flow.async_init
+
+    async def blocking_async_init(*args: Any, **kwargs: Any) -> Any:
+        """Pause the startup import at the config-entry creation boundary."""
+        import_started.set()
+        await allow_import.wait()
+        return await original_async_init(*args, **kwargs)
+
+    with (
+        patch(
+            "custom_components.variable.async_integration_yaml_config",
+            new=AsyncMock(return_value=yaml_config),
+        ),
+        patch.object(
+            hass.config_entries.flow,
+            "async_init",
+            new=AsyncMock(side_effect=blocking_async_init),
+        ) as async_init,
+    ):
+        assert await async_setup_component(hass, DOMAIN, yaml_config)
+        await import_started.wait()
+
+        reload_task = asyncio.create_task(
+            hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
+        )
+        try:
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+            assert async_init.await_count == 1
+            assert not reload_task.done()
+        finally:
+            allow_import.set()
+            await reload_task
+
+    entries = [
+        entry
+        for entry in hass.config_entries.async_entries(DOMAIN)
+        if entry.data.get(CONF_VARIABLE_ID) == variable_id
+    ]
+    assert len(entries) == 1
+    assert len(er.async_entries_for_config_entry(er.async_get(hass), entries[0].entry_id)) == 1
+    state = hass.states.get(f"sensor.{variable_id}")
+    assert state is not None
+    assert state.state == "created-once"
+
+
+async def test_reload_propagates_pending_startup_import_failure(
+    hass: HomeAssistant,
+) -> None:
+    """Fail a reload when the startup lifecycle work it awaits fails.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+    """
+    yaml_config = {DOMAIN: {"failed_startup": {CONF_VALUE: "unused"}}}
+    import_started = asyncio.Event()
+    allow_failure = asyncio.Event()
+
+    async def failing_async_init(*args: Any, **kwargs: Any) -> Any:
+        """Pause and then fail the startup import."""
+        import_started.set()
+        await allow_failure.wait()
+        raise RuntimeError("startup import failed")
+
+    with (
+        patch(
+            "custom_components.variable.async_integration_yaml_config",
+            new=AsyncMock(return_value=yaml_config),
+        ),
+        patch.object(
+            hass.config_entries.flow,
+            "async_init",
+            new=AsyncMock(side_effect=failing_async_init),
+        ),
+    ):
+        assert await async_setup_component(hass, DOMAIN, yaml_config)
+        await import_started.wait()
+        reload_task = asyncio.create_task(
+            hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
+        )
+        await asyncio.sleep(0)
+        allow_failure.set()
+        with pytest.raises(RuntimeError, match="startup import failed"):
+            await reload_task
+
+
 @pytest.mark.parametrize(
     ("initial_config", "removed_key", "removed_attribute"),
     [
