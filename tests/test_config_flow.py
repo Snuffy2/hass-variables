@@ -381,6 +381,27 @@ async def test_typed_sensor_flow_rejects_incompatible_values(
     assert hass.states.get(f"sensor.{variable_id}") is None
 
 
+async def test_yaml_import_discards_incompatible_typed_value(hass: HomeAssistant) -> None:
+    """Discard a YAML value that is incompatible with its sensor device class.
+
+    Args:
+        hass (HomeAssistant): Home Assistant instance that owns the flow.
+    """
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_IMPORT},
+        data={
+            CONF_VARIABLE_ID: "bad_yaml_temperature",
+            CONF_VALUE: "warm",
+            CONF_ATTRIBUTES: {CONF_DEVICE_CLASS: SensorDeviceClass.TEMPERATURE},
+        },
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_VALUE_TYPE] == "number"
+    assert CONF_VALUE not in result["data"]
+
+
 @pytest.mark.parametrize(
     ("invalid_input", "error_key"),
     [
@@ -565,10 +586,11 @@ async def test_add_sensor_normalizes_enum_name_device_class(hass: HomeAssistant)
     data_schema = flow.build_add_sensor_page_2()
     selectors = {getattr(key, "schema", key): value for key, value in data_schema.schema.items()}
 
-    assert selectors[CONF_STATE_CLASS].config["options"] == [
-        {"label": "None", "value": "None"},
-        {"label": "MEASUREMENT", "value": "measurement"},
-    ]
+    state_class_options = selectors[CONF_STATE_CLASS].config["options"]
+    assert state_class_options[0] == {"label": "None", "value": "None"}
+    assert {(option["label"], option["value"]) for option in state_class_options[1:]} == {
+        ("MEASUREMENT", "measurement")
+    }
     assert {
         option["value"] for option in selectors[CONF_UNIT_OF_MEASUREMENT].config["options"]
     } == {
@@ -831,10 +853,11 @@ async def test_sensor_options_normalizes_string_device_class(
         for key, value in data_schema.schema.items()
         if getattr(key, "schema", key) == CONF_STATE_CLASS
     )
-    assert state_class_selector.config["options"] == [
-        {"label": "None", "value": "None"},
-        {"label": "MEASUREMENT", "value": "measurement"},
-    ]
+    state_class_options = state_class_selector.config["options"]
+    assert state_class_options[0] == {"label": "None", "value": "None"}
+    assert {(option["label"], option["value"]) for option in state_class_options[1:]} == {
+        ("MEASUREMENT", "measurement")
+    }
 
 
 async def test_sensor_pages_use_identical_monetary_unit_options(

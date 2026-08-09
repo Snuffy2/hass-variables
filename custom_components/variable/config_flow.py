@@ -9,6 +9,7 @@ from typing import Any
 
 from homeassistant.components import binary_sensor, sensor
 from homeassistant.components.device_tracker.const import ATTR_LOCATION_NAME
+from homeassistant.components.sensor.const import DEVICE_CLASS_UNITS
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import (
     ATTR_BATTERY_LEVEL,
@@ -119,10 +120,14 @@ def _sensor_unit_options(
             for currency in Currency
             if currency.code not in ["XTS", "XXX"]
         ]
+    units = (
+        unit
+        for unit in DEVICE_CLASS_UNITS.get(device_class, set())
+        if unit is not None and unit != "None"
+    )
     return [
         selector.SelectOptionDict(label=str(unit), value=str(unit))
-        for unit in getattr(sensor, "DEVICE_CLASS_UNITS", {}).get(device_class, [])
-        if unit is not None and unit != "None"
+        for unit in sorted(units, key=str)
     ]
 
 
@@ -414,6 +419,7 @@ class VariableConfigFlow(ConfigFlow, domain=DOMAIN):
                         "The value is incompatible with the selected device class; "
                         "setting it to None"
                     )
+                    self.add_sensor_input[CONF_VALUE] = None
                     user_input.update({CONF_VALUE: None})
             else:
                 user_input.update({CONF_VALUE: newval})

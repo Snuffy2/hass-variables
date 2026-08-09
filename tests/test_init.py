@@ -282,23 +282,33 @@ def test_async_remove_helper_devices_fallback_maps_keyword_arguments(
 
     variable_module = importlib.import_module("custom_components.variable")
 
-    monkeypatch.setattr(
-        "homeassistant.helpers.device.async_remove_stale_devices_links_keep_current_device",
-        fake_stale,
-    )
-    monkeypatch.delattr(helper_integration, "async_remove_helper_devices", raising=False)
-
-    variable_module = importlib.reload(variable_module)
     try:
-        variable_module.async_remove_helper_devices(
-            None,
-            helper_config_entry_id="entry-1",
-            source_device_id="device-1",
-            remove_all_devices=True,
-        )
-        assert stale_calls == [("entry-1", "device-1")]
+        with monkeypatch.context() as patch_context:
+            patch_context.setattr(
+                "homeassistant.helpers.device.async_remove_stale_devices_links_keep_current_device",
+                fake_stale,
+            )
+            patch_context.delattr(
+                helper_integration,
+                "async_remove_helper_devices",
+                raising=False,
+            )
+
+            variable_module = importlib.reload(variable_module)
+            variable_module.async_remove_helper_devices(
+                None,
+                helper_config_entry_id="entry-1",
+                source_device_id="device-1",
+                remove_all_devices=True,
+            )
+            assert stale_calls == [("entry-1", "device-1")]
     finally:
-        importlib.reload(variable_module)
+        variable_module = importlib.reload(variable_module)
+
+    assert (
+        variable_module._async_remove_helper_devices
+        is helper_integration.async_remove_helper_devices
+    )
 
 
 async def test_remove_entry_cleans_up_entity_registry(
