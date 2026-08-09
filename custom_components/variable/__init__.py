@@ -49,9 +49,7 @@ from .device import create_device, remove_device
 try:
     from homeassistant.helpers.helper_integration import async_remove_helper_devices
 except ImportError:
-    from homeassistant.helpers.device import (
-        async_remove_stale_devices_links_keep_current_device,
-    )
+    from homeassistant.helpers.device import async_remove_stale_devices_links_keep_current_device
 
     def async_remove_helper_devices(
         hass: HomeAssistant,
@@ -118,28 +116,6 @@ CONFIG_SCHEMA = vol.Schema(
     },
     extra=vol.ALLOW_EXTRA,
 )
-
-
-async def _async_exclude_entity_from_recorder(hass: HomeAssistant, entity_id: str) -> None:
-    """Exclude an entity from recorder by updating recorder's internal config."""
-    try:
-        # Get current recorder config
-        recorder_config = hass.config.get("recorder", {})
-        exclude_entities = list(recorder_config.get("exclude_entities", []))
-
-        # Add entity if not already in list
-        if entity_id not in exclude_entities:
-            exclude_entities.append(entity_id)
-
-            # Try to update recorder's internal state if recorder is loaded
-            if "recorder" in hass.data:
-                recorder = hass.data.get("recorder", {})
-                if isinstance(recorder, dict):
-                    recorder["exclude_entities"] = exclude_entities
-
-            _LOGGER.debug(f"Entity excluded from recorder: {entity_id}")
-    except Exception as err:
-        _LOGGER.debug(f"Error excluding entity from recorder: {err}")
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType):
