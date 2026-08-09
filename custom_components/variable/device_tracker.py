@@ -36,7 +36,6 @@ from homeassistant.util import slugify
 import voluptuous as vol
 import yaml
 
-from . import _async_exclude_entity_from_recorder
 from .const import (
     ATTR_ATTRIBUTES,
     ATTR_DELETE_IN_ZONES,
@@ -425,15 +424,6 @@ class Variable(RestoreEntity, TrackerEntity):
 
 
 class VariableNoRecorder(Variable):
-    """Device tracker variable excluded from recorder history."""
+    """Device tracker variable whose state attributes are not stored by Recorder."""
 
     _unrecorded_attributes = frozenset({MATCH_ALL})
-
-    async def async_added_to_hass(self) -> None:
-        """Run when entity is added to Home Assistant."""
-        await super().async_added_to_hass()
-
-        # Exclude from recorder automatically
-        await _async_exclude_entity_from_recorder(self.hass, self.entity_id)
-
-        _LOGGER.debug("(%s) Excluded from recorder: %s", self._attr_name, self.entity_id)

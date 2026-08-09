@@ -87,7 +87,7 @@
     "error": {
       "invalid_value_type": "The value entered is not compatible with the selected device_class: {device_class}. Expected {value_type}.",
       "invalid_url": "Invalid URL",
-      "unknown": "[%key:common::config_flow::error::unknown%]"
+      "unknown": "Unexpected error"
     }
   },
   "options": {
@@ -204,7 +204,7 @@
     },
     "abort": {
       "entity_not_found": "Variable entity not found",
-      "unknown": "[%key:common::config_flow::error::unknown%]",
+      "unknown": "Unexpected error",
       "yaml_variable": "Cannot change options here for Variables created by YAML.\n\nTo use the User Interface to manage this Variable, you will need to:\n1. Remove it from YAML\n2. Restart Home Assistant\n3. Manually recreate it in Home Assistant, Integrations, +Add Integration.",
       "yaml_update_error": "Unable to update YAML Sensor Variable",
       "value_changed": "Variable Changed"
@@ -212,7 +212,7 @@
     "error": {
       "invalid_value_type": "The value entered is not compatible with the selected device_class: {device_class}. Expected {value_type}.",
       "invalid_url": "Invalid URL",
-      "unknown": "[%key:common::config_flow::error::unknown%]"
+      "unknown": "Unexpected error"
     }
   },
   "selector": {

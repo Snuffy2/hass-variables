@@ -136,7 +136,7 @@ _LOGGER = logging.getLogger(__name__)
 COMPONENT_CONFIG_URL = "https://github.com/Wibias/hass-variables"
 
 # Note the input displayed to the user will be translated. See the
-# translations/<lang>.json file and strings.json. See here for further information:
+# translations/<lang>.json file. See here for further information:
 # https://developers.home-assistant.io/docs/config_entries_config_flow_handler/#translations
 
 SENSOR_DEVICE_CLASS_SELECT_LIST = []
@@ -476,9 +476,9 @@ class VariableConfigFlow(ConfigFlow, domain=DOMAIN):
             == sensor.SensorDeviceClass.TIMESTAMP
         ):
             return "datetime"
-        if (
-            self.add_sensor_input.get(CONF_ATTRIBUTES, {}).get(CONF_DEVICE_CLASS)
-            == sensor.SensorDeviceClass.MONETARY
+        if self.add_sensor_input.get(CONF_ATTRIBUTES, {}).get(CONF_DEVICE_CLASS) in (
+            sensor.SensorDeviceClass.MONETARY,
+            sensor.SensorDeviceClass.ENUM,
         ):
             return "string"
         return "number"

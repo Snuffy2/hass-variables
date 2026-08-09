@@ -68,7 +68,7 @@
     },
     "error": {
       "invalid_value_type": "Zadaná hodnota nie je kompatibilná s vybratou hodnotou device_class: {device_class}. Očakávané {value_type}.",
-      "unknown": "[%key:common::config_flow::error::unknown%]"
+      "unknown": "Neočekávaná chyba"
     }
   },
   "options": {
@@ -171,7 +171,7 @@
     },
     "error": {
       "invalid_value_type": "Zadaná hodnota nie je kompatibilná s vybratou triedou zariadenia: {device_class}. Očakávané {value_type}.",
-      "unknown": "[%key:common::config_flow::error::unknown%]"
+      "unknown": "Neočekávaná chyba"
     }
   },
   "selector": {

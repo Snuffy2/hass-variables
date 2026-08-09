@@ -23,6 +23,7 @@ from homeassistant.const import (
     CONF_ICON,
     CONF_NAME,
     CONF_UNIT_OF_MEASUREMENT,
+    MATCH_ALL,
     STATE_NOT_HOME,
     Platform,
 )
@@ -817,6 +818,8 @@ async def test_sensor_options_flow_updates_entry_and_live_entity(
     assert state is not None
     assert state.state == "26.5"
     assert state.attributes["source"] == "sensor-options"
+    assert state.state_info is not None
+    assert MATCH_ALL in state.state_info["unrecorded_attributes"]
 
 
 async def test_sensor_options_normalizes_string_device_class(
