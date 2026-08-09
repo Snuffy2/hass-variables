@@ -21,6 +21,18 @@ id = "check-yaml"
 id = "check-toml"
 
 [[repos.hooks]]
+id = "check-json"
+
+[[repos.hooks]]
+id = "check-merge-conflict"
+
+[[repos.hooks]]
+id = "check-case-conflict"
+
+[[repos.hooks]]
+id = "detect-private-key"
+
+[[repos.hooks]]
 id = "check-added-large-files"
 
 [[repos]]
@@ -46,12 +58,12 @@ rev = "v2.3.0"
 
 [[repos.hooks]]
 id = "mypy"
-stages = ["manual"]
 language_version = "python3.14"
 args = ["--config-file=pyproject.toml"]
+pass_filenames = false
 additional_dependencies = [
   "homeassistant-stubs",
-  "iso4217>=1.11.20220401",
+  "iso4217>=1.15",
   "pytest",
   "pytest-asyncio",
   "pytest-cov",
@@ -61,8 +73,15 @@ additional_dependencies = [
 ]
 
 [[repos]]
+repo = "https://github.com/jsh9/pydoclint"
+rev = "0.9.1"
+
+[[repos.hooks]]
+id = "pydoclint"
+
+[[repos]]
 repo = "https://github.com/astral-sh/ruff-pre-commit"
-rev = "v0.16.1"
+rev = "v0.16.2"
 
 [[repos.hooks]]
 id = "ruff-check"

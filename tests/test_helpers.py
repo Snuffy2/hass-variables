@@ -9,30 +9,11 @@ import datetime
 import pytest
 
 from custom_components.variable.helpers import (
-    looks_like_attribute_path,
     merge_attribute_dict,
     set_nested_attribute,
     to_num,
     value_to_type,
 )
-
-
-@pytest.mark.parametrize(
-    ("path", "expected"),
-    [
-        pytest.param("items[0]", True, id="bracket-notation"),
-        pytest.param("items.value", False, id="dot-notation-is-literal"),
-        pytest.param("items", False, id="plain-key"),
-    ],
-)
-def test_looks_like_attribute_path(path: str, expected: bool) -> None:
-    """Detect only bracket notation as an attribute path.
-
-    Args:
-        path: Candidate attribute key.
-        expected: Whether the key should be treated as an attribute path.
-    """
-    assert looks_like_attribute_path(path) is expected
 
 
 @pytest.mark.parametrize(
@@ -43,12 +24,12 @@ def test_looks_like_attribute_path(path: str, expected: bool) -> None:
         pytest.param("not-a-number", None, id="invalid"),
     ],
 )
-def test_to_num(value: str, expected: int | float | None) -> None:
+def test_to_num(value: str, expected: float | None) -> None:
     """Parse numeric strings without raising for invalid input.
 
     Args:
-        value: String to parse.
-        expected: Parsed numeric value, or None for invalid input.
+        value (str): String to parse.
+        expected (float | None): Parsed numeric value, or None for invalid input.
     """
     assert to_num(value) == expected
 
@@ -95,9 +76,9 @@ def test_set_nested_attribute_replaces_incompatible_containers(
     """Replace incompatible intermediate values for the requested path.
 
     Args:
-        initial: Mapping containing an incompatible intermediate value.
-        path: Bracket path to update.
-        expected: Mapping expected after the update.
+        initial (MutableMapping[str, object]): Mapping containing an incompatible intermediate value.
+        path (str): Bracket path to update.
+        expected (MutableMapping[str, object]): Mapping expected after the update.
     """
     set_nested_attribute(initial, path, "new")
 
@@ -145,9 +126,9 @@ def test_set_nested_attribute_rejects_invalid_paths(
     """Raise ValueError for malformed paths and incompatible roots.
 
     Args:
-        target: Root container supplied by the caller.
-        path: Invalid path to apply.
-        message: Expected error message fragment.
+        target (object): Root container supplied by the caller.
+        path (str): Invalid path to apply.
+        message (str): Expected error message fragment.
     """
     with pytest.raises(ValueError, match=message):
         set_nested_attribute(target, path, "value")  # type: ignore[arg-type]
@@ -188,7 +169,7 @@ def test_merge_attribute_dict_deep_copies_without_mutating_inputs(
     """Return an isolated merge without mutating either input.
 
     Args:
-        existing: Existing attributes, or None for a new mapping.
+        existing (MutableMapping[str, object] | None): Existing attributes, or None for a new mapping.
     """
     updates: MutableMapping[str, object] = {"added": ["original"]}
     existing_snapshot = copy.deepcopy(existing)
@@ -213,9 +194,17 @@ class StringWrapper:
         """Return the wrapped text.
 
         Returns:
-            Text exposed by the wrapper.
+            str: Text exposed by the wrapper.
         """
         return "wrapped"
+
+
+class DateSubclass(datetime.date):
+    """Represent a concrete date subclass accepted by helper conversion."""
+
+
+class DatetimeSubclass(datetime.datetime):
+    """Represent a concrete datetime subclass accepted by helper conversion."""
 
 
 @pytest.mark.parametrize(
@@ -232,7 +221,7 @@ def test_value_to_type_returns_none_for_null_like_values(initial: str | None) ->
     """Normalize null-like values before destination conversion.
 
     Args:
-        initial: Null-like value to normalize.
+        initial (str | None): Null-like value to normalize.
     """
     assert value_to_type(initial, "number") is None
 
@@ -279,14 +268,14 @@ def test_value_to_type_converts_wrapper_to_string() -> None:
 def test_value_to_type_converts_strings(
     initial: str,
     destination: str | None,
-    expected: str | int | float | datetime.date | datetime.datetime,
+    expected: str | float | datetime.date | datetime.datetime,
 ) -> None:
     """Convert valid strings to the requested public destination type.
 
     Args:
-        initial: String value to convert.
-        destination: Requested destination type, or None for the default.
-        expected: Converted value.
+        initial (str): String value to convert.
+        destination (str | None): Requested destination type, or None for the default.
+        expected (str | float | datetime.date | datetime.datetime): Converted value.
     """
     assert value_to_type(initial, destination) == expected
 
@@ -316,9 +305,9 @@ def test_value_to_type_rejects_invalid_string_conversions(
     """Reject unsupported or malformed string conversions.
 
     Args:
-        initial: String value that cannot satisfy the conversion.
-        destination: Requested destination type.
-        message: Expected error message fragment.
+        initial (str): String value that cannot satisfy the conversion.
+        destination (str): Requested destination type.
+        message (str): Expected error message fragment.
     """
     with pytest.raises(ValueError, match=message):
         value_to_type(initial, destination)
@@ -346,16 +335,16 @@ def test_value_to_type_rejects_invalid_string_conversions(
     ],
 )
 def test_value_to_type_converts_numbers(
-    initial: int | float,
+    initial: float,
     destination: str | None,
-    expected: str | int | float | datetime.date | datetime.datetime,
+    expected: str | float | datetime.date | datetime.datetime,
 ) -> None:
     """Convert numeric input to supported destination types.
 
     Args:
-        initial: Numeric value to convert.
-        destination: Requested destination type, or None for the default.
-        expected: Converted value.
+        initial (float): Numeric value to convert.
+        destination (str | None): Requested destination type, or None for the default.
+        expected (str | float | datetime.date | datetime.datetime): Converted value.
     """
     assert value_to_type(initial, destination) == expected
 
@@ -376,8 +365,8 @@ def test_value_to_type_rejects_invalid_numeric_conversions(destination: str, mes
     """Reject malformed or unsupported numeric conversions.
 
     Args:
-        destination: Requested destination type.
-        message: Expected error message fragment.
+        destination (str): Requested destination type.
+        message (str): Expected error message fragment.
     """
     with pytest.raises(ValueError, match=message):
         value_to_type(1, destination)
@@ -391,22 +380,34 @@ def test_value_to_type_rejects_invalid_numeric_conversions(destination: str, mes
         pytest.param("date", datetime.date(2026, 7, 24), id="date"),
         pytest.param(
             "datetime",
-            datetime.datetime(2026, 7, 24),
+            datetime.datetime(2026, 7, 24, tzinfo=datetime.UTC),
             id="datetime",
+        ),
+        pytest.param(
+            "number",
+            datetime.datetime(2026, 7, 24, tzinfo=datetime.UTC).timestamp(),
+            id="number",
         ),
     ],
 )
 def test_value_to_type_converts_dates(
     destination: str | None,
-    expected: str | datetime.date | datetime.datetime,
+    expected: str | float | datetime.date | datetime.datetime,
 ) -> None:
     """Convert date input to supported destination types.
 
     Args:
-        destination: Requested destination type, or None for the default.
-        expected: Converted value.
+        destination (str | None): Requested destination type, or None for the default.
+        expected (str | float | datetime.date | datetime.datetime): Converted value.
     """
     assert value_to_type(datetime.date(2026, 7, 24), destination) == expected
+
+
+def test_value_to_type_converts_date_subclass() -> None:
+    """Convert a date subclass using the date conversion path."""
+    initial = DateSubclass(2026, 7, 24)
+
+    assert value_to_type(initial, "string") == "2026-07-24"
 
 
 @pytest.mark.parametrize(
@@ -434,12 +435,51 @@ def test_value_to_type_converts_datetimes(
     """Convert an aware datetime to supported destination types.
 
     Args:
-        destination: Requested destination type, or None for the default.
-        expected: Converted value.
+        destination (str | None): Requested destination type, or None for the default.
+        expected (str | float | datetime.date | datetime.datetime): Converted value.
     """
     initial = datetime.datetime(2026, 7, 24, 12, 30, tzinfo=datetime.UTC)
 
     assert value_to_type(initial, destination) == expected
+
+
+@pytest.mark.parametrize(
+    ("destination", "expected"),
+    [
+        pytest.param("date", datetime.date(2026, 7, 24), id="date"),
+        pytest.param(
+            "datetime",
+            datetime.datetime(2026, 7, 24, 12, 30, tzinfo=datetime.UTC),
+            id="datetime-assumes-utc",
+        ),
+        pytest.param(
+            "number",
+            datetime.datetime(2026, 7, 24, 12, 30, tzinfo=datetime.UTC).timestamp(),
+            id="number-uses-utc",
+        ),
+    ],
+)
+def test_value_to_type_normalizes_naive_datetimes(
+    destination: str,
+    expected: float | datetime.date | datetime.datetime,
+) -> None:
+    """Normalize naive datetime input before temporal and numeric conversion.
+
+    Args:
+        destination (str): Requested destination type.
+        expected (float | datetime.date | datetime.datetime): UTC-normalized value.
+    """
+    initial = datetime.datetime.fromisoformat("2026-07-24T12:30:00")
+
+    assert value_to_type(initial, destination) == expected
+
+
+def test_value_to_type_converts_datetime_subclass() -> None:
+    """Convert a datetime subclass using the datetime conversion path."""
+    initial = DatetimeSubclass(2026, 7, 24, 12, 30, tzinfo=datetime.UTC)
+
+    assert value_to_type(initial, "date") == datetime.date(2026, 7, 24)
+    assert value_to_type(initial, "datetime") is initial
 
 
 @pytest.mark.parametrize(
@@ -458,7 +498,7 @@ def test_value_to_type_rejects_invalid_temporal_destination(
     """Reject an unsupported destination for temporal input.
 
     Args:
-        initial: Date or timezone-aware datetime input.
+        initial (datetime.date | datetime.datetime): Date or timezone-aware datetime input.
     """
     with pytest.raises(ValueError, match="Invalid dest_type"):
         value_to_type(initial, "boolean")

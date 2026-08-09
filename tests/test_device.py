@@ -51,9 +51,9 @@ async def test_create_device_reloads_only_linked_variable_entities(
     """Reload linked Variable entities while ignoring YAML and other platforms.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config_entry_factory: Factory that creates registered Variable entries.
-        monkeypatch: Pytest fixture used to observe scheduled entry reloads.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates registered Variable entries.
+        monkeypatch (pytest.MonkeyPatch): Pytest fixture used to observe scheduled entry reloads.
     """
     device_entry = config_entry_factory(
         {
@@ -119,8 +119,8 @@ async def test_update_device_changes_all_registry_metadata(
     """Update every supported device metadata field in the registry.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config_entry_factory: Factory that creates the device config entry.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the device config entry.
     """
     entry = config_entry_factory(
         {
@@ -161,8 +161,8 @@ async def test_update_device_returns_false_when_registry_device_is_missing(
     """Report that metadata cannot be updated without a registry device.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config_entry_factory: Factory that creates the unconfigured entry.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the unconfigured entry.
     """
     entry = config_entry_factory(
         {
@@ -183,9 +183,9 @@ async def test_remove_device_reloads_only_attached_variable_entities(
     """Remove a registry device and reload only attached Variable entities.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config_entry_factory: Factory that creates registered Variable entries.
-        monkeypatch: Pytest fixture used to observe scheduled entry reloads.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates registered Variable entries.
+        monkeypatch (pytest.MonkeyPatch): Pytest fixture used to observe scheduled entry reloads.
     """
     device_entry = config_entry_factory(
         {
@@ -239,8 +239,8 @@ async def test_remove_device_succeeds_when_registry_device_is_missing(
     """Treat removal of an already absent registry device as successful.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config_entry_factory: Factory that creates the unconfigured entry.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the unconfigured entry.
     """
     entry = config_entry_factory(
         {
@@ -260,8 +260,8 @@ async def test_setup_device_entry_creates_registry_device(
     """Load a device config entry and register its metadata.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config_entry_factory: Factory that creates the device config entry.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the device config entry.
     """
     entry = config_entry_factory(
         {
@@ -290,8 +290,8 @@ async def test_clearing_variable_device_links_preserves_entities_when_device_rem
     """Unlink every variable platform before removing its virtual device.
 
     Args:
-        hass: Home Assistant test instance used for the lifecycle workflow.
-        config_entry_factory: Factory that creates registered Variable entries.
+        hass (HomeAssistant): Home Assistant test instance used for the lifecycle workflow.
+        config_entry_factory (ConfigEntryFactory): Factory that creates registered Variable entries.
     """
     flow_result = await hass.config_entries.flow.async_init(
         DOMAIN,

@@ -1,5 +1,7 @@
 """Integration tests for Variable sensor restore and service behavior."""
 
+from datetime import date
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_FRIENDLY_NAME, CONF_DEVICE, CONF_DEVICE_ID, CONF_NAME, Platform
 from homeassistant.core import HomeAssistant, State
@@ -23,7 +25,57 @@ from custom_components.variable.const import (
     SERVICE_INCREMENT_SENSOR,
     SERVICE_UPDATE_SENSOR,
 )
+from custom_components.variable.sensor import Variable
 from tests.types import ConfigEntryFactory
+
+
+@pytest.mark.parametrize(
+    ("method_name", "operation"),
+    [
+        pytest.param("async_increment_variable", "increment", id="increment"),
+        pytest.param("async_decrement_variable", "decrement", id="decrement"),
+    ],
+)
+@pytest.mark.parametrize(
+    "current_value",
+    [
+        pytest.param(date(2026, 8, 8), id="date"),
+        pytest.param(True, id="true"),
+        pytest.param(False, id="false"),
+    ],
+)
+async def test_numeric_services_reject_non_numeric_native_value(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+    method_name: str,
+    operation: str,
+    current_value: date | bool,
+) -> None:
+    """Reject non-numeric values before attempting numeric arithmetic.
+
+    Args:
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+        method_name (str): Numeric entity method to invoke.
+        operation (str): Operation name expected in the user-facing error.
+        current_value (date | bool): Native value that arithmetic must reject.
+    """
+    entry = config_entry_factory(
+        {
+            CONF_VARIABLE_ID: "temporal_value",
+            CONF_VALUE: 1,
+            "value_type": "number",
+        }
+    )
+    sensor = Variable(hass, dict(entry.data), entry, entry.entry_id)
+    sensor._attr_native_value = current_value
+
+    with pytest.raises(TypeError) as exc_info:
+        await getattr(sensor, method_name)()
+
+    assert str(exc_info.value) == (
+        f"Cannot {operation} non-numeric value. Current value: {current_value}"
+    )
 
 
 async def test_sensor_restore_cache_is_applied_during_config_entry_setup(
@@ -33,8 +85,8 @@ async def test_sensor_restore_cache_is_applied_during_config_entry_setup(
     """Restore a sensor's public state and custom attributes on startup.
 
     Args:
-        hass: Home Assistant test instance.
-        config_entry_factory: Factory for test configuration entries.
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
     """
     entity_id = "sensor.restored_sensor"
     restored_state = "42.5"
@@ -81,8 +133,8 @@ async def test_device_linked_sensor_name_is_not_prefixed_again_after_reload(
     """Keep a device-linked sensor's friendly name stable across reload.
 
     Args:
-        hass: Home Assistant test instance.
-        config_entry_factory: Factory for test configuration entries.
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
     """
     entity_id = "sensor.linked_temperature"
     restored_state = "23"
@@ -154,8 +206,8 @@ async def test_sensor_increment_and_decrement_services(
     """Apply explicit and default deltas through registered sensor services.
 
     Args:
-        hass: Home Assistant test instance.
-        config_entry_factory: Factory for test configuration entries.
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
     """
     entry = config_entry_factory(
         {
@@ -204,9 +256,9 @@ async def test_numeric_services_reject_string_sensor(
     """Reject numeric services for string sensors without changing their state.
 
     Args:
-        hass: Home Assistant test instance.
-        config_entry_factory: Factory for test configuration entries.
-        service: Numeric service expected to reject the string sensor.
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+        service (str): Numeric service expected to reject the string sensor.
     """
     entity_id = "sensor.string_value"
     entry = config_entry_factory(
@@ -243,8 +295,8 @@ async def test_sensor_entity_service_updates_state_and_attributes(
     """Mutate a loaded sensor through Home Assistant's registered entity service.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        sensor_entry: Loaded sensor config entry to update.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        sensor_entry (ConfigEntry): Loaded sensor config entry to update.
     """
     assert await hass.config_entries.async_setup(sensor_entry.entry_id)
     await hass.async_block_till_done()

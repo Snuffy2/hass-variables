@@ -2,6 +2,7 @@
 
 import datetime
 from typing import Any
+from unittest.mock import AsyncMock, patch
 
 from homeassistant import config_entries
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
@@ -32,6 +33,7 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.setup import async_setup_component
 import pytest
 
+from custom_components.variable.config_flow import VariableConfigFlow
 from custom_components.variable.const import (
     CONF_ATTRIBUTES,
     CONF_ENTITY_PLATFORM,
@@ -54,11 +56,11 @@ async def _start_sensor_flow(
     """Start a sensor flow and submit its first page.
 
     Args:
-        hass: Home Assistant instance that owns the flow.
-        page_1_input: Data submitted to the sensor flow's first page.
+        hass (HomeAssistant): Home Assistant instance that owns the flow.
+        page_1_input (dict[str, Any]): Data submitted to the sensor flow's first page.
 
     Returns:
-        The sensor flow result for its second page.
+        config_entries.ConfigFlowResult: The sensor flow result for its second page.
     """
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
@@ -82,7 +84,7 @@ async def test_user_flow_menu(hass: HomeAssistant) -> None:
     """Expose every supported config-entry workflow from the user menu.
 
     Args:
-        hass: Home Assistant instance that owns the flow.
+        hass (HomeAssistant): Home Assistant instance that owns the flow.
     """
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
@@ -102,7 +104,7 @@ async def test_sensor_flow_creates_typed_entry(hass: HomeAssistant) -> None:
     """Create a numeric sensor through both pages of the real flow API.
 
     Args:
-        hass: Home Assistant instance that owns the flow.
+        hass (HomeAssistant): Home Assistant instance that owns the flow.
     """
     result = await _start_sensor_flow(
         hass,
@@ -270,14 +272,14 @@ async def test_typed_sensor_flow_matrix(
     """Create typed sensors through the public flow and expose their live state.
 
     Args:
-        hass: Home Assistant instance that owns the flow.
-        variable_id: Unique identifier for the variable under test.
-        device_class: Sensor device class that determines value validation.
-        page_2_input: Data submitted to the sensor flow's second page.
-        expected_value_type: Expected stored variable value type.
-        expected_value: Expected stored variable value.
-        expected_state: Expected Home Assistant entity state.
-        expected_attributes: Expected attributes exposed by the entity.
+        hass (HomeAssistant): Home Assistant instance that owns the flow.
+        variable_id (str): Unique identifier for the variable under test.
+        device_class (SensorDeviceClass): Sensor device class that determines value validation.
+        page_2_input (dict[str, Any]): Data submitted to the sensor flow's second page.
+        expected_value_type (str): Expected stored variable value type.
+        expected_value (object): Expected stored variable value.
+        expected_state (str): Expected Home Assistant entity state.
+        expected_attributes (dict[str, Any]): Expected attributes exposed by the entity.
     """
     result = await _start_sensor_flow(
         hass,
@@ -346,11 +348,11 @@ async def test_typed_sensor_flow_rejects_incompatible_values(
     """Keep typed sensor flows open and entry-free for incompatible values.
 
     Args:
-        hass: Home Assistant instance that owns the flow.
-        variable_id: Unique identifier for the variable under test.
-        device_class: Sensor device class that determines value validation.
-        invalid_value: Value that is incompatible with the device class.
-        raises_invalid_data: Whether the flow is expected to raise InvalidData.
+        hass (HomeAssistant): Home Assistant instance that owns the flow.
+        variable_id (str): Unique identifier for the variable under test.
+        device_class (SensorDeviceClass): Sensor device class that determines value validation.
+        invalid_value (str): Value that is incompatible with the device class.
+        raises_invalid_data (bool): Whether the flow is expected to raise InvalidData.
     """
     result = await _start_sensor_flow(
         hass,
@@ -380,6 +382,27 @@ async def test_typed_sensor_flow_rejects_incompatible_values(
     assert hass.states.get(f"sensor.{variable_id}") is None
 
 
+async def test_yaml_import_discards_incompatible_typed_value(hass: HomeAssistant) -> None:
+    """Discard a YAML value that is incompatible with its sensor device class.
+
+    Args:
+        hass (HomeAssistant): Home Assistant instance that owns the flow.
+    """
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_IMPORT},
+        data={
+            CONF_VARIABLE_ID: "bad_yaml_temperature",
+            CONF_VALUE: "warm",
+            CONF_ATTRIBUTES: {CONF_DEVICE_CLASS: SensorDeviceClass.TEMPERATURE},
+        },
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_VALUE_TYPE] == "number"
+    assert CONF_VALUE not in result["data"]
+
+
 @pytest.mark.parametrize(
     ("invalid_input", "error_key"),
     [
@@ -403,9 +426,9 @@ async def test_temperature_flow_rejects_invalid_typed_selection(
     """Reject state classes and units not offered by the typed sensor page.
 
     Args:
-        hass: Home Assistant instance that owns the flow.
-        invalid_input: Invalid data submitted to the sensor flow's second page.
-        error_key: Schema field expected to report the validation error.
+        hass (HomeAssistant): Home Assistant instance that owns the flow.
+        invalid_input (dict[str, Any]): Invalid data submitted to the sensor flow's second page.
+        error_key (str): Schema field expected to report the validation error.
     """
     result = await _start_sensor_flow(
         hass,
@@ -485,12 +508,12 @@ async def test_single_page_flows_create_entries(
     """Create and fully set up each single-page config flow.
 
     Args:
-        hass: Home Assistant instance that owns the flow.
-        step_id: Menu option that selects the config-flow step.
-        user_input: Data submitted to the selected flow step.
-        expected_platform: Expected platform stored in the config entry.
-        expected_entity_id: Expected entity ID, if the flow creates an entity.
-        expected_state: Expected entity state, if the flow creates an entity.
+        hass (HomeAssistant): Home Assistant instance that owns the flow.
+        step_id (str): Menu option that selects the config-flow step.
+        user_input (dict[str, Any]): Data submitted to the selected flow step.
+        expected_platform (str): Expected platform stored in the config entry.
+        expected_entity_id (str | None): Expected entity ID, if the flow creates an entity.
+        expected_state (str | None): Expected entity state, if the flow creates an entity.
     """
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
@@ -527,7 +550,7 @@ async def test_device_flow_rejects_invalid_configuration_url(hass: HomeAssistant
     """Report an invalid URL without creating a device config entry.
 
     Args:
-        hass: Home Assistant instance that owns the flow.
+        hass (HomeAssistant): Home Assistant instance that owns the flow.
     """
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
@@ -548,11 +571,42 @@ async def test_device_flow_rejects_invalid_configuration_url(hass: HomeAssistant
     assert result["errors"] == {"base": "invalid_url"}
 
 
+async def test_add_sensor_normalizes_enum_name_device_class(hass: HomeAssistant) -> None:
+    """Build typed state-class and unit choices from a device-class enum name.
+
+    Args:
+        hass (HomeAssistant): Home Assistant instance that owns the flow.
+    """
+    flow = VariableConfigFlow()
+    flow.hass = hass
+    flow.add_sensor_input = {
+        CONF_VARIABLE_ID: "enum_name_temperature",
+        CONF_DEVICE_CLASS: SensorDeviceClass.TEMPERATURE.name,
+    }
+
+    data_schema = flow.build_add_sensor_page_2()
+    selectors = {getattr(key, "schema", key): value for key, value in data_schema.schema.items()}
+
+    state_class_options = selectors[CONF_STATE_CLASS].config["options"]
+    assert state_class_options[0] == {"label": "None", "value": "None"}
+    assert {(option["label"], option["value"]) for option in state_class_options[1:]} == {
+        ("MEASUREMENT", "measurement")
+    }
+    assert {
+        option["value"] for option in selectors[CONF_UNIT_OF_MEASUREMENT].config["options"]
+    } == {
+        "None",
+        "K",
+        "°C",
+        "°F",
+    }
+
+
 async def test_yaml_entry_aborts_options_flow(hass: HomeAssistant) -> None:
     """Reject options for a variable managed through YAML.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
     """
     assert await async_setup_component(
         hass,
@@ -572,6 +626,30 @@ async def test_yaml_entry_aborts_options_flow(hass: HomeAssistant) -> None:
     assert result["reason"] == "yaml_variable"
 
 
+async def test_unsupported_platform_aborts_options_flow(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Abort options cleanly when an entry has an unsupported platform.
+
+    Args:
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the unsupported config entry.
+    """
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: "unsupported",
+            CONF_VARIABLE_ID: "unsupported_platform",
+            CONF_YAML_VARIABLE: False,
+        }
+    )
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "unknown"
+
+
 async def test_options_flow_changes_loaded_sensor_value(
     hass: HomeAssistant,
     sensor_entry: ConfigEntry,
@@ -579,8 +657,8 @@ async def test_options_flow_changes_loaded_sensor_value(
     """Change a live entity through the options workflow and its entity service.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        sensor_entry: Loaded sensor config entry to update.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        sensor_entry (ConfigEntry): Loaded sensor config entry to update.
     """
     assert await hass.config_entries.async_setup(sensor_entry.entry_id)
     await hass.async_block_till_done()
@@ -609,6 +687,88 @@ async def test_options_flow_changes_loaded_sensor_value(
     assert state.attributes["source"] == "options"
 
 
+@pytest.mark.parametrize(
+    ("entry_data", "entity_id", "step_id", "user_input"),
+    [
+        pytest.param(
+            {
+                CONF_ENTITY_PLATFORM: Platform.SENSOR,
+                CONF_VARIABLE_ID: "missing_sensor",
+                CONF_YAML_VARIABLE: False,
+                CONF_VALUE: 21.5,
+                CONF_VALUE_TYPE: "number",
+            },
+            "sensor.missing_sensor",
+            "change_sensor_value",
+            {CONF_VALUE: "24.25"},
+            id="sensor",
+        ),
+        pytest.param(
+            {
+                CONF_ENTITY_PLATFORM: Platform.BINARY_SENSOR,
+                CONF_VARIABLE_ID: "missing_binary_sensor",
+                CONF_YAML_VARIABLE: False,
+                CONF_VALUE: "true",
+            },
+            "binary_sensor.missing_binary_sensor",
+            "change_binary_sensor_value",
+            {CONF_VALUE: "false"},
+            id="binary-sensor",
+        ),
+        pytest.param(
+            {
+                CONF_ENTITY_PLATFORM: Platform.DEVICE_TRACKER,
+                CONF_VARIABLE_ID: "missing_device_tracker",
+                CONF_YAML_VARIABLE: False,
+                ATTR_LATITUDE: 40.0,
+                ATTR_LONGITUDE: -75.0,
+            },
+            "device_tracker.missing_device_tracker",
+            "change_device_tracker_value",
+            {ATTR_LATITUDE: 41.5, ATTR_LONGITUDE: -74.5},
+            id="device-tracker",
+        ),
+    ],
+)
+async def test_change_value_submission_aborts_when_runtime_entity_disappears(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+    entry_data: dict[str, Any],
+    entity_id: str,
+    step_id: str,
+    user_input: dict[str, Any],
+) -> None:
+    """Abort submitted value changes when the runtime entity has disappeared.
+
+    Args:
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the config entry.
+        entry_data (dict[str, Any]): Platform-specific config-entry data.
+        entity_id (str): Runtime entity to remove before submission.
+        step_id (str): Platform-specific change-value options step.
+        user_input (dict[str, Any]): Platform-specific submitted value data.
+    """
+    entry = config_entry_factory(entry_data)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={"next_step_id": step_id}
+    )
+    assert result["type"] is FlowResultType.FORM
+
+    hass.states.async_remove(entity_id)
+    with patch.object(type(hass.services), "async_call", new_callable=AsyncMock) as async_call:
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], user_input=user_input
+        )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "entity_not_found"
+    async_call.assert_not_awaited()
+
+
 async def test_sensor_options_flow_updates_entry_and_live_entity(
     hass: HomeAssistant,
     sensor_entry: ConfigEntry,
@@ -616,8 +776,8 @@ async def test_sensor_options_flow_updates_entry_and_live_entity(
     """Persist both sensor option pages and reload the live entity.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        sensor_entry: Loaded sensor config entry to update.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        sensor_entry (ConfigEntry): Loaded sensor config entry to update.
     """
     assert await hass.config_entries.async_setup(sensor_entry.entry_id)
     await hass.async_block_till_done()
@@ -662,6 +822,97 @@ async def test_sensor_options_flow_updates_entry_and_live_entity(
     assert MATCH_ALL in state.state_info["unrecorded_attributes"]
 
 
+async def test_sensor_options_normalizes_string_device_class(
+    hass: HomeAssistant,
+    sensor_entry: ConfigEntry,
+) -> None:
+    """Expose state-class choices for a string-valued sensor device class.
+
+    Args:
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        sensor_entry (ConfigEntry): Sensor config entry whose options flow is under test.
+    """
+    result = await hass.config_entries.options.async_init(sensor_entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={"next_step_id": "sensor_options"},
+    )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            CONF_DEVICE_CLASS: SensorDeviceClass.TEMPERATURE.value,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+            CONF_EXCLUDE_FROM_RECORDER: False,
+        },
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "sensor_options_page_2"
+    data_schema = result["data_schema"]
+    assert data_schema is not None
+    state_class_selector = next(
+        value
+        for key, value in data_schema.schema.items()
+        if getattr(key, "schema", key) == CONF_STATE_CLASS
+    )
+    state_class_options = state_class_selector.config["options"]
+    assert state_class_options[0] == {"label": "None", "value": "None"}
+    assert {(option["label"], option["value"]) for option in state_class_options[1:]} == {
+        ("MEASUREMENT", "measurement")
+    }
+
+
+async def test_sensor_pages_use_identical_monetary_unit_options(
+    hass: HomeAssistant,
+    sensor_entry: ConfigEntry,
+) -> None:
+    """Expose the same labeled currency choices in add and options flows.
+
+    Args:
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        sensor_entry (ConfigEntry): Sensor config entry whose options flow is under test.
+    """
+    add_flow = VariableConfigFlow()
+    add_flow.hass = hass
+    add_flow.add_sensor_input = {
+        CONF_VARIABLE_ID: "monetary_parity",
+        CONF_DEVICE_CLASS: SensorDeviceClass.MONETARY.name,
+    }
+    add_schema = add_flow.build_add_sensor_page_2()
+    add_unit_selector = next(
+        value
+        for key, value in add_schema.schema.items()
+        if getattr(key, "schema", key) == CONF_UNIT_OF_MEASUREMENT
+    )
+
+    result = await hass.config_entries.options.async_init(sensor_entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={"next_step_id": "sensor_options"},
+    )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            CONF_DEVICE_CLASS: SensorDeviceClass.MONETARY.value,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+            CONF_EXCLUDE_FROM_RECORDER: False,
+        },
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    data_schema = result["data_schema"]
+    assert data_schema is not None
+    options_unit_selector = next(
+        value
+        for key, value in data_schema.schema.items()
+        if getattr(key, "schema", key) == CONF_UNIT_OF_MEASUREMENT
+    )
+    assert options_unit_selector.config["options"] == add_unit_selector.config["options"]
+    assert {"label": "US Dollar [USD]", "value": "USD"} in add_unit_selector.config["options"]
+
+
 async def test_binary_sensor_options_update_entry_and_live_entity(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,
@@ -669,8 +920,8 @@ async def test_binary_sensor_options_update_entry_and_live_entity(
     """Persist binary sensor options and reload its state and attributes.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config_entry_factory: Factory that creates the binary-sensor config entry.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the binary-sensor config entry.
     """
     entry = config_entry_factory(
         {
@@ -725,8 +976,8 @@ async def test_device_tracker_options_update_entry_and_live_entity(
     """Persist tracker options and reload its coordinates and attributes.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config_entry_factory: Factory that creates the device-tracker config entry.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the device-tracker config entry.
     """
     entry = config_entry_factory(
         {
@@ -793,8 +1044,8 @@ async def test_binary_sensor_options_flow_changes_live_entity(
     """Change binary state and attributes through the options workflow.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config_entry_factory: Factory that creates the binary-sensor config entry.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the binary-sensor config entry.
     """
     entry = config_entry_factory(
         {
@@ -837,8 +1088,8 @@ async def test_device_tracker_options_flow_changes_live_entity(
     """Change tracker coordinates and metadata through the options workflow.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config_entry_factory: Factory that creates the device-tracker config entry.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the device-tracker config entry.
     """
     entry = config_entry_factory(
         {
@@ -893,8 +1144,8 @@ async def test_device_options_flow_updates_registry_metadata(
     """Persist device options and update the existing registry record.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config_entry_factory: Factory that creates the device config entry.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the device config entry.
     """
     entry = config_entry_factory(
         {
@@ -939,8 +1190,8 @@ async def test_device_options_invalid_url_preserves_entry_and_registry(
     """Keep device data unchanged when its options URL is invalid.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config_entry_factory: Factory that creates the device config entry.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the device config entry.
     """
     entry = config_entry_factory(
         {
