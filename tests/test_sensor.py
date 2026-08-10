@@ -18,6 +18,7 @@ from custom_components.variable.const import (
     CONF_FORCE_UPDATE,
     CONF_RESTORE,
     CONF_VALUE,
+    CONF_VALUE_TYPE,
     CONF_VARIABLE_ID,
     CONF_YAML_VARIABLE,
     DOMAIN,
@@ -318,3 +319,136 @@ async def test_sensor_entity_service_updates_state_and_attributes(
     assert state.state == "19"
     assert state.attributes["service_marker"] is True
     assert "source" not in state.attributes
+
+
+async def test_update_sensor_merges_nested_attributes_by_default(
+    hass: HomeAssistant,
+    sensor_entry: ConfigEntry,
+) -> None:
+    """Merge nested attribute paths without replacing existing attributes.
+
+    Args:
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        sensor_entry (ConfigEntry): Loaded sensor config entry to update.
+    """
+    assert await hass.config_entries.async_setup(sensor_entry.entry_id)
+    await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_UPDATE_SENSOR,
+        {
+            "entity_id": ["sensor.office_temperature"],
+            CONF_VALUE: 22,
+            ATTR_ATTRIBUTES: {"nested.key": "added"},
+        },
+        blocking=True,
+    )
+
+    state = hass.states.get("sensor.office_temperature")
+    assert state is not None
+    assert state.state == "22"
+    assert state.attributes["source"] == "test"
+    assert state.attributes["nested"] == {"key": "added"}
+
+
+async def test_update_sensor_rejects_incompatible_typed_value(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Reject typed sensor updates that cannot convert to the configured type.
+
+    Args:
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+    """
+    entity_id = "sensor.date_guard"
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.SENSOR,
+            CONF_VARIABLE_ID: "date_guard",
+            CONF_VALUE: "2026-08-10",
+            CONF_VALUE_TYPE: "date",
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    with pytest.raises(ValueError, match="not compatible with the selected device_class"):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_UPDATE_SENSOR,
+            {
+                "entity_id": [entity_id],
+                CONF_VALUE: "not-a-date",
+            },
+            blocking=True,
+        )
+
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.state == "2026-08-10"
+
+
+async def test_increment_from_none_uses_zero_baseline(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Treat a missing native value as zero before incrementing.
+
+    Args:
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+    """
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.SENSOR,
+            CONF_VARIABLE_ID: "none_counter",
+            CONF_VALUE: None,
+            CONF_VALUE_TYPE: "number",
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_INCREMENT_SENSOR,
+        {"entity_id": ["sensor.none_counter"], ATTR_VALUE_DELTA: 2},
+        blocking=True,
+    )
+    state = hass.states.get("sensor.none_counter")
+    assert state is not None
+    assert state.state == "2"
+
+
+async def test_increment_converts_numeric_string_native_value(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Convert a numeric string native value before applying an increment.
+
+    Args:
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+    """
+    entry = config_entry_factory(
+        {
+            CONF_VARIABLE_ID: "string_counter",
+            CONF_VALUE: 1,
+            CONF_VALUE_TYPE: "number",
+        }
+    )
+    sensor = Variable(hass, dict(entry.data), entry, entry.entry_id)
+    sensor._attr_native_value = "3.5"
+    sensor.async_write_ha_state = lambda: None  # type: ignore[method-assign]
+
+    await sensor.async_increment_variable(**{ATTR_VALUE_DELTA: 1.5})
+
+    assert sensor._attr_native_value == 5.0

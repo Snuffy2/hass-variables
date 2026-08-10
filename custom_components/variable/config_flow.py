@@ -1108,9 +1108,10 @@ class VariableOptionsFlowHandler(OptionsFlow):
                     CONF_ENTITY_ID: [entity_id],
                     ATTR_REPLACE_ATTRIBUTES: True,
                 }
-                if user_input.get(ATTR_LATITUDE):
+                # Preserve zero coordinates/levels; truthy checks would drop them.
+                if user_input.get(ATTR_LATITUDE) is not None:
                     update_variable.update({ATTR_LATITUDE: user_input.get(ATTR_LATITUDE)})
-                if user_input.get(ATTR_LONGITUDE):
+                if user_input.get(ATTR_LONGITUDE) is not None:
                     update_variable.update({ATTR_LONGITUDE: user_input.get(ATTR_LONGITUDE)})
                 if user_input.get(ATTR_LOCATION_NAME):
                     update_variable.update({ATTR_LOCATION_NAME: user_input.get(ATTR_LOCATION_NAME)})
@@ -1118,9 +1119,9 @@ class VariableOptionsFlowHandler(OptionsFlow):
                     update_variable.update(
                         {ATTR_DELETE_LOCATION_NAME: user_input.get(ATTR_DELETE_LOCATION_NAME)}
                     )
-                if user_input.get(ATTR_GPS_ACCURACY):
+                if user_input.get(ATTR_GPS_ACCURACY) is not None:
                     update_variable.update({ATTR_GPS_ACCURACY: user_input.get(ATTR_GPS_ACCURACY)})
-                if user_input.get(ATTR_BATTERY_LEVEL):
+                if user_input.get(ATTR_BATTERY_LEVEL) is not None:
                     update_variable.update({ATTR_BATTERY_LEVEL: user_input.get(ATTR_BATTERY_LEVEL)})
                 update_variable.update({ATTR_ATTRIBUTES: user_input.get(ATTR_ATTRIBUTES)})
                 _LOGGER.debug("[Change Device Tracker Value] update_variable: %s", update_variable)

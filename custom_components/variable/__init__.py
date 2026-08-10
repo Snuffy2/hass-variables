@@ -156,9 +156,10 @@ async def async_setup(hass: HomeAssistant, config: ConfigType):
             CONF_ENTITY_ID: [var_ent],
             ATTR_REPLACE_ATTRIBUTES: call.data.get(ATTR_REPLACE_ATTRIBUTES, False),
         }
-        if call.data.get(ATTR_VALUE):
+        # Use membership checks so falsy values like 0 are still forwarded.
+        if ATTR_VALUE in call.data:
             update_sensor_data.update({ATTR_VALUE: call.data.get(ATTR_VALUE)})
-        if call.data.get(ATTR_ATTRIBUTES):
+        if ATTR_ATTRIBUTES in call.data:
             update_sensor_data.update({ATTR_ATTRIBUTES: call.data.get(ATTR_ATTRIBUTES)})
         _LOGGER.debug(f"[async_set_legacy_service] update_sensor_data: {update_sensor_data}")
         await hass.services.async_call(
