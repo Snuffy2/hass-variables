@@ -15,6 +15,7 @@ from homeassistant.helpers import device_registry as dr
 import pytest
 from pytest_homeassistant_custom_component.common import mock_restore_cache
 
+from custom_components.variable.binary_sensor import Variable
 from custom_components.variable.const import (
     ATTR_ATTRIBUTES,
     ATTR_REPLACE_ATTRIBUTES,
@@ -182,30 +183,22 @@ async def test_binary_sensor_toggle_service(
     ("value", "expected_state"),
     [
         pytest.param("true", STATE_ON, id="true"),
-        pytest.param("1", STATE_ON, id="one"),
-        pytest.param("yes", STATE_ON, id="yes"),
-        pytest.param("on", STATE_ON, id="on"),
         pytest.param("false", STATE_OFF, id="false"),
-        pytest.param("0", STATE_OFF, id="zero"),
-        pytest.param("none", STATE_UNKNOWN, id="none"),
-        pytest.param("unavailable", STATE_UNKNOWN, id="unavailable"),
-        pytest.param(None, STATE_UNKNOWN, id="null"),
-        pytest.param(True, STATE_ON, id="bool-true"),
-        pytest.param(False, STATE_OFF, id="bool-false"),
+        pytest.param("None", STATE_UNKNOWN, id="none"),
     ],
 )
-async def test_update_binary_sensor_value_coercion_matrix(
+async def test_update_binary_sensor_service_value_and_attribute_merge(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,
-    value: str | bool | None,
+    value: str,
     expected_state: str,
 ) -> None:
-    """Coerce update_binary_sensor values across supported truthy aliases.
+    """Apply allowed update_binary_sensor values while merging attributes.
 
     Args:
         hass (HomeAssistant): Home Assistant test instance.
         config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
-        value (str | bool | None): Service payload value to coerce.
+        value (str): Service payload value allowed by the entity-service schema.
         expected_state (str): Expected public binary state after the update.
     """
     entry = config_entry_factory(
@@ -229,7 +222,7 @@ async def test_update_binary_sensor_value_coercion_matrix(
         {
             "entity_id": [entity_id],
             CONF_VALUE: value,
-            ATTR_ATTRIBUTES: {"source": "coerced"},
+            ATTR_ATTRIBUTES: {"merged": True},
             ATTR_REPLACE_ATTRIBUTES: False,
         },
         blocking=True,
@@ -238,4 +231,46 @@ async def test_update_binary_sensor_value_coercion_matrix(
     state = hass.states.get(entity_id)
     assert state is not None
     assert state.state == expected_state
-    assert state.attributes["source"] == "coerced"
+    assert state.attributes["source"] == "initial"
+    assert state.attributes["merged"] is True
+
+
+@pytest.mark.parametrize(
+    ("value", "expected_is_on"),
+    [
+        pytest.param("1", True, id="one"),
+        pytest.param("yes", True, id="yes"),
+        pytest.param("on", True, id="on"),
+        pytest.param("0", False, id="zero"),
+        pytest.param("unavailable", None, id="unavailable"),
+        pytest.param(True, True, id="bool-true"),
+        pytest.param(False, False, id="bool-false"),
+        pytest.param(None, None, id="null"),
+    ],
+)
+async def test_update_binary_sensor_value_coercion_aliases(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+    value: str | bool | None,
+    expected_is_on: bool | None,
+) -> None:
+    """Coerce direct update payloads across aliases outside the service schema.
+
+    Args:
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+        value (str | bool | None): Update payload value to coerce.
+        expected_is_on (bool | None): Expected internal binary state after the update.
+    """
+    entry = config_entry_factory(
+        {
+            CONF_VARIABLE_ID: "alias_binary",
+            CONF_VALUE: "false",
+        }
+    )
+    binary_sensor = Variable(hass, dict(entry.data), entry, entry.entry_id)
+    binary_sensor.async_write_ha_state = lambda: None  # type: ignore[method-assign]
+
+    await binary_sensor.async_update_variable(**{CONF_VALUE: value})
+
+    assert binary_sensor.is_on is expected_is_on

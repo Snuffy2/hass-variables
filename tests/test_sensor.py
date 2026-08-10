@@ -340,7 +340,7 @@ async def test_update_sensor_merges_nested_attributes_by_default(
         {
             "entity_id": ["sensor.office_temperature"],
             CONF_VALUE: 22,
-            ATTR_ATTRIBUTES: {"nested.key": "added"},
+            ATTR_ATTRIBUTES: {"nested[key]": "added", "marker": "merged"},
         },
         blocking=True,
     )
@@ -349,6 +349,7 @@ async def test_update_sensor_merges_nested_attributes_by_default(
     assert state is not None
     assert state.state == "22"
     assert state.attributes["source"] == "test"
+    assert state.attributes["marker"] == "merged"
     assert state.attributes["nested"] == {"key": "added"}
 
 
