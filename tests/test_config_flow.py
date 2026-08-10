@@ -1137,6 +1137,62 @@ async def test_device_tracker_options_flow_changes_live_entity(
     assert state.attributes["source"] == "tracker-options"
 
 
+async def test_change_device_tracker_value_accepts_zero_coordinates(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Preserve zero latitude/longitude and zero battery/accuracy from options.
+
+    Args:
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the device-tracker config entry.
+    """
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.DEVICE_TRACKER,
+            CONF_VARIABLE_ID: "zero_tracker",
+            CONF_NAME: "Zero Tracker",
+            CONF_YAML_VARIABLE: False,
+            ATTR_LATITUDE: 40.0,
+            ATTR_LONGITUDE: -75.0,
+            ATTR_GPS_ACCURACY: 10,
+            ATTR_BATTERY_LEVEL: 80,
+            "restore": False,
+            "force_update": False,
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={"next_step_id": "change_device_tracker_value"},
+    )
+    assert result["type"] is FlowResultType.FORM
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            ATTR_LATITUDE: 0.0,
+            ATTR_LONGITUDE: 0.0,
+            ATTR_GPS_ACCURACY: 0,
+            ATTR_BATTERY_LEVEL: 0,
+            "attributes": {"source": "zero-options"},
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "value_changed"
+    state = hass.states.get("device_tracker.zero_tracker")
+    assert state is not None
+    assert state.attributes[ATTR_LATITUDE] == 0.0
+    assert state.attributes[ATTR_LONGITUDE] == 0.0
+    assert state.attributes[ATTR_GPS_ACCURACY] == 0
+    assert state.attributes[ATTR_BATTERY_LEVEL] == 0
+    assert state.attributes["source"] == "zero-options"
+
+
 async def test_device_options_flow_updates_registry_metadata(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,

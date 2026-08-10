@@ -118,6 +118,12 @@ def test_set_nested_attribute_deep_copies_assigned_value() -> None:
             "Expected mapping",
             id="wrong-root-container",
         ),
+        pytest.param(
+            {},
+            "[0]",
+            "Expected list",
+            id="list-index-on-mapping-root",
+        ),
     ],
 )
 def test_set_nested_attribute_rejects_invalid_paths(

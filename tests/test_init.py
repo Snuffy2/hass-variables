@@ -27,6 +27,10 @@ from homeassistant.setup import async_setup_component
 import pytest
 
 from custom_components.variable.const import (
+    ATTR_ATTRIBUTES,
+    ATTR_ENTITY,
+    ATTR_REPLACE_ATTRIBUTES,
+    ATTR_VARIABLE,
     CONF_ATTRIBUTES,
     CONF_ENTITY_PLATFORM,
     CONF_EXCLUDE_FROM_RECORDER,
@@ -971,7 +975,7 @@ def test_async_remove_helper_devices_fallback_maps_keyword_arguments(
     ) -> None:
         stale_calls.append((helper_config_entry_id, source_device_id))
 
-    import homeassistant.helpers.helper_integration as helper_integration
+    from homeassistant.helpers import helper_integration
 
     variable_module = importlib.import_module("custom_components.variable")
 
@@ -1012,3 +1016,108 @@ async def test_remove_entry_cleans_up_entity_registry(
     await hass.async_block_till_done()
 
     assert er.async_get(hass).async_get("sensor.office_temperature") is None
+
+
+async def test_legacy_set_variable_and_set_entity_update_sensor(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Route legacy set_variable/set_entity calls through update_sensor.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config_entry_factory: Factory that creates the sensor config entry.
+    """
+    assert await async_setup_component(hass, DOMAIN, {DOMAIN: {}})
+    await hass.async_block_till_done()
+
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.SENSOR,
+            CONF_VARIABLE_ID: "legacy_counter",
+            CONF_VALUE: 5,
+            CONF_VALUE_TYPE: "number",
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+            CONF_ATTRIBUTES: {"source": "initial"},
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        DOMAIN,
+        "set_variable",
+        {
+            ATTR_VARIABLE: "legacy_counter",
+            CONF_VALUE: 0,
+            ATTR_ATTRIBUTES: {"source": "set_variable"},
+            ATTR_REPLACE_ATTRIBUTES: True,
+        },
+        blocking=True,
+    )
+    set_variable_state = hass.states.get("sensor.legacy_counter")
+    assert set_variable_state is not None
+    assert set_variable_state.state == "0"
+    assert set_variable_state.attributes["source"] == "set_variable"
+
+    await hass.services.async_call(
+        DOMAIN,
+        "set_entity",
+        {
+            ATTR_ENTITY: "sensor.legacy_counter",
+            CONF_VALUE: 3,
+            ATTR_ATTRIBUTES: {"merged": True},
+            ATTR_REPLACE_ATTRIBUTES: False,
+        },
+        blocking=True,
+    )
+    set_entity_state = hass.states.get("sensor.legacy_counter")
+    assert set_entity_state is not None
+    assert set_entity_state.state == "3"
+    assert set_entity_state.attributes["source"] == "set_variable"
+    assert set_entity_state.attributes["merged"] is True
+
+
+async def test_legacy_set_entity_rejects_invalid_entity(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Ignore invalid set_entity targets without mutating existing sensors.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        config_entry_factory: Factory that creates the sensor config entry.
+        caplog: Pytest fixture capturing log output.
+    """
+    assert await async_setup_component(hass, DOMAIN, {DOMAIN: {}})
+    await hass.async_block_till_done()
+
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.SENSOR,
+            CONF_VARIABLE_ID: "legacy_guard",
+            CONF_VALUE: 11,
+            CONF_VALUE_TYPE: "number",
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    with caplog.at_level("ERROR"):
+        await hass.services.async_call(
+            DOMAIN,
+            "set_entity",
+            {ATTR_ENTITY: "", CONF_VALUE: 99},
+            blocking=True,
+        )
+
+    state = hass.states.get("sensor.legacy_guard")
+    assert state is not None
+    assert state.state == "11"
+    assert "set_entity legacy service called without valid 'entity' string" in caplog.text
