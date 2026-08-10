@@ -975,7 +975,7 @@ def test_async_remove_helper_devices_fallback_maps_keyword_arguments(
     ) -> None:
         stale_calls.append((helper_config_entry_id, source_device_id))
 
-    import homeassistant.helpers.helper_integration as helper_integration
+    from homeassistant.helpers import helper_integration
 
     variable_module = importlib.import_module("custom_components.variable")
 

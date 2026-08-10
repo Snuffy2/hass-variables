@@ -251,6 +251,7 @@ async def test_update_binary_sensor_service_value_and_attribute_merge(
 async def test_update_binary_sensor_value_coercion_aliases(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,
+    monkeypatch: pytest.MonkeyPatch,
     value: str | bool | None,
     expected_is_on: bool | None,
 ) -> None:
@@ -259,6 +260,7 @@ async def test_update_binary_sensor_value_coercion_aliases(
     Args:
         hass (HomeAssistant): Home Assistant test instance.
         config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+        monkeypatch (pytest.MonkeyPatch): Pytest fixture for replacing the state writer.
         value (str | bool | None): Update payload value to coerce.
         expected_is_on (bool | None): Expected internal binary state after the update.
     """
@@ -269,7 +271,7 @@ async def test_update_binary_sensor_value_coercion_aliases(
         }
     )
     binary_sensor = Variable(hass, dict(entry.data), entry, entry.entry_id)
-    binary_sensor.async_write_ha_state = lambda: None  # type: ignore[method-assign]
+    monkeypatch.setattr(Variable, "async_write_ha_state", lambda self: None)
 
     await binary_sensor.async_update_variable(**{CONF_VALUE: value})
 

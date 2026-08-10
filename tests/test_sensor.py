@@ -470,12 +470,14 @@ async def test_increment_from_none_uses_zero_baseline(
 async def test_increment_converts_numeric_string_native_value(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Convert a numeric string native value before applying an increment.
 
     Args:
         hass (HomeAssistant): Home Assistant test instance.
         config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+        monkeypatch (pytest.MonkeyPatch): Pytest fixture for replacing the state writer.
     """
     entry = config_entry_factory(
         {
@@ -486,8 +488,10 @@ async def test_increment_converts_numeric_string_native_value(
     )
     sensor = Variable(hass, dict(entry.data), entry, entry.entry_id)
     sensor._attr_native_value = "3.5"
-    sensor.async_write_ha_state = lambda: None  # type: ignore[method-assign]
+    monkeypatch.setattr(Variable, "async_write_ha_state", lambda self: None)
 
-    await sensor.async_increment_variable(**{ATTR_VALUE_DELTA: 1.5})
+    await sensor.async_increment_variable(**{ATTR_VALUE_DELTA: 1.25})
 
-    assert sensor._attr_native_value == 5.0
+    native_value = sensor._attr_native_value
+    assert isinstance(native_value, float)
+    assert native_value == 4.75
