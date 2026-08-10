@@ -340,7 +340,10 @@ async def test_update_sensor_merges_nested_attributes_by_default(
         {
             "entity_id": ["sensor.office_temperature"],
             CONF_VALUE: 22,
-            ATTR_ATTRIBUTES: {"nested[key]": "added", "marker": "merged"},
+            ATTR_ATTRIBUTES: {
+                "marker": "merged",
+                "items[0].name": "nested",
+            },
         },
         blocking=True,
     )
@@ -350,7 +353,42 @@ async def test_update_sensor_merges_nested_attributes_by_default(
     assert state.state == "22"
     assert state.attributes["source"] == "test"
     assert state.attributes["marker"] == "merged"
-    assert state.attributes["nested"] == {"key": "added"}
+    assert state.attributes["items"] == [{"name": "nested"}]
+
+
+async def test_update_sensor_swallows_invalid_attribute_paths(
+    hass: HomeAssistant,
+    sensor_entry: ConfigEntry,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Keep prior attributes and still update value when a nested path is invalid.
+
+    Args:
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        sensor_entry (ConfigEntry): Loaded sensor config entry to update.
+        caplog (pytest.LogCaptureFixture): Pytest fixture capturing log output.
+    """
+    assert await hass.config_entries.async_setup(sensor_entry.entry_id)
+    await hass.async_block_till_done()
+
+    with caplog.at_level("ERROR"):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_UPDATE_SENSOR,
+            {
+                "entity_id": ["sensor.office_temperature"],
+                CONF_VALUE: 18,
+                ATTR_ATTRIBUTES: {"broken[path": "ignored"},
+            },
+            blocking=True,
+        )
+
+    state = hass.states.get("sensor.office_temperature")
+    assert state is not None
+    assert state.state == "18"
+    assert state.attributes["source"] == "test"
+    assert "broken[path" not in state.attributes
+    assert "AttributeError: Invalid attribute path" in caplog.text
 
 
 async def test_update_sensor_rejects_incompatible_typed_value(
