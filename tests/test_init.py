@@ -434,7 +434,7 @@ async def test_yaml_reload_removes_duplicate_yaml_entries(
         pytest.param(
             "yaml_timestamp",
             {
-                CONF_VALUE: "2026-08-11 12:00:00+0000",
+                CONF_VALUE: datetime.datetime(2026, 8, 11, 12, 0, tzinfo=datetime.UTC),
                 CONF_ATTRIBUTES: {"device_class": "timestamp"},
             },
             "sensor.yaml_timestamp",

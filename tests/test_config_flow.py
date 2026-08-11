@@ -728,7 +728,7 @@ async def test_options_flow_rejects_invalid_typed_sensor_value(
 @pytest.mark.parametrize(
     ("tz_offset", "expected_state"),
     [
-        pytest.param("+0530", "2026-08-11T12:00:00+05:30", id="explicit-offset"),
+        pytest.param("+0530", "2026-08-11T06:30:00+00:00", id="explicit-offset"),
         pytest.param("bad", "2026-08-11T12:00:00+00:00", id="invalid-falls-back-utc"),
         pytest.param(None, "2026-08-11T12:00:00+00:00", id="missing-falls-back-utc"),
     ],
