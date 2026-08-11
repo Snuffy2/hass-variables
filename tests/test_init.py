@@ -431,6 +431,28 @@ async def test_yaml_reload_removes_duplicate_yaml_entries(
             "string",
             id="enum",
         ),
+        pytest.param(
+            "yaml_timestamp",
+            {
+                CONF_VALUE: "2026-08-11 12:00:00+0000",
+                CONF_ATTRIBUTES: {"device_class": "timestamp"},
+            },
+            "sensor.yaml_timestamp",
+            "2026-08-11T12:00:00+00:00",
+            "datetime",
+            id="timestamp",
+        ),
+        pytest.param(
+            "yaml_temperature",
+            {
+                CONF_VALUE: 21.5,
+                CONF_ATTRIBUTES: {"device_class": "temperature"},
+            },
+            "sensor.yaml_temperature",
+            "21.5",
+            "number",
+            id="temperature",
+        ),
     ],
 )
 async def test_yaml_reload_creates_entities_before_service_returns(
@@ -1121,3 +1143,175 @@ async def test_legacy_set_entity_rejects_invalid_entity(
     assert state is not None
     assert state.state == "11"
     assert "set_entity legacy service called without valid 'entity' string" in caplog.text
+
+
+async def test_yaml_reload_exits_when_yaml_config_unavailable(
+    hass: HomeAssistant,
+) -> None:
+    """Leave existing YAML entities unchanged when reload YAML is unavailable.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+    """
+    variable_id = "yaml_reload_missing"
+    initial_config = {
+        DOMAIN: {
+            variable_id: {
+                CONF_VALUE: "kept",
+                CONF_RESTORE: False,
+                CONF_ATTRIBUTES: {"source": "initial"},
+            }
+        }
+    }
+    assert await async_setup_component(hass, DOMAIN, initial_config)
+    await hass.async_block_till_done()
+
+    entry = next(
+        config_entry
+        for config_entry in hass.config_entries.async_entries(DOMAIN)
+        if config_entry.data.get(CONF_VARIABLE_ID) == variable_id
+    )
+    previous_data = dict(entry.data)
+    entity_id = f"sensor.{variable_id}"
+    initial_state = hass.states.get(entity_id)
+    assert initial_state is not None
+    assert initial_state.state == "kept"
+
+    with patch(
+        "custom_components.variable.async_integration_yaml_config",
+        new=AsyncMock(return_value=None),
+    ):
+        await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
+
+    current_entry = hass.config_entries.async_get_entry(entry.entry_id)
+    assert current_entry is not None
+    assert dict(current_entry.data) == previous_data
+    current_state = hass.states.get(entity_id)
+    assert current_state is not None
+    assert current_state.state == "kept"
+    assert current_state.attributes["source"] == "initial"
+
+
+@pytest.mark.parametrize(
+    ("rollback_failure", "log_fragment"),
+    [
+        pytest.param(
+            False,
+            "Reload returned false",
+            id="reload-false",
+        ),
+        pytest.param(
+            HomeAssistantError("rollback reload rejected"),
+            "Error reloading",
+            id="reload-raises",
+        ),
+    ],
+)
+async def test_yaml_reload_reports_failed_rollback_reload(
+    hass: HomeAssistant,
+    rollback_failure: bool | HomeAssistantError,
+    log_fragment: str,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Restore prior data and log when the rollback reload itself fails.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+        rollback_failure: Second reload outcome that should be logged.
+        log_fragment: Expected log text for the rollback failure mode.
+        caplog: Pytest fixture capturing log output.
+    """
+    variable_id = "yaml_rollback_secondary"
+    initial_config = {
+        DOMAIN: {
+            variable_id: {
+                CONF_VALUE: "accepted",
+                CONF_RESTORE: False,
+                CONF_ATTRIBUTES: {"source": "accepted"},
+            }
+        }
+    }
+    assert await async_setup_component(hass, DOMAIN, initial_config)
+    await hass.async_block_till_done()
+
+    entry = next(
+        config_entry
+        for config_entry in hass.config_entries.async_entries(DOMAIN)
+        if config_entry.data.get(CONF_VARIABLE_ID) == variable_id
+    )
+    previous_data = dict(entry.data)
+    entity_id = f"sensor.{variable_id}"
+    call_count = 0
+
+    async def fail_update_then_rollback(
+        entry_id: str,
+    ) -> bool:
+        """Reject the updated reload, then fail the rollback reload."""
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return False
+        if isinstance(rollback_failure, HomeAssistantError):
+            raise rollback_failure
+        return False
+
+    rejected_config = {
+        DOMAIN: {
+            variable_id: {
+                CONF_VALUE: "rejected",
+                CONF_RESTORE: False,
+                CONF_ATTRIBUTES: {"source": "rejected"},
+            }
+        }
+    }
+    with (
+        patch(
+            "custom_components.variable.async_integration_yaml_config",
+            new=AsyncMock(return_value=rejected_config),
+        ),
+        patch.object(
+            hass.config_entries,
+            "async_reload",
+            new=fail_update_then_rollback,
+        ),
+        caplog.at_level("ERROR"),
+        pytest.raises(HomeAssistantError, match="restored its prior configuration"),
+    ):
+        await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
+
+    assert call_count == 2
+    assert log_fragment in caplog.text
+    current_entry = hass.config_entries.async_get_entry(entry.entry_id)
+    assert current_entry is not None
+    assert dict(current_entry.data) == previous_data
+    recovered_state = hass.states.get(entity_id)
+    assert recovered_state is not None
+    assert recovered_state.state == "accepted"
+
+
+async def test_yaml_setup_drops_none_valued_fields(
+    hass: HomeAssistant,
+) -> None:
+    """Omit YAML keys whose values are explicitly null.
+
+    Args:
+        hass: Home Assistant instance that hosts the integration.
+    """
+    yaml_config = {
+        DOMAIN: {
+            "yaml_null_fields": {
+                CONF_VALUE: 7,
+                CONF_ICON: None,
+                CONF_RESTORE: False,
+                CONF_ATTRIBUTES: {"source": "yaml"},
+            }
+        }
+    }
+
+    assert await async_setup_component(hass, DOMAIN, yaml_config)
+    await hass.async_block_till_done()
+
+    (entry,) = hass.config_entries.async_entries(DOMAIN)
+    assert entry.data[CONF_VALUE] == 7
+    assert CONF_ICON not in entry.data
+    assert entry.data[CONF_ATTRIBUTES] == {"source": "yaml"}

@@ -687,6 +687,111 @@ async def test_options_flow_changes_loaded_sensor_value(
     assert state.attributes["source"] == "options"
 
 
+async def test_options_flow_rejects_invalid_typed_sensor_value(
+    hass: HomeAssistant,
+    sensor_entry: ConfigEntry,
+) -> None:
+    """Redisplay the change-value form when typed conversion fails.
+
+    Args:
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        sensor_entry (ConfigEntry): Loaded numeric sensor config entry to update.
+    """
+    assert await hass.config_entries.async_setup(sensor_entry.entry_id)
+    await hass.async_block_till_done()
+    original_state = hass.states.get("sensor.office_temperature")
+    assert original_state is not None
+    original_value = original_state.state
+
+    result = await hass.config_entries.options.async_init(sensor_entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={"next_step_id": "change_sensor_value"},
+    )
+    assert result["type"] is FlowResultType.FORM
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={CONF_VALUE: "not-a-number", "attributes": {"source": "bad"}},
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "change_sensor_value"
+    assert result["errors"] == {"base": "invalid_value_type"}
+    state = hass.states.get("sensor.office_temperature")
+    assert state is not None
+    assert state.state == original_value
+    assert state.attributes["source"] == "test"
+
+
+@pytest.mark.parametrize(
+    ("tz_offset", "expected_state"),
+    [
+        pytest.param("+0530", "2026-08-11T12:00:00+05:30", id="explicit-offset"),
+        pytest.param("bad", "2026-08-11T12:00:00+00:00", id="invalid-falls-back-utc"),
+        pytest.param(None, "2026-08-11T12:00:00+00:00", id="missing-falls-back-utc"),
+    ],
+)
+async def test_options_flow_change_sensor_value_applies_timezone_offset(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+    tz_offset: str | None,
+    expected_state: str,
+) -> None:
+    """Append a valid timezone offset or default UTC when updating datetimes.
+
+    Args:
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the config entry.
+        tz_offset (str | None): Submitted timezone offset, or None when omitted.
+        expected_state (str): Expected ISO datetime state after conversion.
+    """
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.SENSOR,
+            CONF_VARIABLE_ID: "timestamp_options",
+            CONF_YAML_VARIABLE: False,
+            CONF_NAME: "Timestamp Options",
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+            CONF_VALUE: "2026-08-10 00:00:00+0000",
+            CONF_VALUE_TYPE: "datetime",
+            CONF_DEVICE_CLASS: SensorDeviceClass.TIMESTAMP,
+            CONF_ATTRIBUTES: {"source": "initial"},
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={"next_step_id": "change_sensor_value"},
+    )
+    assert result["type"] is FlowResultType.FORM
+
+    user_input: dict[str, Any] = {
+        CONF_VALUE: "2026-08-11 12:00:00",
+        "attributes": {"source": "options"},
+    }
+    if tz_offset is not None:
+        user_input[CONF_TZOFFSET] = tz_offset
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input=user_input,
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "value_changed"
+    state = hass.states.get("sensor.timestamp_options")
+    assert state is not None
+    assert state.state == expected_state
+    assert state.attributes["source"] == "options"
+
+
 @pytest.mark.parametrize(
     ("entry_data", "entity_id", "step_id", "user_input"),
     [

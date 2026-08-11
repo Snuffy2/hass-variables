@@ -66,6 +66,18 @@ def test_set_nested_attribute_creates_and_expands_containers() -> None:
             {"node": [{"value": "new"}]},
             id="scalar-list-item-replaced-with-mapping",
         ),
+        pytest.param(
+            {"node": "scalar"},
+            "node.child",
+            {"node": {"child": "new"}},
+            id="scalar-replaced-with-mapping",
+        ),
+        pytest.param(
+            {"node": [["keep"]]},
+            "node[0][1]",
+            {"node": [["keep", "new"]]},
+            id="existing-nested-list-reused",
+        ),
     ],
 )
 def test_set_nested_attribute_replaces_incompatible_containers(

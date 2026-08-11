@@ -68,6 +68,40 @@ async def test_binary_sensor_restore_cache_is_applied_during_config_entry_setup(
     assert state.attributes["source"] == restored_attributes["source"]
 
 
+async def test_binary_sensor_empty_restore_uses_config_attributes(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Apply configured attributes when the restore cache has none.
+
+    Args:
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+    """
+    entity_id = "binary_sensor.empty_restored_binary"
+    mock_restore_cache(hass, [State(entity_id, STATE_UNKNOWN, {})])
+    configured_attributes = {"source": "config-fallback"}
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.BINARY_SENSOR,
+            CONF_VARIABLE_ID: "empty_restored_binary",
+            CONF_VALUE: "false",
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: True,
+            CONF_FORCE_UPDATE: False,
+            CONF_ATTRIBUTES: configured_attributes,
+        }
+    )
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.state == STATE_UNKNOWN
+    assert state.attributes["source"] == "config-fallback"
+
+
 async def test_device_linked_binary_sensor_name_is_not_prefixed_again_after_reload(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,
