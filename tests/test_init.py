@@ -22,7 +22,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import entity_registry as er, helper_integration
 from homeassistant.setup import async_setup_component
 import pytest
 
@@ -53,7 +53,7 @@ async def test_yaml_explicit_name_precedes_friendly_name_attribute(
     """Prefer an explicit name and omit the friendly-name attribute.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
     """
     yaml_config = {
         DOMAIN: {
@@ -81,7 +81,7 @@ async def test_yaml_setup_and_reload_manage_config_entries(
     """Create, update, and remove YAML variables through Home Assistant APIs.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
     """
     initial_config = {
         DOMAIN: {
@@ -157,10 +157,10 @@ async def test_yaml_reload_rolls_back_when_config_entry_reload_fails(
     """Restore config-entry data and live state after a failed YAML update.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        failed_lifecycle_method: Integration lifecycle method that rejects the
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        failed_lifecycle_method (str): Integration lifecycle method that rejects the
             first config-entry reload.
-        expected_call_count: Lifecycle calls expected after rollback recovery.
+        expected_call_count (int): Lifecycle calls expected after rollback recovery.
     """
     variable_id = "yaml_rollback"
     initial_config = {
@@ -193,7 +193,15 @@ async def test_yaml_reload_rolls_back_when_config_entry_reload_fails(
     async def fail_first_lifecycle_call(
         lifecycle_hass: HomeAssistant, lifecycle_entry: ConfigEntry
     ) -> bool:
-        """Reject the update reload, then allow the rollback reload."""
+        """Reject the update reload, then allow the rollback reload.
+
+        Args:
+            lifecycle_hass (HomeAssistant): Home Assistant instance under test.
+            lifecycle_entry (ConfigEntry): Config entry being reloaded.
+
+        Returns:
+            bool: False for the first call, then the real lifecycle result.
+        """
         nonlocal call_count
         call_count += 1
         if call_count == 1:
@@ -246,10 +254,10 @@ async def test_startup_yaml_update_rolls_back_after_background_reload_failure(
     """Recover prior entry data and live state after startup reload failure.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        failed_lifecycle_method: Integration lifecycle method that rejects the
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        failed_lifecycle_method (str): Integration lifecycle method that rejects the
             first background reload.
-        expected_call_count: Lifecycle calls expected after rollback recovery.
+        expected_call_count (int): Lifecycle calls expected after rollback recovery.
     """
     variable_id = "startup_yaml_rollback"
     initial_config = {
@@ -283,7 +291,15 @@ async def test_startup_yaml_update_rolls_back_after_background_reload_failure(
     async def fail_first_lifecycle_call(
         lifecycle_hass: HomeAssistant, lifecycle_entry: ConfigEntry
     ) -> bool:
-        """Reject the startup update reload, then allow recovery."""
+        """Reject the startup update reload, then allow recovery.
+
+        Args:
+            lifecycle_hass (HomeAssistant): Home Assistant instance under test.
+            lifecycle_entry (ConfigEntry): Config entry being reloaded.
+
+        Returns:
+            bool: False for the first call, then the real lifecycle result.
+        """
         nonlocal call_count
         call_count += 1
         if call_count == 1:
@@ -327,8 +343,8 @@ async def test_yaml_reload_removes_duplicate_yaml_entries(
     """Retain one updated YAML entry and fully remove its duplicate.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config_entry_factory: Factory that creates registered config entries.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates registered config entries.
     """
     assert await async_setup_component(hass, DOMAIN, {DOMAIN: {}})
     entries = [
@@ -466,12 +482,12 @@ async def test_yaml_reload_creates_entities_before_service_returns(
     """Create YAML entities synchronously through the reload service.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        variable_id: YAML variable ID to import.
-        yaml_config: Configuration for the imported YAML variable.
-        entity_id: Expected entity identifier after import.
-        expected_state: Expected state after import.
-        expected_value_type: Expected stored value type, if any.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        variable_id (str): YAML variable ID to import.
+        yaml_config (dict[str, Any]): Configuration for the imported YAML variable.
+        entity_id (str): Expected entity identifier after import.
+        expected_state (str): Expected state after import.
+        expected_value_type (str | None): Expected stored value type, if any.
     """
     assert await async_setup_component(hass, DOMAIN, {DOMAIN: {}})
 
@@ -503,7 +519,7 @@ async def test_concurrent_yaml_reloads_create_one_entry(
     """Serialize concurrent reloads before they snapshot config entries.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
     """
     assert await async_setup_component(hass, DOMAIN, {DOMAIN: {}})
 
@@ -514,7 +530,15 @@ async def test_concurrent_yaml_reloads_create_one_entry(
     original_async_init = hass.config_entries.flow.async_init
 
     async def blocking_async_init(*args: Any, **kwargs: Any) -> Any:
-        """Pause the first import so the second reload overlaps it."""
+        """Pause the first import so the second reload overlaps it.
+
+        Args:
+            args (Any): Positional arguments for the real flow initializer.
+            kwargs (Any): Keyword arguments for the real flow initializer.
+
+        Returns:
+            Any: Result from the real flow initializer.
+        """
         import_started.set()
         await allow_import.wait()
         return await original_async_init(*args, **kwargs)
@@ -562,7 +586,7 @@ async def test_startup_import_and_reload_create_one_entry(
     """Wait for a pending startup import before a reload snapshots entries.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
     """
     variable_id = "startup_overlap"
     yaml_config = {DOMAIN: {variable_id: {CONF_VALUE: "created-once"}}}
@@ -571,7 +595,15 @@ async def test_startup_import_and_reload_create_one_entry(
     original_async_init = hass.config_entries.flow.async_init
 
     async def blocking_async_init(*args: Any, **kwargs: Any) -> Any:
-        """Pause the startup import at the config-entry creation boundary."""
+        """Pause the startup import at the config-entry creation boundary.
+
+        Args:
+            args (Any): Positional arguments for the real flow initializer.
+            kwargs (Any): Keyword arguments for the real flow initializer.
+
+        Returns:
+            Any: Result from the real flow initializer.
+        """
         import_started.set()
         await allow_import.wait()
         return await original_async_init(*args, **kwargs)
@@ -620,14 +652,25 @@ async def test_reload_propagates_pending_startup_import_failure(
     """Fail a reload when the startup lifecycle work it awaits fails.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
     """
     yaml_config = {DOMAIN: {"failed_startup": {CONF_VALUE: "unused"}}}
     import_started = asyncio.Event()
     allow_failure = asyncio.Event()
 
     async def failing_async_init(*args: Any, **kwargs: Any) -> Any:
-        """Pause and then fail the startup import."""
+        """Pause and then fail the startup import.
+
+        Args:
+            args (Any): Positional arguments supplied to the flow initializer.
+            kwargs (Any): Keyword arguments supplied to the flow initializer.
+
+        Returns:
+            Any: This function always raises before returning.
+
+        Raises:
+            RuntimeError: Always, after the test releases the failure gate.
+        """
         import_started.set()
         await allow_failure.wait()
         raise RuntimeError("startup import failed")
@@ -700,10 +743,10 @@ async def test_yaml_reload_removes_omitted_settings(
     """Replace prior YAML data rather than retaining omitted settings.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        initial_config: Initial settings that the later YAML omits.
-        removed_key: Config-entry key expected to be removed on reload.
-        removed_attribute: Entity attribute expected to be removed on reload.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        initial_config (dict[str, Any]): Initial settings that the later YAML omits.
+        removed_key (str | None): Config-entry key expected to be removed on reload.
+        removed_attribute (str | None): Entity attribute expected to be removed on reload.
     """
     variable_id = "yaml_settings"
     assert await async_setup_component(hass, DOMAIN, {DOMAIN: {variable_id: initial_config}})
@@ -734,7 +777,7 @@ async def test_yaml_reload_restores_default_when_restore_is_omitted(
     """Enable state restoration when reloaded YAML omits the restore setting.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
     """
     variable_id = "yaml_restore_default"
     assert await async_setup_component(
@@ -775,9 +818,9 @@ async def test_yaml_reload_does_not_overwrite_ui_created_entry(
     """Leave a UI-created entry unchanged when YAML uses its variable ID.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config_entry_factory: Factory that creates registered config entries.
-        yaml_entry_present: Whether a stale YAML-owned entry also exists.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates registered config entries.
+        yaml_entry_present (bool): Whether a stale YAML-owned entry also exists.
     """
     assert await async_setup_component(hass, DOMAIN, {DOMAIN: {}})
     ui_entry = config_entry_factory(
@@ -898,12 +941,12 @@ async def test_setup_entry_creates_platform_entity(
     """Load a config entry and expose its entity through Home Assistant state.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config_entry_factory: Factory that creates the platform config entry.
-        data: Platform-specific config-entry data to load.
-        entity_id: Expected entity identifier after setup.
-        expected_state: Expected state value for the created entity.
-        expected_attributes: Expected attributes for the created entity.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the platform config entry.
+        data (dict[str, Any]): Platform-specific config-entry data to load.
+        entity_id (str): Expected entity identifier after setup.
+        expected_state (str): Expected state value for the created entity.
+        expected_attributes (dict[str, Any]): Expected attributes for the created entity.
     """
     marker = expected_attributes["marker"]
     entry_data = {
@@ -936,8 +979,8 @@ async def test_unload_entry_removes_active_entity(
     """Unload a platform entry and remove its active entity state.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        sensor_entry: Sensor config entry to set up and unload.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        sensor_entry (ConfigEntry): Sensor config entry to set up and unload.
     """
     assert await hass.config_entries.async_setup(sensor_entry.entry_id)
     await hass.async_block_till_done()
@@ -959,9 +1002,9 @@ async def test_setup_entry_calls_helper_device_cleanup(
     """Call helper device cleanup before forwarding platform setup.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        sensor_entry: Sensor config entry to set up.
-        monkeypatch: Pytest fixture used to stub helper cleanup.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        sensor_entry (ConfigEntry): Sensor config entry to set up.
+        monkeypatch (pytest.MonkeyPatch): Pytest fixture used to stub helper cleanup.
     """
     cleanup = MagicMock()
     monkeypatch.setattr(
@@ -986,7 +1029,7 @@ def test_async_remove_helper_devices_fallback_maps_keyword_arguments(
     """Map the 2026.8 helper cleanup API onto the legacy device helper.
 
     Args:
-        monkeypatch: Pytest fixture used to simulate missing helper APIs.
+        monkeypatch (pytest.MonkeyPatch): Pytest fixture used to simulate missing helper APIs.
     """
     stale_calls: list[tuple[str, str | None]] = []
 
@@ -996,8 +1039,6 @@ def test_async_remove_helper_devices_fallback_maps_keyword_arguments(
         source_device_id: str | None,
     ) -> None:
         stale_calls.append((helper_config_entry_id, source_device_id))
-
-    from homeassistant.helpers import helper_integration
 
     variable_module = importlib.import_module("custom_components.variable")
 
@@ -1014,6 +1055,7 @@ def test_async_remove_helper_devices_fallback_maps_keyword_arguments(
             helper_config_entry_id="entry-1",
             source_device_id="device-1",
             remove_all_devices=True,
+            keep_device_ids={"device-1"},
         )
         assert stale_calls == [("entry-1", "device-1")]
     finally:
@@ -1027,8 +1069,8 @@ async def test_remove_entry_cleans_up_entity_registry(
     """Remove a config entry and clean up its entity registry record.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        sensor_entry: Sensor config entry to set up and remove.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        sensor_entry (ConfigEntry): Sensor config entry to set up and remove.
     """
     assert await hass.config_entries.async_setup(sensor_entry.entry_id)
     await hass.async_block_till_done()
@@ -1047,8 +1089,8 @@ async def test_legacy_set_variable_and_set_entity_update_sensor(
     """Route legacy set_variable/set_entity calls through update_sensor.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config_entry_factory: Factory that creates the sensor config entry.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the sensor config entry.
     """
     assert await async_setup_component(hass, DOMAIN, {DOMAIN: {}})
     await hass.async_block_till_done()
@@ -1110,9 +1152,9 @@ async def test_legacy_set_entity_rejects_invalid_entity(
     """Ignore invalid set_entity targets without mutating existing sensors.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config_entry_factory: Factory that creates the sensor config entry.
-        caplog: Pytest fixture capturing log output.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the sensor config entry.
+        caplog (pytest.LogCaptureFixture): Pytest fixture capturing log output.
     """
     assert await async_setup_component(hass, DOMAIN, {DOMAIN: {}})
     await hass.async_block_till_done()
@@ -1151,7 +1193,7 @@ async def test_yaml_reload_exits_when_yaml_config_unavailable(
     """Leave existing YAML entities unchanged when reload YAML is unavailable.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
     """
     variable_id = "yaml_reload_missing"
     initial_config = {
@@ -1216,10 +1258,10 @@ async def test_yaml_reload_reports_failed_rollback_reload(
     """Restore prior data and log when the rollback reload itself fails.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        rollback_failure: Second reload outcome that should be logged.
-        log_fragment: Expected log text for the rollback failure mode.
-        caplog: Pytest fixture capturing log output.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        rollback_failure (bool | HomeAssistantError): Second reload outcome that should be logged.
+        log_fragment (str): Expected log text for the rollback failure mode.
+        caplog (pytest.LogCaptureFixture): Pytest fixture capturing log output.
     """
     variable_id = "yaml_rollback_secondary"
     initial_config = {
@@ -1246,7 +1288,17 @@ async def test_yaml_reload_reports_failed_rollback_reload(
     async def fail_update_then_rollback(
         entry_id: str,
     ) -> bool:
-        """Reject the updated reload, then fail the rollback reload."""
+        """Reject the updated reload, then fail the rollback reload.
+
+        Args:
+            entry_id (str): Config entry identifier passed by Home Assistant.
+
+        Returns:
+            bool: False when Home Assistant reports a rejected reload.
+
+        Raises:
+            rollback_failure: The parameterized Home Assistant rollback error.
+        """
         nonlocal call_count
         call_count += 1
         if call_count == 1:
@@ -1295,7 +1347,7 @@ async def test_yaml_setup_drops_none_valued_fields(
     """Omit YAML keys whose values are explicitly null.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
     """
     yaml_config = {
         DOMAIN: {
