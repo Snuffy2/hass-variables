@@ -181,7 +181,10 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             update_sensor_data.update({ATTR_VALUE: call.data.get(ATTR_VALUE)})
         if ATTR_ATTRIBUTES in call.data:
             update_sensor_data.update({ATTR_ATTRIBUTES: call.data.get(ATTR_ATTRIBUTES)})
-        _LOGGER.debug("[async_set_legacy_service] update_sensor_data: %s", update_sensor_data)
+        _LOGGER.debug(
+            "[async_set_legacy_service] update fields: %s",
+            sorted(update_sensor_data),
+        )
         await hass.services.async_call(
             DOMAIN, SERVICE_UPDATE_SENSOR, service_data=update_sensor_data
         )
@@ -367,7 +370,6 @@ async def _async_reconcile_yaml(
     for var, var_fields in variables.items():
         if var is not None:
             _LOGGER.debug("[YAML] variable_id: %s", var)
-            _LOGGER.debug("[YAML] var_fields: %s", var_fields)
 
             for key_empty, var_empty in var_fields.copy().items():
                 if var_empty is None:
@@ -549,7 +551,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     Returns:
         bool: Whether the entry unloaded successfully.
     """
-    _LOGGER.info("Unloading: %s", entry.data)
+    _LOGGER.info("Unloading config entry: %s", entry.entry_id)
     # _LOGGER.debug(f"[init async_unload_entry] entry: {entry}")
     hass_data = dict(entry.data)
     unload_ok = False

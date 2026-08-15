@@ -3,10 +3,10 @@
 import asyncio
 import datetime
 import importlib
-from typing import Any
+from typing import Any, NoReturn
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigFlowContext
 from homeassistant.const import (
     ATTR_BATTERY_LEVEL,
     ATTR_GPS_ACCURACY,
@@ -49,30 +49,46 @@ from tests.types import ConfigEntryFactory
 
 async def test_yaml_explicit_name_precedes_friendly_name_attribute(
     hass: HomeAssistant,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Prefer an explicit name and omit the friendly-name attribute.
 
     Args:
         hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        caplog (pytest.LogCaptureFixture): Pytest fixture capturing log output.
     """
     yaml_config = {
         DOMAIN: {
             "named_variable": {
                 CONF_NAME: "Explicit Name",
                 CONF_ATTRIBUTES: {
-                    CONF_FRIENDLY_NAME: "Attribute Name",
+                    CONF_FRIENDLY_NAME: "private-friendly-name",
                     "retained": True,
+                    "private_attribute": "private-attribute-value",
                 },
+                CONF_VALUE: "private-yaml-value",
             }
         }
     }
 
-    assert await async_setup_component(hass, DOMAIN, yaml_config)
+    with caplog.at_level("DEBUG", logger="custom_components.variable"):
+        assert await async_setup_component(hass, DOMAIN, yaml_config)
     await hass.async_block_till_done()
 
     (entry,) = hass.config_entries.async_entries(DOMAIN)
     assert entry.data[CONF_NAME] == "Explicit Name"
-    assert entry.data[CONF_ATTRIBUTES] == {"retained": True}
+    assert entry.data[CONF_ATTRIBUTES] == {
+        "retained": True,
+        "private_attribute": "private-attribute-value",
+    }
+    integration_logs = "\n".join(
+        record.getMessage()
+        for record in caplog.records
+        if record.name == "custom_components.variable"
+    )
+    assert "[YAML] variable_id: named_variable" in integration_logs
+    assert "private-yaml-value" not in integration_logs
+    assert "private-attribute-value" not in integration_logs
 
 
 async def test_yaml_setup_and_reload_manage_config_entries(
@@ -658,15 +674,18 @@ async def test_reload_propagates_pending_startup_import_failure(
     import_started = asyncio.Event()
     allow_failure = asyncio.Event()
 
-    async def failing_async_init(*args: Any, **kwargs: Any) -> Any:
+    async def failing_async_init(
+        handler: str,
+        *,
+        context: ConfigFlowContext | None = None,
+        data: Any = None,
+    ) -> NoReturn:
         """Pause and then fail the startup import.
 
         Args:
-            args (Any): Positional arguments supplied to the flow initializer.
-            kwargs (Any): Keyword arguments supplied to the flow initializer.
-
-        Returns:
-            Any: This function always raises before returning.
+            handler (str): Integration domain that owns the import flow.
+            context (ConfigFlowContext | None): Optional flow initialization context.
+            data (Any): Optional flow initialization data.
 
         Raises:
             RuntimeError: Always, after the test releases the failure gate.
@@ -975,19 +994,30 @@ async def test_setup_entry_creates_platform_entity(
 async def test_unload_entry_removes_active_entity(
     hass: HomeAssistant,
     sensor_entry: ConfigEntry,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Unload a platform entry and remove its active entity state.
 
     Args:
         hass (HomeAssistant): Home Assistant instance that hosts the integration.
         sensor_entry (ConfigEntry): Sensor config entry to set up and unload.
+        caplog (pytest.LogCaptureFixture): Pytest fixture capturing log output.
     """
     assert await hass.config_entries.async_setup(sensor_entry.entry_id)
     await hass.async_block_till_done()
     assert hass.states.get("sensor.office_temperature") is not None
 
-    assert await hass.config_entries.async_unload(sensor_entry.entry_id)
+    caplog.clear()
+    with caplog.at_level("INFO", logger="custom_components.variable"):
+        assert await hass.config_entries.async_unload(sensor_entry.entry_id)
     await hass.async_block_till_done()
+    integration_logs = "\n".join(
+        record.getMessage()
+        for record in caplog.records
+        if record.name == "custom_components.variable"
+    )
+    assert sensor_entry.entry_id in integration_logs
+    assert sensor_entry.data[CONF_VARIABLE_ID] not in integration_logs
 
     unloaded_state = hass.states.get("sensor.office_temperature")
     assert unloaded_state is not None
@@ -1085,12 +1115,14 @@ async def test_remove_entry_cleans_up_entity_registry(
 async def test_legacy_set_variable_and_set_entity_update_sensor(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Route legacy set_variable/set_entity calls through update_sensor.
 
     Args:
         hass (HomeAssistant): Home Assistant instance that hosts the integration.
         config_entry_factory (ConfigEntryFactory): Factory that creates the sensor config entry.
+        caplog (pytest.LogCaptureFixture): Pytest fixture capturing log output.
     """
     assert await async_setup_component(hass, DOMAIN, {DOMAIN: {}})
     await hass.async_block_till_done()
@@ -1110,21 +1142,30 @@ async def test_legacy_set_variable_and_set_entity_update_sensor(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    await hass.services.async_call(
-        DOMAIN,
-        "set_variable",
-        {
-            ATTR_VARIABLE: "legacy_counter",
-            CONF_VALUE: 0,
-            ATTR_ATTRIBUTES: {"source": "set_variable"},
-            ATTR_REPLACE_ATTRIBUTES: True,
-        },
-        blocking=True,
-    )
+    with caplog.at_level("DEBUG", logger="custom_components.variable"):
+        await hass.services.async_call(
+            DOMAIN,
+            "set_variable",
+            {
+                ATTR_VARIABLE: "legacy_counter",
+                CONF_VALUE: 0,
+                ATTR_ATTRIBUTES: {"source": "private-legacy-attribute"},
+                ATTR_REPLACE_ATTRIBUTES: True,
+            },
+            blocking=True,
+        )
     set_variable_state = hass.states.get("sensor.legacy_counter")
     assert set_variable_state is not None
     assert set_variable_state.state == "0"
-    assert set_variable_state.attributes["source"] == "set_variable"
+    assert set_variable_state.attributes["source"] == "private-legacy-attribute"
+    integration_logs = "\n".join(
+        record.getMessage()
+        for record in caplog.records
+        if record.name == "custom_components.variable"
+    )
+    assert "update fields" in integration_logs
+    assert ATTR_ATTRIBUTES in integration_logs
+    assert "private-legacy-attribute" not in integration_logs
 
     await hass.services.async_call(
         DOMAIN,
@@ -1140,7 +1181,7 @@ async def test_legacy_set_variable_and_set_entity_update_sensor(
     set_entity_state = hass.states.get("sensor.legacy_counter")
     assert set_entity_state is not None
     assert set_entity_state.state == "3"
-    assert set_entity_state.attributes["source"] == "set_variable"
+    assert set_entity_state.attributes["source"] == "private-legacy-attribute"
     assert set_entity_state.attributes["merged"] is True
 
 
