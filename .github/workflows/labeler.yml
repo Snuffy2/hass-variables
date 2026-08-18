@@ -2,12 +2,17 @@ name: Pull Request Labeler
 
 on:
   pull_request_target:
-    types: [opened, reopened, synchronize, edited]
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - edited
 
 permissions: {}
 
 jobs:
   labeler:
+    name: Pull Request Labeler
     runs-on: ubuntu-latest
 
     permissions:
@@ -15,44 +20,120 @@ jobs:
 
     steps:
       - name: Apply labels
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          TITLE: ${{ github.event.pull_request.title }}
-          AUTHOR: ${{ github.event.pull_request.user.login }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          shopt -s nocasematch
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const title = pr.title;
+            const author = pr.user.login;
 
-          labels=()
+            const labels = [];
 
-          case "$AUTHOR" in
-            "pre-commit-ci[bot]"|"dependabot[bot]"|"renovate[bot]")
-              labels+=("dependencies")
-              ;;
-          esac
+            // Dependency bots
+            if ([
+              "pre-commit-ci[bot]",
+              "dependabot[bot]",
+              "renovate[bot]",
+            ].includes(author)) {
+              labels.push("dependencies");
+            }
 
-          [[ "$TITLE" =~ fix ]] && labels+=("bugfix")
-          [[ "$TITLE" =~ feat ]] && labels+=("feature")
-          [[ "$TITLE" =~ breaking[[:space:]_-]*change ]] && labels+=("breaking-change")
+            // Title-based labels
+            const rules = [
+              ["bugfix", /fix/i],
+              ["feature", /feat/i],
+              ["breaking-change", /breaking[ _-]change/i],
+              ["github_actions", /github[ _-]?actions?|workflows?/i],
+              ["enhancement", /enhance|improv(e|ement)/i],
+              ["documentation", /docs|document|readme/i],
+              [
+                "code-quality",
+                /lint|ruff|mypy|pytest|coverage|prek|type-?check|pre[ _-]?commit/i,
+              ],
+            ];
 
-          if [[ "$TITLE" =~ github[[:space:]_-]*actions? ]] ||
-             [[ "$TITLE" =~ workflows? ]]; then
-            labels+=("github_actions")
-          fi
+            for (const [label, pattern] of rules) {
+              if (pattern.test(title)) {
+                labels.push(label);
+              }
+            }
 
-          [[ "$TITLE" =~ (enhance|improv(e|ement)) ]] &&
-            labels+=("enhancement")
+            if (labels.length === 0) {
+              return;
+            }
 
-          [[ "$TITLE" =~ (docs|document|readme) ]] &&
-            labels+=("documentation")
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              labels,
+            });name: Pull Request Labeler
 
-          [[ "$TITLE" =~ (lint|ruff|mypy|pytest|coverage|prek|type-?check|pre[[:space:]_-]?commit) ]] &&
-            labels+=("code-quality")
+on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - edited
 
-          for label in "${labels[@]}"; do
-            gh pr edit "$PR_NUMBER" \
-              --repo "$GITHUB_REPOSITORY" \
-              --add-label "$label"
-          done
+permissions: {}
+
+jobs:
+  labeler:
+    name: Pull Request Labeler
+    runs-on: ubuntu-latest
+
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Apply labels
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const title = pr.title;
+            const author = pr.user.login;
+
+            const labels = [];
+
+            // Dependency bots
+            if ([
+              "pre-commit-ci[bot]",
+              "dependabot[bot]",
+              "renovate[bot]",
+            ].includes(author)) {
+              labels.push("dependencies");
+            }
+
+            // Title-based labels
+            const rules = [
+              ["bugfix", /fix/i],
+              ["feature", /feat/i],
+              ["breaking-change", /breaking[ _-]change/i],
+              ["github_actions", /github[ _-]?actions?|workflows?/i],
+              ["enhancement", /enhance|improv(e|ement)/i],
+              ["documentation", /docs|document|readme/i],
+              [
+                "code-quality",
+                /lint|ruff|mypy|pytest|coverage|prek|type-?check|pre[ _-]?commit/i,
+              ],
+            ];
+
+            for (const [label, pattern] of rules) {
+              if (pattern.test(title)) {
+                labels.push(label);
+              }
+            }
+
+            if (labels.length === 0) {
+              return;
+            }
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              labels,
+            });
