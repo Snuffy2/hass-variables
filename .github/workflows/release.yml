@@ -5,61 +5,100 @@ on:
   release:
     types: [published]
 
+permissions: {}
+
 jobs:
-  update_version_and_create_zip:
-    name: Update Version and Create Zip on Release
+  manual-zip:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+
     permissions:
-      contents: write
+      contents: read
+
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Use the release branch when available so git-auto-commit can push
-          # back cleanly; otherwise keep the workflow's triggering ref.
-          ref: ${{ github.event_name == 'release' && github.event.release.target_commitish || github.ref }}
+          persist-credentials: false
+
+      - name: Create Zip
+        working-directory: custom_components/variable
+        run: zip "$GITHUB_WORKSPACE/variable.zip" -r ./
+
+      - name: Add Zip to Action
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: variable
+          path: variable.zip
+          if-no-files-found: error
+
+  release:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.target_commitish }}
+          persist-credentials: false
 
       - name: Update integration version
-        if: github.event_name == 'release'
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: python .github/scripts/update_version.py
 
-      # Build and upload the zip before the version-bump push: master is a
-      # protected branch, so the push can be rejected (GH006) and must not
-      # block the release asset that HACS zip_release downloads.
       - name: Create Zip
         working-directory: custom_components/variable
         run: zip "$GITHUB_WORKSPACE/variable.zip" -r ./
 
       - name: Upload Zip to Release
-        if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v3
-        with:
-          files: variable.zip
-          tag_name: ${{ github.event.release.tag_name }}
-
-      - name: Commit & Push Version Changes
-        if: github.event_name == 'release' && github.event.release.prerelease == false
-        continue-on-error: true
-        uses: stefanzweifel/git-auto-commit-action@v7
-        with:
-          branch: ${{ github.event.release.target_commitish }}
-          commit_message: 'Updating to version ${{ github.event.release.tag_name }} [skip ci]'
-
-      - name: Update Release with Version Changes Commit
-        if: github.event_name == 'release' && github.event.release.prerelease == false
-        continue-on-error: true
         env:
+          GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          git tag -f "$RELEASE_TAG"
-          git push --force origin "$RELEASE_TAG"
+          gh release upload "$RELEASE_TAG" \
+            "$GITHUB_WORKSPACE/variable.zip" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
 
-      - name: Add Zip to Action
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v7
-        with:
-          name: variable
-          path: variable.zip
-          if-no-files-found: error
+      - name: Commit and push version changes
+        id: version_commit
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          TARGET_BRANCH: ${{ github.event.release.target_commitish }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            custom_components/variable/manifest.json \
+            custom_components/variable/const.py
+
+          if git diff --cached --quiet; then
+            echo "No version changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Updating to version ${RELEASE_TAG} [skip ci]"
+
+          gh auth setup-git
+          git push origin "HEAD:${TARGET_BRANCH}"
+
+      - name: Update release tag
+        if: steps.version_commit.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          gh auth setup-git
+          git tag -f "$RELEASE_TAG"
+          git push --force origin "refs/tags/${RELEASE_TAG}"
