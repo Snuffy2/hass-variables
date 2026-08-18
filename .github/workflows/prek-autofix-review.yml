@@ -4,8 +4,7 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: prek-autofix-${{ github.event.pull_request.number }}
@@ -15,8 +14,12 @@ jobs:
   review:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+
+    permissions:
+      contents: read
+
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.sha }}
@@ -24,4 +27,6 @@ jobs:
           persist-credentials: false
 
       - id: review
-        uses: Snuffy2/prek-autofix/review@v1
+        uses: Snuffy2/prek-autofix/review@ce7466280e089e648ab0ed5b5fca2095bd1e78b1 # v1 / 1.0.7
+        with:
+          prek-version: "0.4.14"
