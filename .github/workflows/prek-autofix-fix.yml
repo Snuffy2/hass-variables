@@ -27,5 +27,5 @@ jobs:
     steps:
       - uses: Snuffy2/prek-autofix/fix@ce7466280e089e648ab0ed5b5fca2095bd1e78b1 # v1 / 1.0.7
         with:
-          autofix-token: ${{ secrets.PREK_AUTOFIX_TOKEN }}
+          autofix-token: ""
           source-workflow: prek-autofix
