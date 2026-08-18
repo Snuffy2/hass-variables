@@ -1,18 +1,58 @@
-name: 'Pull Request Labeler'
+name: Pull Request Labeler
+
 on:
   pull_request_target:
+    types: [opened, reopened, synchronize, edited]
+
+permissions: {}
 
 jobs:
   labeler:
-    name: Pull Request Labeler
     runs-on: ubuntu-latest
 
     permissions:
-      contents: read
       pull-requests: write
 
     steps:
-      - name: Pull Request Labeler
-        uses: srvaroa/labeler@v1.14.0
+      - name: Apply labels
         env:
-          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          TITLE: ${{ github.event.pull_request.title }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nocasematch
+
+          labels=()
+
+          case "$AUTHOR" in
+            "pre-commit-ci[bot]"|"dependabot[bot]"|"renovate[bot]")
+              labels+=("dependencies")
+              ;;
+          esac
+
+          [[ "$TITLE" =~ fix ]] && labels+=("bugfix")
+          [[ "$TITLE" =~ feat ]] && labels+=("feature")
+          [[ "$TITLE" =~ breaking[[:space:]_-]*change ]] && labels+=("breaking-change")
+
+          if [[ "$TITLE" =~ github[[:space:]_-]*actions? ]] ||
+             [[ "$TITLE" =~ workflows? ]]; then
+            labels+=("github_actions")
+          fi
+
+          [[ "$TITLE" =~ (enhance|improv(e|ement)) ]] &&
+            labels+=("enhancement")
+
+          [[ "$TITLE" =~ (docs|document|readme) ]] &&
+            labels+=("documentation")
+
+          [[ "$TITLE" =~ (lint|ruff|mypy|pytest|coverage|prek|type-?check|pre[[:space:]_-]?commit) ]] &&
+            labels+=("code-quality")
+
+          for label in "${labels[@]}"; do
+            gh pr edit "$PR_NUMBER" \
+              --repo "$GITHUB_REPOSITORY" \
+              --add-label "$label"
+          done
