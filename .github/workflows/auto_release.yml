@@ -9,8 +9,7 @@ on:
       - custom_components/variable/const.py
   workflow_dispatch:
 
-permissions:
-  contents: write
+permissions: {}
 
 concurrency:
   group: auto-release
@@ -21,28 +20,46 @@ jobs:
     name: Create Release from Version Bump
     runs-on: ubuntu-latest
 
-    env:
-      GH_TOKEN: ${{ github.token }}
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Full history is needed for the generated changelog.
+          # Full history is needed for generated release notes.
           fetch-depth: 0
+
+          # Do not leave the workflow's write-capable token in the local
+          # repository's git configuration.
+          persist-credentials: false
 
       - name: Read version from manifest.json
         id: version
+        shell: bash
         run: |
-          VERSION="$(python -c 'import json; print(json.load(open("custom_components/variable/manifest.json"))["version"])')"
+          set -euo pipefail
+
+          VERSION="$(
+            python -c '
+          import json
+          with open("custom_components/variable/manifest.json", encoding="utf-8") as file:
+              print(json.load(file)["version"])
+          '
+          )"
+
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Version: ${VERSION}"
 
       - name: Check if release already exists
         id: check
         env:
+          GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
         run: |
+          set -euo pipefail
+
           if gh release view "${VERSION}" \
             --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
@@ -50,31 +67,42 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # Build the HACS zip in this same job. Releases created with
-      # GITHUB_TOKEN do not cascade into release.yml, so the asset must be
-      # attached here or HACS downloads 404.
+      # Releases created with GITHUB_TOKEN do not trigger release.yml.
+      # Build and attach the HACS zip here instead.
       - name: Create Zip
         working-directory: custom_components/variable
-        run: zip "$GITHUB_WORKSPACE/variable.zip" -r ./
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          zip "$GITHUB_WORKSPACE/variable.zip" -r ./
 
       - name: Create tag and release with changelog
         if: steps.check.outputs.exists == 'false'
         env:
+          GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
         run: |
+          set -euo pipefail
+
           gh release create "${VERSION}" \
             --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
             --title "${VERSION}" \
-            variable.zip \
+            "$GITHUB_WORKSPACE/variable.zip" \
             --generate-notes
 
       - name: Upload Zip to existing release
         if: steps.check.outputs.exists == 'true'
         env:
+          GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
         run: |
+          set -euo pipefail
+
           gh release upload "${VERSION}" \
+            "$GITHUB_WORKSPACE/variable.zip" \
             --repo "${GITHUB_REPOSITORY}" \
-            --clobber \
-            variable.zip
+            --clobber
