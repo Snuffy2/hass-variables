@@ -160,6 +160,57 @@ async def test_yaml_setup_and_reload_manage_config_entries(
     assert er.async_get(hass).async_get("sensor.yaml_removed") is None
 
 
+async def test_yaml_reload_does_not_log_configuration_values(
+    hass: HomeAssistant,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Keep YAML configuration values out of reload logs.
+
+    Args:
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        caplog (pytest.LogCaptureFixture): Pytest fixture capturing log output.
+    """
+    initial_config = {
+        DOMAIN: {
+            "yaml_reload_secret": {
+                CONF_VALUE: "initial-secret-value",
+                CONF_ATTRIBUTES: {"source": "initial-secret-attribute"},
+            }
+        }
+    }
+    assert await async_setup_component(hass, DOMAIN, initial_config)
+    await hass.async_block_till_done()
+
+    reloaded_config = {
+        DOMAIN: {
+            "yaml_reload_secret": {
+                CONF_VALUE: "reload-secret-value",
+                CONF_ATTRIBUTES: {"source": "reload-secret-attribute"},
+            }
+        }
+    }
+    caplog.clear()
+    with (
+        caplog.at_level("DEBUG", logger="custom_components.variable"),
+        patch(
+            "custom_components.variable.async_integration_yaml_config",
+            new=AsyncMock(return_value=reloaded_config),
+        ),
+    ):
+        await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
+
+    integration_logs = "\n".join(
+        record.getMessage()
+        for record in caplog.records
+        if record.name == "custom_components.variable"
+    )
+    assert "Reloading YAML variables: count=1" in integration_logs
+    assert "reload-secret-value" not in integration_logs
+    assert "reload-secret-attribute" not in integration_logs
+    assert "initial-secret-value" not in integration_logs
+    assert "initial-secret-attribute" not in integration_logs
+
+
 @pytest.mark.parametrize(
     ("failed_lifecycle_method", "expected_call_count"),
     [("async_unload_entry", 1), ("async_setup_entry", 2)],

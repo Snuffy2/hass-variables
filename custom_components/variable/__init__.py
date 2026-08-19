@@ -201,7 +201,11 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             reload_config = await async_integration_yaml_config(hass, DOMAIN)
         if reload_config is None:
             return
-        _LOGGER.debug(" reload_config: %s", reload_config)
+        yaml_variables = reload_config.get(DOMAIN, {})
+        _LOGGER.debug(
+            "Reloading YAML variables: count=%s",
+            len(yaml_variables) if isinstance(yaml_variables, Mapping) else 0,
+        )
         await _async_process_yaml(hass, reload_config)
 
     hass.services.async_register(
@@ -238,10 +242,14 @@ async def _async_process_yaml(
             config-entry setup cycle.
 
     Returns:
-        bool: True after all YAML imports, updates, and removals have completed.
+        bool: True after YAML reconciliation has been dispatched. When
+            wait_for_completion is true, this is after all YAML imports,
+            updates, and removals have completed. When wait_for_completion is
+            false, this is after lifecycle work has been dispatched and before
+            that work completes.
 
     Raises:
-        result: The original exception returned by pending lifecycle work.
+        BaseException: Failure propagated from pending lifecycle work.
     """
     reconcile_lock: asyncio.Lock = hass.data.setdefault(_YAML_RECONCILE_LOCK, asyncio.Lock())
     async with reconcile_lock:
