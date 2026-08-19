@@ -1,42 +1,31 @@
 # Variables+History
 ### aka. `variable`
 
-  <img alt="Variable Logo" src="https://github.com/wibias/hass-variables/raw/master/logo/icon.png">
+  <img alt="Variable Logo" src="https://github.com/wibias/hass-variables/raw/master/custom_components/variable/brand/icon@2x.png">
+
+[![Integration Usage][integration-usage-shield]][releases]
+
+[![GitHub Downloads][downloads-shield]][releases]
+[![GitHub Latest Downloads][downloads-latest-shield]][releases]
+[![GitHub Release][releases-shield]][releases]
+[![GitHub Release Date][release-date-shield]][releases]
+[![GitHub Activity][commits-shield]][commits]
+[![Coverage][coverage-shield]][coverage]
+[![License][license-shield]](LICENSE)
+[![hacs][hacsbadge]][hacs]
 
 A Home Assistant Integration to declare and set/update variables.
 
-Forked and updated from initial integration developed by [rogro82](https://github.com/rogro82)
-
-# Home Assistant versions starting with v2024.7.2 will prevent Variables+History versions earlier than v3.4.5 from working. Be sure to upgrade.
-
-## Upgrading from v2 to v3
-**Existing variables will remain as yaml variables but instead of starting with `variable.`, they will now start with `sensor.` If you would like to manage the variable using the UI configuration, you will need to delete the entity from your yaml and recreate it in the UI. This is also the only change needed when migrating from rogro82's version to this one**
-
 ## Installation
 
-### HACS *(recommended)*
 1. Ensure that [HACS](https://hacs.xyz/) is installed
-2. [Click Here](https://my.home-assistant.io/redirect/hacs_repository/?owner=wibiasa&repository=hass-variables) to directly open `Variables+History` in HACS **or**<br/>
+2. [Click Here](https://my.home-assistant.io/redirect/hacs_repository/?owner=wibias&repository=hass-variables) to directly open `Variables+History` in HACS **or**<br/>
   a. Navigate to HACS<br/>
   b. Click `+ Explore & Download Repositories`<br/>
   c. Find the `Variables+History` integration <br/>
 3. Click `Download`
 4. Restart Home Assistant
 5. See [Configuration](#configuration) below
-
-<details>
-<summary><h3>Manual</h3></summary>
-
-You probably **do not** want to do this! Use the HACS method above unless you know what you are doing and have a good reason as to why you are installing manually
-
-1. Using the tool of choice open the directory (folder) for your HA configuration (where you find `configuration.yaml`)
-2. If you do not have a `custom_components` directory there, you need to create it
-3. In the `custom_components` directory create a new folder called `variable`
-4. Download _all_ the files from the `custom_components/variable/` directory in this repository
-5. Place the files you downloaded in the new directory you created
-6. Restart Home Assistant
-7. See [Configuration](#configuration) below
-</details>
 
 ## <a name="configuration"></a>Preferred Configuration
 1. [Click Here](https://my.home-assistant.io/redirect/config_flow_start/?domain=variable) to directly add a `Variables+History` sensor **or**<br/>
@@ -63,7 +52,7 @@ You probably **do not** want to do this! Use the HACS method above unless you kn
 | `Initial Attributes`    | `No`     |                | Initial attributes of the variable. If `Restore on Restart` is `False`, the variable will reset to this value on every restart  |
 | `Restore on Restart`    | `No`     | `True`         | If `True` will restore previous value on restart. If `False`, will reset to `Initial Value` and `Initial Attributes` on restart |
 | `Force Update`          | `No`     | `False`        | Variable's `last_updated` time will change with any service calls to update the variable even if the value does not change      |
-| `Exclude from Recorder` | `No`     | `False`        | For Variables with large attributes (>16 kB), enable this to prevent Recorder Errors.                                           |
+| `Exclude from Recorder` | `No`     | `False`        | Excludes attributes from Recorder while preserving state history. Enable for Variables with large attributes to prevent Recorder Errors. |
 
 </details>
 
@@ -79,7 +68,7 @@ You probably **do not** want to do this! Use the HACS method above unless you kn
 | `Initial Attributes`    | `No`     |                | Initial attributes of the variable. If `Restore on Restart` is `False`, the variable will reset to this value on every restart                 |
 | `Restore on Restart`    | `No`     | `True`         | If `True` will restore previous value on restart. If `False`, will reset to `Initial Value` and `Initial Attributes` on restart                |
 | `Force Update`          | `No`     | `False`        | Variable's `last_updated` time will change with any service calls to update the variable even if the value does not change                     |
-| `Exclude from Recorder` | `No`     | `False`        | For Variables with large attributes (>16 kB), enable this to prevent Recorder Errors.                                                          |
+| `Exclude from Recorder` | `No`     | `False`        | Excludes attributes from Recorder while preserving state history. Enable for Variables with large attributes to prevent Recorder Errors. |
 
 </details>
 
@@ -99,7 +88,7 @@ You probably **do not** want to do this! Use the HACS method above unless you kn
 | `Initial Attributes`    | `No`     |                | Initial attributes of the variable                                                                                                                                                                                                 |
 | `Restore on Restart`    | `No`     | `True`         | If `True` will restore previous value on restart. If `False`, will reset to `Initial Latitude`, `Initial Longitude`, `Initial Location Name`, `Initial GPS Accuracy`, `Initial Battery Level`, and `Initial Attributes` on restart |
 | `Force Update`          | `No`     | `False`        | Variable's `last_updated` time will change with any service calls to update the variable even if the value does not change                                                                                                         |
-| `Exclude from Recorder` | `No`     | `False`        | For Variables with large attributes (>16 kB), enable this to prevent Recorder Errors.                                                                                                                                              |
+| `Exclude from Recorder` | `No`     | `False`        | Excludes attributes from Recorder while preserving state history. Enable for Variables with large attributes to prevent Recorder Errors.                                                                                          |
 
 </details>
 
@@ -120,7 +109,7 @@ Add the component `variable` to your configuration and declare the variables you
 | Initial Attributes    | `attributes`            | `No`     |         | Initial attributes of the variable. If `Restore on Restart` is `False`, the variable will reset to this value on every restart  |
 | Restore on Restart    | `restore`               | `No`     | `True`  | If `True` will restore previous value on restart. If `False`, will reset to `Initial Value` and `Initial Attributes` on restart |
 | Force Update          | `force_update`          | `No`     | `False` | Variable's `last_updated` time will change with any service calls to update the variable even if the value does not change      |
-| Exclude from Recorder | `exclude_from_recorder` | `No`     | `False` | For Variables with large attributes (>16 kB), set to `True` to prevent Recorder Errors.                                         |
+| Exclude from Recorder | `exclude_from_recorder` | `No`     | `False` | Excludes attributes from Recorder while preserving state history. Set to `True` for Variables with large attributes to prevent Recorder Errors. |
 
 #### Example:
 
@@ -191,8 +180,11 @@ Used to update the value or attributes of a Device Tracker Variable
 | `Location Name`        | `location_name`                         | `No`     |         | HA 2026.3.4–2026.5: free-form value sets state.<br />HA 2026.6+: `location_name` attribute; does not set state |
 | `Delete Location Name` | `delete_location_name`                  | `No`     |         | Removes location context (`boolean`). HA 2026.3.4–2026.5: removes legacy state so it can use Lat/Long.<br />HA 2026.6+: removes only the attribute; does not drive state |
 | `In Zones`             | `in_zones`                              | `No`     |         | HA 2026.6+ only: list of zone entity IDs that controls state. State can also be derived from coordinates |
+| `Delete In Zones`      | `delete_in_zones`                       | `No`     |         | HA 2026.6+ only: clears the `in_zones` list so state falls back to coordinates or `not_home` |
 | `GPS Accuracy`         | `gps_accuracy`                          | `No`     |         | Accuracy in meters                                                                                    |
 | `Battery Level`        | `battery_level`                         | `No`     |         | Battery level from 0-100%                                                                             |
+| `New Attributes`       | `attributes`                            | `No`     |         | What to update the attributes to                                                                      |
+| `Replace Attributes`   | `replace_attributes`                    | `No`     | `False` | Replace or merge current attributes (`False` = merge)                                                  |
 
 ### `variable.toggle_binary_sensor`
 
@@ -357,7 +349,7 @@ Saved messages will survive restarts.
 
 BONUS - OPTIONAL TTS MESSAGE HISTORY
 
-You can find the full documentation on how to do this and adjust this to your needs in [here](https://github.com/wibias/hass-variables/tree/master/examples/save-tts-message/tts.md).
+You can find the full documentation on how to do this and adjust this to your needs in the [Save TTS Messages repository](https://github.com/jazzyisj/save-tts-messages).
 </details>
 
 #### More examples can be found in the [examples](https://github.com/wibias/hass-variables/tree/master/examples) folder.
@@ -377,10 +369,31 @@ Removing UI-created variables
 - In Home Assistant go to Settings → Integrations → Variables+History and select the variable to configure.
 - Use the integration's UI to remove or delete the variable. This will delete the Config Entry and the integration now also cleans up entity registry entries during unload so the entity should disappear from the Entities list.
 
-If an entity remains without a unique_id (orphaned entity)
+<details>
+<summary><b>Advanced:</b> If an entity remains without a unique_id (orphaned entity)</summary>
 
 1. Open Settings → Devices & Services → Entities and search for the orphaned entity.
 2. If the entity has no unique ID and cannot be removed via the UI, go to Settings → Devices & Services → Entities → three-dot menu → Delete (if available). If that is not available, you can remove the entity registry entry manually by editing the `.storage/core.entity_registry` file in your Home Assistant config (advanced — backup first) or use the UI or `entity_registry` service from a local script.
 3. After removing the registry entry, restart Home Assistant. The entity should no longer appear.
 
 Note: Manual edits to `.storage` are advanced and should be done carefully with a backup. The integration now tries to prevent these situations by removing YAML-missing entries and cleaning up entity registry entries when a config entry unloads.
+
+</details>
+
+## Attribution
+
+Forked and updated from initial integration developed by [rogro82](https://github.com/rogro82)
+
+[integration-usage-shield]: https://img.shields.io/badge/dynamic/json?color=41BDF5&logo=home-assistant&label=integration%20usage&suffix=%20installs&cacheSeconds=15600&url=https%3A%2F%2Fanalytics.home-assistant.io%2Fcustom_integrations.json&query=%24.variable.total&style=for-the-badge
+[commits-shield]: https://img.shields.io/github/last-commit/Wibias/hass-variables?style=for-the-badge
+[commits]: https://github.com/Wibias/hass-variables/commits/master
+[hacs]: https://hacs.xyz
+[hacsbadge]: https://img.shields.io/badge/HACS-Default-blue.svg?style=for-the-badge
+[license-shield]: https://img.shields.io/github/license/Wibias/hass-variables.svg?style=for-the-badge
+[downloads-latest-shield]: https://img.shields.io/github/downloads-pre/Wibias/hass-variables/latest/total?style=for-the-badge
+[downloads-shield]: https://img.shields.io/github/downloads/Wibias/hass-variables/total?style=for-the-badge&label=total%20downloads
+[release-date-shield]: https://img.shields.io/github/release-date/Wibias/hass-variables?display_date=published_at&style=for-the-badge
+[releases-shield]: https://img.shields.io/github/v/release/Wibias/hass-variables?style=for-the-badge
+[releases]: https://github.com/Wibias/hass-variables/releases
+[coverage]: https://htmlpreview.github.io/?https://github.com/Wibias/hass-variables/blob/python-coverage-comment-action-data/htmlcov/index.html
+[coverage-shield]: https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FWibias%2Fhass-variables%2Fpython-coverage-comment-action-data%2Fendpoint.json&style=for-the-badge

@@ -5,9 +5,7 @@
         "recorder"
     ],
     "codeowners": [
-        "@rogro82",
-        "@wibias",
-        "@Snuffy2"
+        "@wibias"
     ],
     "config_flow": true,
     "dependencies": [],
@@ -17,5 +15,5 @@
     "requirements": [
         "iso4217>=1.15"
     ],
-    "version": "3.5.12"
+    "version": "3.5.13"
 }

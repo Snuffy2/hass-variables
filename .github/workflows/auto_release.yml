@@ -1,80 +1,120 @@
-name: Auto Release on Version Bump
+name: Release on Version Bump
 
 on:
   push:
     branches:
-      - master
+      - main
     paths:
       - custom_components/variable/manifest.json
       - custom_components/variable/const.py
+
   workflow_dispatch:
 
-permissions:
-  contents: write
+permissions: {}
 
 concurrency:
-  group: auto-release
+  group: release-${{ github.repository }}
   cancel-in-progress: false
 
 jobs:
   release:
-    name: Create Release from Version Bump
+    name: Create Release
     runs-on: ubuntu-latest
 
-    env:
-      GH_TOKEN: ${{ github.token }}
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Full history is needed for the generated changelog.
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Read version from manifest.json
+      - name: Validate version
         id: version
+        shell: bash
         run: |
-          VERSION="$(python -c 'import json; print(json.load(open("custom_components/variable/manifest.json"))["version"])')"
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Version: ${VERSION}"
+          set -euo pipefail
 
-      - name: Check if release already exists
-        id: check
+          python <<'PY'
+          import json
+          import os
+          import re
+          import sys
+          from pathlib import Path
+
+          manifest = json.loads(
+              Path("custom_components/variable/manifest.json").read_text()
+          )
+          manifest_version = manifest["version"]
+
+          const = Path("custom_components/variable/const.py").read_text()
+
+          match = re.search(
+              r'^VERSION = "([^"]+)"$',
+              const,
+              flags=re.MULTILINE,
+          )
+
+          if match is None:
+              print("Could not find VERSION in const.py", file=sys.stderr)
+              sys.exit(1)
+
+          const_version = match.group(1)
+
+          if manifest_version != const_version:
+              print(
+                  f"Version mismatch: manifest.json={manifest_version}, "
+                  f"const.py={const_version}",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"version={manifest_version}\n")
+
+          print(f"Release version: {manifest_version}")
+          PY
+
+      - name: Check whether release already exists
+        id: existing
         env:
+          GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
         run: |
-          if gh release view "${VERSION}" \
-            --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+          set -euo pipefail
+
+          if gh release view "$VERSION" \
+            --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+
             echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release $VERSION already exists. It will NOT be modified."
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # Build the HACS zip in this same job. Releases created with
-      # GITHUB_TOKEN do not cascade into release.yml, so the asset must be
-      # attached here or HACS downloads 404.
-      - name: Create Zip
+      - name: Create ZIP
+        if: steps.existing.outputs.exists == 'false'
         working-directory: custom_components/variable
-        run: zip "$GITHUB_WORKSPACE/variable.zip" -r ./
-
-      - name: Create tag and release with changelog
-        if: steps.check.outputs.exists == 'false'
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
         run: |
-          gh release create "${VERSION}" \
-            --repo "${GITHUB_REPOSITORY}" \
-            --target "${GITHUB_SHA}" \
-            --title "${VERSION}" \
-            variable.zip \
+          set -euo pipefail
+          zip "$GITHUB_WORKSPACE/variable.zip" -r ./
+
+      - name: Create Release
+        if: steps.existing.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          gh release create "$VERSION" \
+            "$GITHUB_WORKSPACE/variable.zip" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "$VERSION" \
             --generate-notes
-
-      - name: Upload Zip to existing release
-        if: steps.check.outputs.exists == 'true'
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          gh release upload "${VERSION}" \
-            --repo "${GITHUB_REPOSITORY}" \
-            --clobber \
-            variable.zip
