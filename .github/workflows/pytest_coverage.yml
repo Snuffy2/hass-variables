@@ -91,8 +91,6 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
 
       - name: Download coverage database
         env:
@@ -107,6 +105,5 @@ jobs:
         uses: py-cov-action/python-coverage-comment-action@7188638f871f721a365d644f505d1ff3df20d683 # v3.40
         with:
           GITHUB_TOKEN: ${{ github.token }}
-          ACTIVITY: save_coverage_data_files
           MINIMUM_GREEN: 90
           MINIMUM_ORANGE: 70
