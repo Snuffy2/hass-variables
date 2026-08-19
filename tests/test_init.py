@@ -1389,7 +1389,7 @@ async def test_yaml_reload_reports_failed_rollback_reload(
             bool: False when Home Assistant reports a rejected reload.
 
         Raises:
-            HomeAssistantError: The parameterized Home Assistant rollback error.
+            rollback_failure: The parameterized Home Assistant rollback error.
         """
         nonlocal call_count
         call_count += 1

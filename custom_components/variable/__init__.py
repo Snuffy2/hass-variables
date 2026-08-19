@@ -249,7 +249,7 @@ async def _async_process_yaml(
             that work completes.
 
     Raises:
-        BaseException: Failure propagated from pending lifecycle work.
+        result: Failure propagated from pending lifecycle work.
     """
     reconcile_lock: asyncio.Lock = hass.data.setdefault(_YAML_RECONCILE_LOCK, asyncio.Lock())
     async with reconcile_lock:
