@@ -1,7 +1,7 @@
 """Variable implementation for Home Assistant."""
 
 import asyncio
-from collections.abc import Coroutine, Mapping
+from collections.abc import Collection, Coroutine, Mapping
 import contextlib
 import copy
 import logging
@@ -63,14 +63,16 @@ except ImportError:
         helper_config_entry_id: str,
         source_device_id: str | None,
         remove_all_devices: bool = False,
+        keep_device_ids: Collection[str] = (),
     ) -> None:
         """Remove stale helper device links on Home Assistant releases before 2026.8.
 
         Args:
-            hass: Home Assistant instance hosting the helper integration.
-            helper_config_entry_id: Config entry identifier for the helper.
-            source_device_id: Device identifier that should remain linked.
-            remove_all_devices: Ignored on legacy Home Assistant releases.
+            hass (HomeAssistant): Home Assistant instance hosting the helper integration.
+            helper_config_entry_id (str): Config entry identifier for the helper.
+            source_device_id (str | None): Device identifier that should remain linked.
+            remove_all_devices (bool): Ignored on legacy Home Assistant releases.
+            keep_device_ids (Collection[str]): Ignored on legacy Home Assistant releases.
         """
         async_remove_stale_devices_links_keep_current_device(
             hass,
@@ -126,21 +128,35 @@ CONFIG_SCHEMA = vol.Schema(
 )
 
 
-async def async_setup(hass: HomeAssistant, config: ConfigType):
-    """Set up the Variable services."""
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Set up the Variable services.
+
+    Args:
+        hass (HomeAssistant): Home Assistant instance hosting the integration.
+        config (ConfigType): Home Assistant configuration containing this domain.
+
+    Returns:
+        bool: True after YAML processing has been dispatched.
+    """
 
     async def async_set_variable_legacy_service(call: ServiceCall) -> None:
-        """Handle calls to the set_variable legacy service."""
+        """Handle calls to the set_variable legacy service.
 
+        Args:
+            call (ServiceCall): Legacy service call to translate.
+        """
         # _LOGGER.debug(f"[async_set_variable_legacy_service] Pre call data: {call.data}")
-        ENTITY_ID_FORMAT = Platform.SENSOR + ".{}"
-        var_ent = ENTITY_ID_FORMAT.format(call.data.get(ATTR_VARIABLE))
+        entity_id_format = Platform.SENSOR + ".{}"
+        var_ent = entity_id_format.format(call.data.get(ATTR_VARIABLE))
         # _LOGGER.debug(f"[async_set_variable_legacy_service] Post call data: {call.data}")
         await _async_set_legacy_service(call, var_ent)
 
     async def async_set_entity_legacy_service(call: ServiceCall) -> None:
-        """Handle calls to the set_entity legacy service."""
+        """Handle calls to the set_entity legacy service.
 
+        Args:
+            call (ServiceCall): Legacy service call to translate.
+        """
         # _LOGGER.debug(f"[async_set_entity_legacy_service] call data: {call.data}")
         entity = call.data.get(ATTR_ENTITY)
         if not entity or not isinstance(entity, str):
@@ -148,9 +164,13 @@ async def async_setup(hass: HomeAssistant, config: ConfigType):
             return
         await _async_set_legacy_service(call, entity)
 
-    async def _async_set_legacy_service(call: ServiceCall, var_ent: str):
-        """Shared function for both set_entity and set_variable legacy services."""
+    async def _async_set_legacy_service(call: ServiceCall, var_ent: str) -> None:
+        """Forward a legacy service call to the current update service.
 
+        Args:
+            call (ServiceCall): Legacy service call containing update data.
+            var_ent (str): Target entity identifier.
+        """
         # _LOGGER.debug(f"[async_set_legacy_service] call data: {call.data}")
         update_sensor_data = {
             CONF_ENTITY_ID: [var_ent],
@@ -161,20 +181,31 @@ async def async_setup(hass: HomeAssistant, config: ConfigType):
             update_sensor_data.update({ATTR_VALUE: call.data.get(ATTR_VALUE)})
         if ATTR_ATTRIBUTES in call.data:
             update_sensor_data.update({ATTR_ATTRIBUTES: call.data.get(ATTR_ATTRIBUTES)})
-        _LOGGER.debug(f"[async_set_legacy_service] update_sensor_data: {update_sensor_data}")
+        _LOGGER.debug(
+            "[async_set_legacy_service] update fields: %s",
+            sorted(update_sensor_data),
+        )
         await hass.services.async_call(
             DOMAIN, SERVICE_UPDATE_SENSOR, service_data=update_sensor_data
         )
 
     async def _async_reload_service_handler(service: ServiceCall) -> None:
-        """Handle reload service call."""
+        """Handle a reload service call.
+
+        Args:
+            service (ServiceCall): Reload service call.
+        """
         _LOGGER.info("Service %s.reload called: reloading YAML integration", DOMAIN)
         reload_config = None
         with contextlib.suppress(HomeAssistantError):
             reload_config = await async_integration_yaml_config(hass, DOMAIN)
         if reload_config is None:
             return
-        _LOGGER.debug(f" reload_config: {reload_config}")
+        yaml_variables = reload_config.get(DOMAIN, {})
+        _LOGGER.debug(
+            "Reloading YAML variables: count=%s",
+            len(yaml_variables) if isinstance(yaml_variables, Mapping) else 0,
+        )
         await _async_process_yaml(hass, reload_config)
 
     hass.services.async_register(
@@ -204,14 +235,21 @@ async def _async_process_yaml(
     """Reconcile YAML-defined variables with their config entries.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config: Complete Home Assistant configuration containing this domain.
-        wait_for_completion: Whether to wait for config-entry lifecycle work.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config (ConfigType): Complete Home Assistant configuration containing this domain.
+        wait_for_completion (bool): Whether to wait for config-entry lifecycle work.
             This must be false during initial integration setup to avoid a
             config-entry setup cycle.
 
     Returns:
-        True after all YAML imports, updates, and removals have completed.
+        bool: True after YAML reconciliation has been dispatched. When
+            wait_for_completion is true, this is after all YAML imports,
+            updates, and removals have completed. When wait_for_completion is
+            false, this is after lifecycle work has been dispatched and before
+            that work completes.
+
+    Raises:
+        result: Failure propagated from pending lifecycle work.
     """
     reconcile_lock: asyncio.Lock = hass.data.setdefault(_YAML_RECONCILE_LOCK, asyncio.Lock())
     async with reconcile_lock:
@@ -235,12 +273,12 @@ async def _async_dispatch_yaml_lifecycle(
     """Await lifecycle work or track it until background completion.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        lifecycle_work: Config-entry lifecycle operation to dispatch.
-        wait_for_completion: Whether to wait for the operation to finish.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        lifecycle_work (Coroutine[Any, Any, object]): Lifecycle operation to dispatch.
+        wait_for_completion (bool): Whether to wait for the operation to finish.
 
     Returns:
-        The lifecycle result when waiting for completion, otherwise None.
+        object | None: The lifecycle result when waiting, otherwise None.
     """
     if wait_for_completion:
         return await lifecycle_work
@@ -250,7 +288,11 @@ async def _async_dispatch_yaml_lifecycle(
     pending_tasks.add(task)
 
     def async_log_lifecycle_result(completed_task: asyncio.Task[object]) -> None:
-        """Remove completed work from tracking and log background failures."""
+        """Remove completed work from tracking and log background failures.
+
+        Args:
+            completed_task (asyncio.Task[object]): Completed lifecycle task.
+        """
         pending_tasks.discard(completed_task)
         if completed_task.cancelled():
             return
@@ -273,10 +315,10 @@ async def _async_update_yaml_entry(
     """Apply YAML data and restore the prior entry when reload is rejected.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        entry: YAML-owned config entry being updated.
-        variable_id: YAML variable identifier used in diagnostics.
-        yaml_data: Complete replacement data built from the current YAML.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        entry (ConfigEntry): YAML-owned config entry being updated.
+        variable_id (str): YAML variable identifier used in diagnostics.
+        yaml_data (Mapping[str, object]): Replacement data built from the current YAML.
 
     Raises:
         HomeAssistantError: If Home Assistant rejects the updated entry reload.
@@ -313,12 +355,12 @@ async def _async_reconcile_yaml(
     """Reconcile YAML while the per-instance reconciliation lock is held.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        config: Complete Home Assistant configuration containing this domain.
-        wait_for_completion: Whether to wait for config-entry lifecycle work.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config (ConfigType): Complete Home Assistant configuration containing this domain.
+        wait_for_completion (bool): Whether to wait for config-entry lifecycle work.
 
     Returns:
-        True after the requested YAML reconciliation work has been dispatched
+        bool: True after the requested YAML reconciliation work has been dispatched
         or completed.
     """
     variables = copy.deepcopy(config.get(DOMAIN, {}))
@@ -335,8 +377,7 @@ async def _async_reconcile_yaml(
 
     for var, var_fields in variables.items():
         if var is not None:
-            _LOGGER.debug(f"[YAML] variable_id: {var}")
-            _LOGGER.debug(f"[YAML] var_fields: {var_fields}")
+            _LOGGER.debug("[YAML] variable_id: %s", var)
 
             for key_empty, var_empty in var_fields.copy().items():
                 if var_empty is None:
@@ -348,7 +389,8 @@ async def _async_reconcile_yaml(
                 for entry in entries_by_variable_id.get(var, [])
             ):
                 _LOGGER.error(
-                    "[YAML] Cannot import %s because that variable ID belongs to a UI-created entry",
+                    "[YAML] Cannot import %s because that variable ID belongs to a "
+                    "UI-created entry",
                     var,
                 )
                 for entry in yaml_entries:
@@ -407,11 +449,11 @@ def _yaml_entry_data(variable_id: str, variable_config: Mapping[str, Any]) -> di
     """Build the complete config-entry data owned by one YAML variable.
 
     Args:
-        variable_id: YAML mapping key that identifies the variable.
-        variable_config: Configuration supplied for that variable.
+        variable_id (str): YAML mapping key that identifies the variable.
+        variable_config (Mapping[str, Any]): Configuration supplied for that variable.
 
     Returns:
-        Config entry data which contains only the current YAML settings and
+        dict[str, object]: Config entry data containing only current YAML settings and
         required YAML provenance fields.
     """
     yaml_config = copy.deepcopy(dict(variable_config))
@@ -460,8 +502,15 @@ def _yaml_entry_data(variable_id: str, variable_config: Mapping[str, Any]) -> di
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up from a config entry."""
+    """Set up from a config entry.
 
+    Args:
+        hass (HomeAssistant): Home Assistant instance hosting the integration.
+        entry (ConfigEntry): Config entry to set up.
+
+    Returns:
+        bool: True after the entry has been set up.
+    """
     # _LOGGER.debug(f"[init async_setup_entry] entry: {entry.data}")
     if entry.data.get(CONF_YAML_PRESENT) is True:
         yaml_data = copy.deepcopy(dict(entry.data))
@@ -472,8 +521,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not entry.data.get(CONF_YAML_VARIABLE, False):
 
         async def _async_on_entry_update(hass: HomeAssistant, entry: ConfigEntry) -> None:
-            """Handle config entry update."""
-            _LOGGER.debug(f"Config entry updated: {entry.data.get(CONF_VARIABLE_ID)}")
+            """Handle a config entry update.
+
+            Args:
+                hass (HomeAssistant): Home Assistant instance hosting the integration.
+                entry (ConfigEntry): Updated config entry.
+            """
+            _LOGGER.debug("Config entry updated: %s", entry.data.get(CONF_VARIABLE_ID))
             await hass.config_entries.async_reload(entry.entry_id)
 
         entry.async_on_unload(entry.add_update_listener(_async_on_entry_update))
@@ -496,9 +550,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload a config entry."""
+    """Unload a config entry.
 
-    _LOGGER.info(f"Unloading: {entry.data}")
+    Args:
+        hass (HomeAssistant): Home Assistant instance hosting the integration.
+        entry (ConfigEntry): Config entry to unload.
+
+    Returns:
+        bool: Whether the entry unloaded successfully.
+    """
+    _LOGGER.info("Unloading config entry: %s", entry.entry_id)
     # _LOGGER.debug(f"[init async_unload_entry] entry: {entry}")
     hass_data = dict(entry.data)
     unload_ok = False
@@ -518,13 +579,14 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Remove entity registry entries tied to a config entry.
 
     Args:
-        hass: Home Assistant instance that hosts the integration.
-        entry: Config entry being permanently removed.
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        entry (ConfigEntry): Config entry being permanently removed.
     """
     registry = er.async_get(hass)
     entries = er.async_entries_for_config_entry(registry, entry.entry_id)
     for entity_entry in entries:
         _LOGGER.debug(
-            f"Removing entity registry entry for removed config: {entity_entry.entity_id}"
+            "Removing entity registry entry for removed config: %s",
+            entity_entry.entity_id,
         )
         registry.async_remove(entity_entry.entity_id)
