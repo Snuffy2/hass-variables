@@ -108,13 +108,13 @@ update_device_tracker:
           value: true
     location_name:
       name: Location Name (deprecated)
-      description: "Deprecated: does not set state on Home Assistant 2026.6+. Use in_zones or coordinates instead. Kept as an extra attribute until Home Assistant removes location_name (planned 2027.7)."
+      description: "Deprecated: does not set state. Use in_zones or coordinates instead. Kept as an extra attribute until Home Assistant removes location_name (planned 2027.7)."
       example: "School"
       selector:
         text:
     delete_location_name:
       name: Delete Location Name
-      description: Remove the location_name extra attribute. Does not change state on Home Assistant 2026.6+.
+      description: Remove the location_name extra attribute. Does not change state.
       selector:
         constant:
           label: Will Delete

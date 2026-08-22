@@ -58,7 +58,7 @@
           "icon": "Icon",
           "latitude": "Initial Latitude",
           "longitude": "Initial Longitude",
-          "location_name": "Initial Location Name (attribute only; does not set state on HA 2026.6+)",
+          "location_name": "Initial Location Name (attribute only; does not set state)",
           "gps_accuracy": "Initial GPS Accuracy",
           "battery_level": "Initial Battery Level",
           "attributes": "Initial Attributes",
@@ -148,7 +148,7 @@
         "data": {
           "latitude": "Latitude",
           "longitude": "Longitude",
-          "location_name": "Location Name (attribute only; does not set state on HA 2026.6+)",
+          "location_name": "Location Name (attribute only; does not set state)",
           "delete_location_name": "Delete Location Name",
           "in_zones": "In Zones",
           "delete_in_zones": "Clear In Zones",

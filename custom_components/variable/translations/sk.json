@@ -55,7 +55,7 @@
           "icon": "Ikona",
           "latitude": "Počiatočná zemepisná šírka",
           "longitude": "Počiatočná zemepisná dĺžka",
-          "location_name": "Názov počiatočného miesta (iba atribút; na HA 2026.6+ nenastavuje stav)",
+          "location_name": "Názov počiatočného miesta (iba atribút; nenastavuje stav)",
           "gps_accuracy": "Počiatočná presnosť GPS",
           "battery_level": "Počiatočná úroveň nabitia batérie",
           "attributes": "Počiatočné atribúty",
@@ -126,7 +126,7 @@
         "data": {
           "latitude": "Zemepisná šírka",
           "longitude": "Zemepisná dĺžka",
-          "location_name": "Názov miesta (iba atribút; na HA 2026.6+ nenastavuje stav)",
+          "location_name": "Názov miesta (iba atribút; nenastavuje stav)",
           "delete_location_name": "Odstrániť názov miesta",
           "in_zones": "V zónach",
           "delete_in_zones": "Vymazať zóny",

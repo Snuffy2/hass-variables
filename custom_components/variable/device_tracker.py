@@ -57,12 +57,6 @@ from .helpers import merge_attribute_dict
 
 _LOGGER = logging.getLogger(__name__)
 
-# Home Assistant 2026.6 added TrackerEntity.in_zones, which replaces using a
-# free-form location name as the tracker state. Once the minimum version is
-# 2026.6, remove this capability flag and the legacy mirror in
-# _set_location_name, then assign only to _location_name.
-SUPPORTS_TRACKER_IN_ZONES = hasattr(TrackerEntity, "in_zones")
-
 PLATFORM = Platform.DEVICE_TRACKER
 ENTITY_ID_FORMAT = PLATFORM + ".{}"
 SERVICE_UPDATE_VARIABLE = "update_" + PLATFORM
@@ -181,7 +175,7 @@ class Variable(RestoreEntity, TrackerEntity):
         self._attr_battery_level = config.get(ATTR_BATTERY_LEVEL)
         self._attr_in_zones = config.get(ATTR_IN_ZONES)
         self._location_name_deprecated_logged = False
-        self._set_location_name(config.get(ATTR_LOCATION_NAME))
+        self._location_name = config.get(ATTR_LOCATION_NAME)
         self._attr_gps_accuracy = config.get(ATTR_GPS_ACCURACY)
 
     async def async_added_to_hass(self) -> None:
@@ -267,10 +261,7 @@ class Variable(RestoreEntity, TrackerEntity):
                             attributes.pop(attrib, None)
                         else:
                             value = attributes.pop(attrib, None)
-                            if attrib == ATTR_LOCATION_NAME:
-                                self._set_location_name(value)
-                            else:
-                                setattr(self, setting, value)
+                            setattr(self, setting, value)
                 return copy.deepcopy(attributes)
             _LOGGER.error(
                 "(%s) AttributeError: Attributes must be a dictionary: %s",
@@ -280,36 +271,20 @@ class Variable(RestoreEntity, TrackerEntity):
             return new_attributes
         return None
 
-    def _set_location_name(self, location_name: str | None) -> None:
-        """Store free-form location context and support pre-2026.6 state behavior.
-
-        Home Assistant 2026.6 introduced ``TrackerEntity.in_zones`` for tracker
-        state calculation. Until the integration minimum version is 2026.6 or
-        newer, older cores need ``_attr_location_name`` to retain their legacy
-        location-name state. Newer cores keep the name as an extra attribute.
-
-        Args:
-            location_name (str | None): Free-form location name supplied for the tracker.
-        """
-        self._location_name = location_name
-        if not SUPPORTS_TRACKER_IN_ZONES:
-            self._attr_location_name = location_name
-
     def _warn_location_name_deprecated(self) -> None:
-        """Log once that ``location_name`` no longer drives tracker state.
+        """Log once that ``location_name`` does not drive tracker state.
 
-        Home Assistant 2026.6 stopped using ``TrackerEntity.location_name`` as
-        the entity state. This integration still stores the value as an extra
+        Home Assistant no longer uses ``TrackerEntity.location_name`` as the
+        entity state. This integration still stores the value as an extra
         attribute until Home Assistant removes the property.
         """
-        if not SUPPORTS_TRACKER_IN_ZONES or self._location_name_deprecated_logged:
+        if self._location_name_deprecated_logged:
             return
         _LOGGER.warning(
-            "(%s) location_name no longer sets device_tracker state on "
-            "Home Assistant 2026.6+. Use latitude/longitude so Home Assistant "
-            "can match zones, or set in_zones to zone entity IDs. "
-            "location_name is kept as an extra attribute until Home Assistant "
-            "removes it (planned 2027.7).",
+            "(%s) location_name does not set device_tracker state. "
+            "Use latitude/longitude so Home Assistant can match zones, or set "
+            "in_zones to zone entity IDs. location_name is kept as an extra "
+            "attribute until Home Assistant removes it (planned 2027.7).",
             self._attr_name,
         )
         self._location_name_deprecated_logged = True
@@ -395,13 +370,13 @@ class Variable(RestoreEntity, TrackerEntity):
             self._attr_in_zones = None
         if ATTR_LOCATION_NAME in kwargs:
             self._warn_location_name_deprecated()
-            self._set_location_name(kwargs.get(ATTR_LOCATION_NAME))
+            self._location_name = kwargs.get(ATTR_LOCATION_NAME)
         if ATTR_BATTERY_LEVEL in kwargs:
             self._attr_battery_level = kwargs.get(ATTR_BATTERY_LEVEL)
         if ATTR_GPS_ACCURACY in kwargs:
             self._attr_gps_accuracy = kwargs.get(ATTR_GPS_ACCURACY)
         if ATTR_DELETE_LOCATION_NAME in kwargs and kwargs.get(ATTR_DELETE_LOCATION_NAME) is True:
-            self._set_location_name(None)
+            self._location_name = None
         try:
             self.async_write_ha_state()
         except RuntimeError as err:
