@@ -65,6 +65,8 @@ VARIABLE_ATTR_SETTINGS = {
     CONF_DEVICE_CLASS: "_attr_device_class",
     CONF_STATE_CLASS: "_attr_state_class",
     ATTR_NATIVE_UNIT_OF_MEASUREMENT: "_attr_native_unit_of_measurement",
+    # YAML and update-service payloads use the public sensor attribute name.
+    CONF_UNIT_OF_MEASUREMENT: "_attr_native_unit_of_measurement",
     ATTR_SUGGESTED_UNIT_OF_MEASUREMENT: "_attr_suggested_unit_of_measurement",
 }
 
@@ -190,8 +192,8 @@ class Variable(RestoreSensor):
                 self._attr_native_value = value_to_type(configured_value, self._value_type)
             except ValueError:
                 self._attr_native_value = None
-        if config.get(CONF_DEVICE_CLASS) in UNIT_CONVERTERS:
-            self._attr_suggested_unit_of_measurement = config.get(CONF_UNIT_OF_MEASUREMENT)
+        if self._attr_device_class in UNIT_CONVERTERS:
+            self._attr_suggested_unit_of_measurement = self._attr_native_unit_of_measurement
 
     async def async_added_to_hass(self) -> None:
         """Restore saved sensor state and attributes when configured."""
@@ -232,6 +234,10 @@ class Variable(RestoreSensor):
                 # name duplication across reboots.
                 restored_attributes = dict(state.attributes)
                 restored_attributes.pop(ATTR_FRIENDLY_NAME, None)
+                # Last state exposes the display unit. Native unit is restored
+                # separately from RestoreSensor extra data and must not be
+                # overwritten by a converted unit_of_measurement.
+                restored_attributes.pop(CONF_UNIT_OF_MEASUREMENT, None)
                 self._attr_extra_state_attributes = self._update_attr_settings(
                     restored_attributes,
                     just_pop=self._config.get(CONF_UPDATED, False),
@@ -304,6 +310,7 @@ class Variable(RestoreSensor):
                         self._attr_name,
                         err,
                     )
+        self._apply_missing_native_unit_from_config()
         if self._config.get(CONF_UPDATED, True):
             self._config.update({CONF_UPDATED: False})
             self._hass.config_entries.async_update_entry(
@@ -316,6 +323,35 @@ class Variable(RestoreSensor):
                 self._attr_name,
                 self._config_entry.data.get(CONF_UPDATED),
             )
+
+    def _apply_missing_native_unit_from_config(self) -> None:
+        """Fill a missing native unit from configured sensor unit attributes.
+
+        RestoreSensor extra data can restore ``None`` for YAML variables that
+        previously stored ``unit_of_measurement`` only as a custom attribute.
+        """
+        extra_attributes = self._attr_extra_state_attributes
+        if self._attr_native_unit_of_measurement is not None:
+            if isinstance(extra_attributes, MutableMapping):
+                extra_attributes.pop(CONF_UNIT_OF_MEASUREMENT, None)
+            return
+
+        attributes = self._config.get(CONF_ATTRIBUTES)
+        unit = None
+        if isinstance(attributes, MutableMapping):
+            unit = attributes.get(CONF_UNIT_OF_MEASUREMENT)
+            if unit is None:
+                unit = attributes.get(ATTR_NATIVE_UNIT_OF_MEASUREMENT)
+        if unit is None:
+            unit = self._config.get(CONF_UNIT_OF_MEASUREMENT)
+        if unit is None or (isinstance(unit, str) and unit.lower() in ("", "none")):
+            return
+
+        self._attr_native_unit_of_measurement = unit
+        if isinstance(extra_attributes, MutableMapping):
+            extra_attributes.pop(CONF_UNIT_OF_MEASUREMENT, None)
+        if self._attr_device_class in UNIT_CONVERTERS:
+            self._attr_suggested_unit_of_measurement = unit
 
     @property
     def should_poll(self) -> bool:

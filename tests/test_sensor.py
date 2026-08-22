@@ -2,10 +2,22 @@
 
 from datetime import date
 
+from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import ATTR_FRIENDLY_NAME, CONF_DEVICE, CONF_DEVICE_ID, CONF_NAME, Platform
+from homeassistant.const import (
+    ATTR_FRIENDLY_NAME,
+    ATTR_UNIT_OF_MEASUREMENT,
+    CONF_DEVICE,
+    CONF_DEVICE_CLASS,
+    CONF_DEVICE_ID,
+    CONF_NAME,
+    CONF_UNIT_OF_MEASUREMENT,
+    Platform,
+    UnitOfPower,
+)
 from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.entity_platform import async_get_platforms
 import pytest
 from pytest_homeassistant_custom_component.common import mock_restore_cache_with_extra_data
 
@@ -28,6 +40,28 @@ from custom_components.variable.const import (
 )
 from custom_components.variable.sensor import Variable
 from tests.types import ConfigEntryFactory
+
+NATIVE_UNIT_NONE_WARNING = "native unit of measurement 'None'"
+
+
+def _loaded_sensor(hass: HomeAssistant, entity_id: str) -> Variable:
+    """Return the loaded Variable sensor entity for an entity ID.
+
+    Args:
+        hass (HomeAssistant): Home Assistant test instance.
+        entity_id (str): Entity identifier to look up.
+
+    Returns:
+        Variable: The loaded sensor entity.
+
+    Raises:
+        AssertionError: If the entity is not registered on the sensor platform.
+    """
+    for platform in async_get_platforms(hass, DOMAIN):
+        entity = platform.entities.get(entity_id)
+        if isinstance(entity, Variable):
+            return entity
+    raise AssertionError(f"Variable sensor {entity_id} was not loaded")
 
 
 @pytest.mark.parametrize(
@@ -540,3 +574,225 @@ async def test_increment_converts_numeric_string_native_value(
     native_value = sensor._attr_native_value
     assert isinstance(native_value, float)
     assert native_value == 4.75
+
+
+async def test_attribute_unit_of_measurement_is_native_unit(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Promote YAML-style unit_of_measurement attributes to the native unit.
+
+    Args:
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+        caplog (pytest.LogCaptureFixture): Pytest fixture capturing log output.
+    """
+    entity_id = "sensor.variable_test_del_15m"
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.SENSOR,
+            CONF_VARIABLE_ID: "variable_test_del_15m",
+            CONF_VALUE: 1,
+            CONF_VALUE_TYPE: "number",
+            CONF_YAML_VARIABLE: True,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+            CONF_ATTRIBUTES: {
+                "state_class": SensorStateClass.MEASUREMENT,
+                CONF_DEVICE_CLASS: SensorDeviceClass.POWER,
+                CONF_UNIT_OF_MEASUREMENT: UnitOfPower.KILO_WATT,
+            },
+        }
+    )
+
+    with caplog.at_level("WARNING"):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.state == "1"
+    assert state.attributes[CONF_DEVICE_CLASS] == SensorDeviceClass.POWER
+    assert state.attributes["state_class"] == SensorStateClass.MEASUREMENT
+    assert state.attributes[ATTR_UNIT_OF_MEASUREMENT] == UnitOfPower.KILO_WATT
+
+    sensor = _loaded_sensor(hass, entity_id)
+    assert sensor.native_unit_of_measurement == UnitOfPower.KILO_WATT
+    assert sensor.device_class == SensorDeviceClass.POWER
+    assert sensor.state_class == SensorStateClass.MEASUREMENT
+    extra_attributes = sensor._attr_extra_state_attributes
+    assert extra_attributes is not None
+    assert CONF_UNIT_OF_MEASUREMENT not in extra_attributes
+    assert NATIVE_UNIT_NONE_WARNING not in caplog.text
+
+
+async def test_restore_keeps_native_unit_when_display_unit_differs(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Keep RestoreSensor native units when last state has a converted display unit.
+
+    Args:
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+    """
+    entity_id = "sensor.restored_power"
+    mock_restore_cache_with_extra_data(
+        hass,
+        [
+            (
+                State(
+                    entity_id,
+                    "1",
+                    {
+                        CONF_DEVICE_CLASS: SensorDeviceClass.POWER,
+                        "state_class": SensorStateClass.MEASUREMENT,
+                        ATTR_UNIT_OF_MEASUREMENT: UnitOfPower.WATT,
+                    },
+                ),
+                {
+                    "native_value": "1",
+                    "native_unit_of_measurement": UnitOfPower.KILO_WATT,
+                },
+            )
+        ],
+    )
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.SENSOR,
+            CONF_VARIABLE_ID: "restored_power",
+            CONF_VALUE: 0,
+            CONF_VALUE_TYPE: "number",
+            CONF_YAML_VARIABLE: True,
+            CONF_RESTORE: True,
+            CONF_FORCE_UPDATE: False,
+            CONF_ATTRIBUTES: {
+                "state_class": SensorStateClass.MEASUREMENT,
+                CONF_DEVICE_CLASS: SensorDeviceClass.POWER,
+                CONF_UNIT_OF_MEASUREMENT: UnitOfPower.KILO_WATT,
+            },
+        }
+    )
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    sensor = _loaded_sensor(hass, entity_id)
+    assert sensor.native_unit_of_measurement == UnitOfPower.KILO_WATT
+    extra_attributes = sensor._attr_extra_state_attributes
+    assert extra_attributes is not None
+    assert CONF_UNIT_OF_MEASUREMENT not in extra_attributes
+    assert ATTR_UNIT_OF_MEASUREMENT not in extra_attributes
+
+
+async def test_restore_replaces_missing_native_unit_from_config_attributes(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Recover a YAML unit when RestoreSensor extra data stored native unit as None.
+
+    Args:
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+        caplog (pytest.LogCaptureFixture): Pytest fixture capturing log output.
+    """
+    entity_id = "sensor.legacy_power"
+    mock_restore_cache_with_extra_data(
+        hass,
+        [
+            (
+                State(
+                    entity_id,
+                    "1",
+                    {
+                        CONF_DEVICE_CLASS: SensorDeviceClass.POWER,
+                        "state_class": SensorStateClass.MEASUREMENT,
+                        ATTR_UNIT_OF_MEASUREMENT: UnitOfPower.KILO_WATT,
+                    },
+                ),
+                {
+                    "native_value": "1",
+                    "native_unit_of_measurement": None,
+                },
+            )
+        ],
+    )
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.SENSOR,
+            CONF_VARIABLE_ID: "legacy_power",
+            CONF_VALUE: 1,
+            CONF_VALUE_TYPE: "number",
+            CONF_YAML_VARIABLE: True,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+            CONF_ATTRIBUTES: {
+                "state_class": SensorStateClass.MEASUREMENT,
+                CONF_DEVICE_CLASS: SensorDeviceClass.POWER,
+                CONF_UNIT_OF_MEASUREMENT: UnitOfPower.KILO_WATT,
+            },
+        }
+    )
+
+    with caplog.at_level("WARNING"):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    sensor = _loaded_sensor(hass, entity_id)
+    assert sensor.native_unit_of_measurement == UnitOfPower.KILO_WATT
+    extra_attributes = sensor._attr_extra_state_attributes
+    assert extra_attributes is not None
+    assert CONF_UNIT_OF_MEASUREMENT not in extra_attributes
+    assert NATIVE_UNIT_NONE_WARNING not in caplog.text
+
+
+async def test_update_sensor_promotes_unit_of_measurement_attribute(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Apply unit_of_measurement from an update-service attribute payload.
+
+    Args:
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+    """
+    entity_id = "sensor.service_power"
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.SENSOR,
+            CONF_VARIABLE_ID: "service_power",
+            CONF_VALUE: 2,
+            CONF_VALUE_TYPE: "number",
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_UPDATE_SENSOR,
+        {
+            "entity_id": [entity_id],
+            ATTR_ATTRIBUTES: {
+                CONF_DEVICE_CLASS: SensorDeviceClass.POWER,
+                "state_class": SensorStateClass.MEASUREMENT,
+                CONF_UNIT_OF_MEASUREMENT: UnitOfPower.KILO_WATT,
+            },
+        },
+        blocking=True,
+    )
+
+    sensor = _loaded_sensor(hass, entity_id)
+    assert sensor.native_unit_of_measurement == UnitOfPower.KILO_WATT
+    assert sensor.device_class == SensorDeviceClass.POWER
+    extra_attributes = sensor._attr_extra_state_attributes
+    assert extra_attributes is not None
+    assert CONF_UNIT_OF_MEASUREMENT not in extra_attributes
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.attributes[ATTR_UNIT_OF_MEASUREMENT] == UnitOfPower.KILO_WATT

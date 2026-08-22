@@ -580,6 +580,44 @@ async def test_yaml_reload_creates_entities_before_service_returns(
     assert state.state == expected_state
 
 
+async def test_yaml_power_sensor_uses_attribute_unit_as_native_unit(
+    hass: HomeAssistant,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Treat YAML unit_of_measurement as the sensor native unit.
+
+    Args:
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        caplog (pytest.LogCaptureFixture): Pytest fixture capturing log output.
+    """
+    yaml_config = {
+        DOMAIN: {
+            "variable_test_del_15m": {
+                CONF_VALUE: 1,
+                CONF_RESTORE: False,
+                CONF_EXCLUDE_FROM_RECORDER: False,
+                CONF_ATTRIBUTES: {
+                    "state_class": "measurement",
+                    "device_class": "power",
+                    "unit_of_measurement": "kW",
+                },
+            }
+        }
+    }
+
+    with caplog.at_level("WARNING"):
+        assert await async_setup_component(hass, DOMAIN, yaml_config)
+        await hass.async_block_till_done()
+
+    state = hass.states.get("sensor.variable_test_del_15m")
+    assert state is not None
+    assert state.state == "1"
+    assert state.attributes["device_class"] == "power"
+    assert state.attributes["state_class"] == "measurement"
+    assert state.attributes["unit_of_measurement"] == "kW"
+    assert "native unit of measurement 'None'" not in caplog.text
+
+
 async def test_concurrent_yaml_reloads_create_one_entry(
     hass: HomeAssistant,
 ) -> None:
