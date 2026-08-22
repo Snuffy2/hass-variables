@@ -2,21 +2,36 @@
 
 from datetime import date
 
+from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import ATTR_FRIENDLY_NAME, CONF_DEVICE, CONF_DEVICE_ID, CONF_NAME, Platform
+from homeassistant.const import (
+    ATTR_FRIENDLY_NAME,
+    ATTR_UNIT_OF_MEASUREMENT,
+    CONF_DEVICE,
+    CONF_DEVICE_CLASS,
+    CONF_DEVICE_ID,
+    CONF_NAME,
+    CONF_UNIT_OF_MEASUREMENT,
+    Platform,
+    UnitOfPower,
+)
 from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.entity_platform import async_get_platforms
 import pytest
 from pytest_homeassistant_custom_component.common import mock_restore_cache_with_extra_data
 
 from custom_components.variable.const import (
     ATTR_ATTRIBUTES,
+    ATTR_NATIVE_UNIT_OF_MEASUREMENT,
     ATTR_REPLACE_ATTRIBUTES,
+    ATTR_SUGGESTED_UNIT_OF_MEASUREMENT,
     ATTR_VALUE_DELTA,
     CONF_ATTRIBUTES,
     CONF_ENTITY_PLATFORM,
     CONF_FORCE_UPDATE,
     CONF_RESTORE,
+    CONF_UPDATED,
     CONF_VALUE,
     CONF_VALUE_TYPE,
     CONF_VARIABLE_ID,
@@ -28,6 +43,28 @@ from custom_components.variable.const import (
 )
 from custom_components.variable.sensor import Variable
 from tests.types import ConfigEntryFactory
+
+NATIVE_UNIT_NONE_WARNING = "native unit of measurement 'None'"
+
+
+def _loaded_sensor(hass: HomeAssistant, entity_id: str) -> Variable:
+    """Return the loaded Variable sensor entity for an entity ID.
+
+    Args:
+        hass (HomeAssistant): Home Assistant test instance.
+        entity_id (str): Entity identifier to look up.
+
+    Returns:
+        Variable: The loaded sensor entity.
+
+    Raises:
+        AssertionError: If the entity is not registered on the sensor platform.
+    """
+    for platform in async_get_platforms(hass, DOMAIN):
+        entity = platform.entities.get(entity_id)
+        if isinstance(entity, Variable):
+            return entity
+    raise AssertionError(f"Variable sensor {entity_id} was not loaded")
 
 
 @pytest.mark.parametrize(
@@ -540,3 +577,488 @@ async def test_increment_converts_numeric_string_native_value(
     native_value = sensor._attr_native_value
     assert isinstance(native_value, float)
     assert native_value == 4.75
+
+
+async def test_attribute_unit_of_measurement_is_native_unit(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Promote YAML-style unit_of_measurement attributes to the native unit.
+
+    Args:
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+        caplog (pytest.LogCaptureFixture): Pytest fixture capturing log output.
+    """
+    entity_id = "sensor.variable_test_del_15m"
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.SENSOR,
+            CONF_VARIABLE_ID: "variable_test_del_15m",
+            CONF_VALUE: 1,
+            CONF_VALUE_TYPE: "number",
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+            CONF_ATTRIBUTES: {
+                "state_class": SensorStateClass.MEASUREMENT,
+                CONF_DEVICE_CLASS: SensorDeviceClass.POWER,
+                CONF_UNIT_OF_MEASUREMENT: UnitOfPower.KILO_WATT,
+            },
+        }
+    )
+
+    with caplog.at_level("WARNING"):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.state == "1"
+    assert state.attributes[CONF_DEVICE_CLASS] == SensorDeviceClass.POWER
+    assert state.attributes["state_class"] == SensorStateClass.MEASUREMENT
+    assert state.attributes[ATTR_UNIT_OF_MEASUREMENT] == UnitOfPower.KILO_WATT
+
+    sensor = _loaded_sensor(hass, entity_id)
+    assert sensor.native_unit_of_measurement == UnitOfPower.KILO_WATT
+    assert sensor.device_class == SensorDeviceClass.POWER
+    assert sensor.state_class == SensorStateClass.MEASUREMENT
+    extra_attributes = sensor._attr_extra_state_attributes
+    assert extra_attributes is not None
+    assert CONF_UNIT_OF_MEASUREMENT not in extra_attributes
+    assert NATIVE_UNIT_NONE_WARNING not in caplog.text
+
+
+async def test_restore_keeps_native_unit_when_display_unit_differs(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Keep RestoreSensor native units when last state has a converted display unit.
+
+    Args:
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+    """
+    entity_id = "sensor.restored_power"
+    mock_restore_cache_with_extra_data(
+        hass,
+        [
+            (
+                State(
+                    entity_id,
+                    "1",
+                    {
+                        CONF_DEVICE_CLASS: SensorDeviceClass.POWER,
+                        "state_class": SensorStateClass.MEASUREMENT,
+                        ATTR_UNIT_OF_MEASUREMENT: UnitOfPower.WATT,
+                    },
+                ),
+                {
+                    "native_value": "1",
+                    "native_unit_of_measurement": UnitOfPower.KILO_WATT,
+                },
+            )
+        ],
+    )
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.SENSOR,
+            CONF_VARIABLE_ID: "restored_power",
+            CONF_VALUE: 0,
+            CONF_VALUE_TYPE: "number",
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: True,
+            CONF_UPDATED: False,
+            CONF_FORCE_UPDATE: False,
+            CONF_ATTRIBUTES: {
+                "state_class": SensorStateClass.MEASUREMENT,
+                CONF_DEVICE_CLASS: SensorDeviceClass.POWER,
+                CONF_UNIT_OF_MEASUREMENT: UnitOfPower.KILO_WATT,
+            },
+        }
+    )
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    sensor = _loaded_sensor(hass, entity_id)
+    assert sensor.native_unit_of_measurement == UnitOfPower.KILO_WATT
+    extra_attributes = sensor._attr_extra_state_attributes
+    assert extra_attributes is not None
+    assert CONF_UNIT_OF_MEASUREMENT not in extra_attributes
+    assert ATTR_UNIT_OF_MEASUREMENT not in extra_attributes
+
+
+async def test_restore_replaces_missing_native_unit_from_config_attributes(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Recover a YAML unit when RestoreSensor extra data stored native unit as None.
+
+    Args:
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+        caplog (pytest.LogCaptureFixture): Pytest fixture capturing log output.
+    """
+    entity_id = "sensor.legacy_power"
+    mock_restore_cache_with_extra_data(
+        hass,
+        [
+            (
+                State(
+                    entity_id,
+                    "1",
+                    {
+                        CONF_DEVICE_CLASS: SensorDeviceClass.POWER,
+                        "state_class": SensorStateClass.MEASUREMENT,
+                        ATTR_UNIT_OF_MEASUREMENT: UnitOfPower.KILO_WATT,
+                    },
+                ),
+                {
+                    "native_value": "1",
+                    "native_unit_of_measurement": None,
+                },
+            )
+        ],
+    )
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.SENSOR,
+            CONF_VARIABLE_ID: "legacy_power",
+            CONF_VALUE: 1,
+            CONF_VALUE_TYPE: "number",
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: True,
+            CONF_UPDATED: False,
+            CONF_FORCE_UPDATE: False,
+            CONF_ATTRIBUTES: {
+                "state_class": SensorStateClass.MEASUREMENT,
+                CONF_DEVICE_CLASS: SensorDeviceClass.POWER,
+                CONF_UNIT_OF_MEASUREMENT: UnitOfPower.KILO_WATT,
+            },
+        }
+    )
+
+    with caplog.at_level("WARNING"):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    sensor = _loaded_sensor(hass, entity_id)
+    assert sensor.native_unit_of_measurement == UnitOfPower.KILO_WATT
+    extra_attributes = sensor._attr_extra_state_attributes
+    assert extra_attributes is not None
+    assert CONF_UNIT_OF_MEASUREMENT not in extra_attributes
+    assert NATIVE_UNIT_NONE_WARNING not in caplog.text
+
+
+async def test_restore_prefers_stored_native_unit_over_config(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Keep a restored native unit when configuration specifies a different unit.
+
+    Args:
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+    """
+    entity_id = "sensor.restored_unit_precedence"
+    mock_restore_cache_with_extra_data(
+        hass,
+        [
+            (
+                State(
+                    entity_id,
+                    "1",
+                    {
+                        CONF_DEVICE_CLASS: SensorDeviceClass.POWER,
+                        "state_class": SensorStateClass.MEASUREMENT,
+                        ATTR_UNIT_OF_MEASUREMENT: UnitOfPower.WATT,
+                    },
+                ),
+                {
+                    "native_value": "1",
+                    "native_unit_of_measurement": UnitOfPower.WATT,
+                },
+            )
+        ],
+    )
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.SENSOR,
+            CONF_VARIABLE_ID: "restored_unit_precedence",
+            CONF_VALUE: 0,
+            CONF_VALUE_TYPE: "number",
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: True,
+            CONF_UPDATED: False,
+            CONF_FORCE_UPDATE: False,
+            CONF_ATTRIBUTES: {
+                "state_class": SensorStateClass.MEASUREMENT,
+                CONF_DEVICE_CLASS: SensorDeviceClass.POWER,
+                CONF_UNIT_OF_MEASUREMENT: UnitOfPower.KILO_WATT,
+            },
+        }
+    )
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    sensor = _loaded_sensor(hass, entity_id)
+    assert sensor.native_unit_of_measurement == UnitOfPower.WATT
+    extra_attributes = sensor._attr_extra_state_attributes
+    assert extra_attributes is not None
+    assert CONF_UNIT_OF_MEASUREMENT not in extra_attributes
+    assert ATTR_UNIT_OF_MEASUREMENT not in extra_attributes
+
+
+async def test_update_sensor_promotes_unit_of_measurement_attribute(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Apply unit_of_measurement from an update-service attribute payload.
+
+    Args:
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+    """
+    entity_id = "sensor.service_power"
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.SENSOR,
+            CONF_VARIABLE_ID: "service_power",
+            CONF_VALUE: 2,
+            CONF_VALUE_TYPE: "number",
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_UPDATE_SENSOR,
+        {
+            "entity_id": [entity_id],
+            ATTR_ATTRIBUTES: {
+                CONF_DEVICE_CLASS: SensorDeviceClass.POWER,
+                "state_class": SensorStateClass.MEASUREMENT,
+                CONF_UNIT_OF_MEASUREMENT: UnitOfPower.KILO_WATT,
+            },
+        },
+        blocking=True,
+    )
+
+    sensor = _loaded_sensor(hass, entity_id)
+    assert sensor.native_unit_of_measurement == UnitOfPower.KILO_WATT
+    assert sensor.device_class == SensorDeviceClass.POWER
+    extra_attributes = sensor._attr_extra_state_attributes
+    assert extra_attributes is not None
+    assert CONF_UNIT_OF_MEASUREMENT not in extra_attributes
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.attributes[ATTR_UNIT_OF_MEASUREMENT] == UnitOfPower.KILO_WATT
+
+
+@pytest.mark.parametrize(
+    ("config", "initial_native", "extra_attributes", "expected_native"),
+    [
+        pytest.param(
+            {
+                CONF_VARIABLE_ID: "unit_fill",
+                CONF_VALUE: 1,
+                CONF_DEVICE_CLASS: SensorDeviceClass.POWER,
+                CONF_ATTRIBUTES: {CONF_UNIT_OF_MEASUREMENT: UnitOfPower.KILO_WATT},
+            },
+            None,
+            {CONF_UNIT_OF_MEASUREMENT: UnitOfPower.KILO_WATT},
+            UnitOfPower.KILO_WATT,
+            id="attributes-unit",
+        ),
+        pytest.param(
+            {
+                CONF_VARIABLE_ID: "unit_fill",
+                CONF_VALUE: 1,
+                CONF_ATTRIBUTES: {ATTR_NATIVE_UNIT_OF_MEASUREMENT: UnitOfPower.WATT},
+            },
+            None,
+            {},
+            UnitOfPower.WATT,
+            id="attributes-native-unit",
+        ),
+        pytest.param(
+            {
+                CONF_VARIABLE_ID: "unit_fill",
+                CONF_VALUE: 1,
+                CONF_UNIT_OF_MEASUREMENT: UnitOfPower.KILO_WATT,
+            },
+            None,
+            {},
+            UnitOfPower.KILO_WATT,
+            id="config-unit",
+        ),
+        pytest.param(
+            {
+                CONF_VARIABLE_ID: "unit_fill",
+                CONF_VALUE: 1,
+                CONF_ATTRIBUTES: {CONF_UNIT_OF_MEASUREMENT: "none"},
+            },
+            None,
+            {},
+            None,
+            id="none-string",
+        ),
+        pytest.param(
+            {
+                CONF_VARIABLE_ID: "unit_fill",
+                CONF_VALUE: 1,
+                CONF_ATTRIBUTES: {CONF_UNIT_OF_MEASUREMENT: "unknown"},
+            },
+            None,
+            {},
+            None,
+            id="unknown-string",
+        ),
+        pytest.param(
+            {
+                CONF_VARIABLE_ID: "unit_fill",
+                CONF_VALUE: 1,
+                CONF_ATTRIBUTES: {CONF_UNIT_OF_MEASUREMENT: "unavailable"},
+            },
+            None,
+            {},
+            None,
+            id="unavailable-string",
+        ),
+        pytest.param(
+            {
+                CONF_VARIABLE_ID: "unit_fill",
+                CONF_VALUE: 1,
+                CONF_ATTRIBUTES: {CONF_UNIT_OF_MEASUREMENT: UnitOfPower.WATT},
+            },
+            UnitOfPower.KILO_WATT,
+            {CONF_UNIT_OF_MEASUREMENT: UnitOfPower.WATT},
+            UnitOfPower.KILO_WATT,
+            id="keep-existing-native",
+        ),
+    ],
+)
+def test_apply_missing_native_unit_from_config(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+    config: dict[str, object],
+    initial_native: str | None,
+    extra_attributes: dict[str, str],
+    expected_native: str | None,
+) -> None:
+    """Fill or preserve native units from configured sensor unit attributes.
+
+    Args:
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+        config (dict[str, object]): Variable configuration used to construct the entity.
+        initial_native (str | None): Native unit present before the helper runs.
+        extra_attributes (dict[str, str]): Extra state attributes present before the helper runs.
+        expected_native (str | None): Native unit expected after the helper runs.
+    """
+    entry = config_entry_factory(config)
+    sensor = Variable(hass, dict(entry.data), entry, entry.entry_id)
+    sensor._attr_native_unit_of_measurement = initial_native
+    sensor._attr_extra_state_attributes = dict(extra_attributes)
+
+    sensor._apply_missing_native_unit_from_config()
+
+    assert sensor._attr_native_unit_of_measurement == expected_native
+    extra_state_attributes = sensor._attr_extra_state_attributes
+    assert extra_state_attributes is not None
+    assert CONF_UNIT_OF_MEASUREMENT not in extra_state_attributes
+    if expected_native == UnitOfPower.KILO_WATT and config.get(CONF_DEVICE_CLASS):
+        assert sensor._attr_suggested_unit_of_measurement == UnitOfPower.KILO_WATT
+
+
+@pytest.mark.parametrize(
+    ("unit_payload", "expected_native", "expected_suggested"),
+    [
+        pytest.param(
+            {CONF_UNIT_OF_MEASUREMENT: "unknown"},
+            None,
+            None,
+            id="unknown",
+        ),
+        pytest.param(
+            {CONF_UNIT_OF_MEASUREMENT: "unavailable"},
+            None,
+            None,
+            id="unavailable",
+        ),
+        pytest.param(
+            {CONF_UNIT_OF_MEASUREMENT: "None"},
+            None,
+            None,
+            id="none-selector",
+        ),
+        pytest.param(
+            {ATTR_SUGGESTED_UNIT_OF_MEASUREMENT: "unknown"},
+            None,
+            None,
+            id="suggested-unknown",
+        ),
+        pytest.param(
+            {CONF_UNIT_OF_MEASUREMENT: UnitOfPower.KILO_WATT},
+            UnitOfPower.KILO_WATT,
+            None,
+            id="valid-unit",
+        ),
+    ],
+)
+def test_update_attr_settings_normalizes_unit_sentinels(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+    unit_payload: dict[str, str],
+    expected_native: str | None,
+    expected_suggested: str | None,
+) -> None:
+    """Reject missing unit sentinels from attribute payloads.
+
+    Args:
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+        unit_payload (dict[str, str]): Special unit attributes to apply.
+        expected_native (str | None): Native unit expected after normalization.
+        expected_suggested (str | None): Suggested unit expected after normalization.
+    """
+    entry = config_entry_factory({CONF_VARIABLE_ID: "unit_sentinels", CONF_VALUE: 1})
+    sensor = Variable(hass, dict(entry.data), entry, entry.entry_id)
+
+    remaining = sensor._update_attr_settings({**unit_payload, "source": "kept"})
+
+    assert remaining is not None
+    assert remaining["source"] == "kept"
+    assert sensor._attr_native_unit_of_measurement == expected_native
+    assert sensor._attr_suggested_unit_of_measurement == expected_suggested
+
+
+def test_init_normalizes_configured_unit_sentinel(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Treat the UI None unit selector as a missing native unit.
+
+    Args:
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+    """
+    entry = config_entry_factory(
+        {
+            CONF_VARIABLE_ID: "ui_none_unit",
+            CONF_VALUE: 1,
+            CONF_UNIT_OF_MEASUREMENT: "None",
+        }
+    )
+    sensor = Variable(hass, dict(entry.data), entry, entry.entry_id)
+
+    assert sensor._attr_native_unit_of_measurement is None
+    assert sensor._attr_suggested_unit_of_measurement is None

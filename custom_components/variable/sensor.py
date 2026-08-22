@@ -65,8 +65,44 @@ VARIABLE_ATTR_SETTINGS = {
     CONF_DEVICE_CLASS: "_attr_device_class",
     CONF_STATE_CLASS: "_attr_state_class",
     ATTR_NATIVE_UNIT_OF_MEASUREMENT: "_attr_native_unit_of_measurement",
+    # YAML and update-service payloads use the public sensor attribute name.
+    CONF_UNIT_OF_MEASUREMENT: "_attr_native_unit_of_measurement",
     ATTR_SUGGESTED_UNIT_OF_MEASUREMENT: "_attr_suggested_unit_of_measurement",
 }
+
+_MISSING_SENSOR_SENTINELS = frozenset({"", "none", "unknown", "unavailable"})
+_UNIT_SETTINGS = frozenset(
+    {
+        "_attr_native_unit_of_measurement",
+        "_attr_suggested_unit_of_measurement",
+    }
+)
+
+
+def _is_missing_sensor_value(value: object) -> bool:
+    """Return whether a restored or configured value represents absence.
+
+    Args:
+        value (object): Native value or unit to inspect.
+
+    Returns:
+        bool: True when the value is missing or a Home Assistant unavailable sentinel.
+    """
+    return value is None or (isinstance(value, str) and value.lower() in _MISSING_SENSOR_SENTINELS)
+
+
+def _normalize_sensor_unit(value: object) -> str | None:
+    """Return a unit string, or None for missing sentinels.
+
+    Args:
+        value (object): Configured, restored, or service-provided unit.
+
+    Returns:
+        str | None: The unit string, or ``None`` when the value is missing.
+    """
+    if _is_missing_sensor_value(value) or not isinstance(value, str):
+        return None
+    return value
 
 
 async def async_setup_entry(
@@ -164,7 +200,9 @@ class Variable(RestoreSensor):
         self._exclude_from_recorder = config.get(CONF_EXCLUDE_FROM_RECORDER)
         self._value_type = config.get(CONF_VALUE_TYPE)
         self._attr_device_class = config.get(CONF_DEVICE_CLASS)
-        self._attr_native_unit_of_measurement = config.get(CONF_UNIT_OF_MEASUREMENT)
+        self._attr_native_unit_of_measurement = _normalize_sensor_unit(
+            config.get(CONF_UNIT_OF_MEASUREMENT)
+        )
         self._attr_suggested_unit_of_measurement = None
         self._attr_state_class = config.get(CONF_STATE_CLASS)
         if (device_id := config.get(CONF_DEVICE_ID)) is not None:
@@ -190,8 +228,8 @@ class Variable(RestoreSensor):
                 self._attr_native_value = value_to_type(configured_value, self._value_type)
             except ValueError:
                 self._attr_native_value = None
-        if config.get(CONF_DEVICE_CLASS) in UNIT_CONVERTERS:
-            self._attr_suggested_unit_of_measurement = config.get(CONF_UNIT_OF_MEASUREMENT)
+        if self._attr_device_class in UNIT_CONVERTERS:
+            self._attr_suggested_unit_of_measurement = self._attr_native_unit_of_measurement
 
     async def async_added_to_hass(self) -> None:
         """Restore saved sensor state and attributes when configured."""
@@ -200,16 +238,13 @@ class Variable(RestoreSensor):
             _LOGGER.info("(%s) Restoring after Reboot", self._attr_name)
             sensor = await self.async_get_last_sensor_data()
             if sensor and hasattr(sensor, "native_value"):
-                if sensor.native_value is None or (
-                    isinstance(sensor.native_value, str)
-                    and sensor.native_value.lower()
-                    in [
-                        "",
-                        "none",
-                        "unknown",
-                        "unavailable",
-                    ]
-                ):
+                restored_unit = _normalize_sensor_unit(
+                    getattr(sensor, "native_unit_of_measurement", None)
+                )
+                self._attr_native_unit_of_measurement = restored_unit
+                if restored_unit is not None and self._attr_device_class in UNIT_CONVERTERS:
+                    self._attr_suggested_unit_of_measurement = restored_unit
+                if _is_missing_sensor_value(sensor.native_value):
                     self._attr_native_value = None
                 else:
                     try:
@@ -232,6 +267,10 @@ class Variable(RestoreSensor):
                 # name duplication across reboots.
                 restored_attributes = dict(state.attributes)
                 restored_attributes.pop(ATTR_FRIENDLY_NAME, None)
+                # Last state exposes the display unit. Native unit is restored
+                # separately from RestoreSensor extra data and must not be
+                # overwritten by a converted unit_of_measurement.
+                restored_attributes.pop(CONF_UNIT_OF_MEASUREMENT, None)
                 self._attr_extra_state_attributes = self._update_attr_settings(
                     restored_attributes,
                     just_pop=self._config.get(CONF_UPDATED, False),
@@ -288,8 +327,11 @@ class Variable(RestoreSensor):
                 not getattr(self, "_attr_extra_state_attributes", None)
                 or self._attr_extra_state_attributes == {}
             ) and self._config.get(CONF_ATTRIBUTES):
+                # Last sensor extra data already restored native unit. Re-applying
+                # configured special attributes would overwrite that restored unit.
                 self._attr_extra_state_attributes = self._update_attr_settings(
-                    self._config.get(CONF_ATTRIBUTES)
+                    self._config.get(CONF_ATTRIBUTES),
+                    just_pop=sensor is not None,
                 )
                 _LOGGER.debug(
                     "(%s) [restored] applied config attributes: %s",
@@ -304,6 +346,7 @@ class Variable(RestoreSensor):
                         self._attr_name,
                         err,
                     )
+        self._apply_missing_native_unit_from_config()
         if self._config.get(CONF_UPDATED, True):
             self._config.update({CONF_UPDATED: False})
             self._hass.config_entries.async_update_entry(
@@ -316,6 +359,36 @@ class Variable(RestoreSensor):
                 self._attr_name,
                 self._config_entry.data.get(CONF_UPDATED),
             )
+
+    def _apply_missing_native_unit_from_config(self) -> None:
+        """Fill a missing native unit from configured sensor unit attributes.
+
+        RestoreSensor extra data can restore ``None`` for YAML variables that
+        previously stored ``unit_of_measurement`` only as a custom attribute.
+        """
+        extra_attributes = self._attr_extra_state_attributes
+        if not _is_missing_sensor_value(self._attr_native_unit_of_measurement):
+            if isinstance(extra_attributes, MutableMapping):
+                extra_attributes.pop(CONF_UNIT_OF_MEASUREMENT, None)
+            return
+
+        attributes = self._config.get(CONF_ATTRIBUTES)
+        unit = None
+        if isinstance(attributes, MutableMapping):
+            unit = attributes.get(CONF_UNIT_OF_MEASUREMENT)
+            if unit is None:
+                unit = attributes.get(ATTR_NATIVE_UNIT_OF_MEASUREMENT)
+        if unit is None:
+            unit = self._config.get(CONF_UNIT_OF_MEASUREMENT)
+        if _is_missing_sensor_value(unit):
+            self._attr_native_unit_of_measurement = None
+            return
+
+        self._attr_native_unit_of_measurement = _normalize_sensor_unit(unit)
+        if isinstance(extra_attributes, MutableMapping):
+            extra_attributes.pop(CONF_UNIT_OF_MEASUREMENT, None)
+        if self._attr_device_class in UNIT_CONVERTERS:
+            self._attr_suggested_unit_of_measurement = self._attr_native_unit_of_measurement
 
     @property
     def should_poll(self) -> bool:
@@ -357,7 +430,10 @@ class Variable(RestoreSensor):
                         if just_pop:
                             attributes.pop(attrib, None)
                         else:
-                            setattr(self, setting, attributes.pop(attrib, None))
+                            value = attributes.pop(attrib, None)
+                            if setting in _UNIT_SETTINGS:
+                                value = _normalize_sensor_unit(value)
+                            setattr(self, setting, value)
                 return copy.deepcopy(attributes)
             _LOGGER.error(
                 "(%s) AttributeError: Attributes must be a dictionary: %s",
