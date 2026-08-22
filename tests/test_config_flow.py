@@ -35,6 +35,8 @@ import pytest
 
 from custom_components.variable.config_flow import VariableConfigFlow
 from custom_components.variable.const import (
+    ATTR_DELETE_IN_ZONES,
+    ATTR_IN_ZONES,
     CONF_ATTRIBUTES,
     CONF_ENTITY_PLATFORM,
     CONF_EXCLUDE_FROM_RECORDER,
@@ -46,6 +48,7 @@ from custom_components.variable.const import (
     CONF_VARIABLE_ID,
     CONF_YAML_VARIABLE,
     DOMAIN,
+    SERVICE_UPDATE_DEVICE_TRACKER,
 )
 from tests.types import ConfigEntryFactory
 
@@ -1240,6 +1243,139 @@ async def test_device_tracker_options_flow_changes_live_entity(
     assert state.attributes[ATTR_GPS_ACCURACY] == 6
     assert state.attributes[ATTR_BATTERY_LEVEL] == 72
     assert state.attributes["source"] == "tracker-options"
+
+
+async def test_device_tracker_options_flow_sets_in_zones_state(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Set tracker state from zone membership through the options workflow.
+
+    Args:
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the device-tracker config entry.
+    """
+    entity_id = "device_tracker.options_zone_tracker"
+    zone_id = "zone.workshop"
+    hass.states.async_set(
+        zone_id,
+        "zoning",
+        {
+            "friendly_name": "Workshop Zone",
+            "latitude": 41.5,
+            "longitude": -74.5,
+            "radius": 100,
+            "passive": False,
+        },
+    )
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.DEVICE_TRACKER,
+            CONF_VARIABLE_ID: "options_zone_tracker",
+            CONF_NAME: "Options Zone Tracker",
+            CONF_YAML_VARIABLE: False,
+            ATTR_LATITUDE: 40.0,
+            ATTR_LONGITUDE: -75.0,
+            "restore": False,
+            "force_update": False,
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={"next_step_id": "change_device_tracker_value"},
+    )
+    assert result["type"] is FlowResultType.FORM
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            ATTR_LATITUDE: 40.0,
+            ATTR_LONGITUDE: -75.0,
+            ATTR_IN_ZONES: [zone_id],
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "value_changed"
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.state == "Workshop Zone"
+    assert state.attributes[ATTR_IN_ZONES] == [zone_id]
+
+
+async def test_device_tracker_options_flow_clears_in_zones(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Clear explicit zone membership from the options workflow.
+
+    Args:
+        hass (HomeAssistant): Home Assistant instance that hosts the integration.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the device-tracker config entry.
+    """
+    entity_id = "device_tracker.options_clear_zones"
+    zone_id = "zone.workshop"
+    hass.states.async_set(
+        zone_id,
+        "zoning",
+        {
+            "friendly_name": "Workshop Zone",
+            "latitude": 41.5,
+            "longitude": -74.5,
+            "radius": 100,
+            "passive": False,
+        },
+    )
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.DEVICE_TRACKER,
+            CONF_VARIABLE_ID: "options_clear_zones",
+            CONF_YAML_VARIABLE: False,
+            ATTR_LATITUDE: 40.0,
+            ATTR_LONGITUDE: -75.0,
+            "restore": False,
+            "force_update": False,
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_UPDATE_DEVICE_TRACKER,
+        {"entity_id": [entity_id], ATTR_IN_ZONES: [zone_id]},
+        blocking=True,
+    )
+    zoned = hass.states.get(entity_id)
+    assert zoned is not None
+    assert zoned.state == "Workshop Zone"
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={"next_step_id": "change_device_tracker_value"},
+    )
+    assert result["type"] is FlowResultType.FORM
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            ATTR_LATITUDE: 40.0,
+            ATTR_LONGITUDE: -75.0,
+            ATTR_DELETE_IN_ZONES: True,
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "value_changed"
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.state != "Workshop Zone"
+    assert state.attributes.get(ATTR_IN_ZONES) == []
 
 
 async def test_change_device_tracker_value_accepts_zero_coordinates(

@@ -40,6 +40,7 @@ from .const import (
     ATTR_ATTRIBUTES,
     ATTR_DELETE_IN_ZONES,
     ATTR_DELETE_LOCATION_NAME,
+    ATTR_IN_ZONES,
     ATTR_REPLACE_ATTRIBUTES,
     CONF_ATTRIBUTES,
     CONF_EXCLUDE_FROM_RECORDER,
@@ -55,8 +56,6 @@ from .const import (
 from .helpers import merge_attribute_dict
 
 _LOGGER = logging.getLogger(__name__)
-
-ATTR_IN_ZONES = "in_zones"
 
 # Home Assistant 2026.6 added TrackerEntity.in_zones, which replaces using a
 # free-form location name as the tracker state. Once the minimum version is
@@ -181,6 +180,7 @@ class Variable(RestoreEntity, TrackerEntity):
         self._attr_longitude = config.get(ATTR_LONGITUDE)
         self._attr_battery_level = config.get(ATTR_BATTERY_LEVEL)
         self._attr_in_zones = config.get(ATTR_IN_ZONES)
+        self._location_name_deprecated_logged = False
         self._set_location_name(config.get(ATTR_LOCATION_NAME))
         self._attr_gps_accuracy = config.get(ATTR_GPS_ACCURACY)
 
@@ -295,6 +295,25 @@ class Variable(RestoreEntity, TrackerEntity):
         if not SUPPORTS_TRACKER_IN_ZONES:
             self._attr_location_name = location_name
 
+    def _warn_location_name_deprecated(self) -> None:
+        """Log once that ``location_name`` no longer drives tracker state.
+
+        Home Assistant 2026.6 stopped using ``TrackerEntity.location_name`` as
+        the entity state. This integration still stores the value as an extra
+        attribute until Home Assistant removes the property.
+        """
+        if not SUPPORTS_TRACKER_IN_ZONES or self._location_name_deprecated_logged:
+            return
+        _LOGGER.warning(
+            "(%s) location_name no longer sets device_tracker state on "
+            "Home Assistant 2026.6+. Use latitude/longitude so Home Assistant "
+            "can match zones, or set in_zones to zone entity IDs. "
+            "location_name is kept as an extra attribute until Home Assistant "
+            "removes it (planned 2027.7).",
+            self._attr_name,
+        )
+        self._location_name_deprecated_logged = True
+
     async def async_update_variable(self, **kwargs: Any) -> None:
         """Apply an update service payload to tracker state and attributes.
 
@@ -330,6 +349,8 @@ class Variable(RestoreEntity, TrackerEntity):
                     )
                     attributes = None
             if isinstance(attributes, MutableMapping):
+                if ATTR_LOCATION_NAME in attributes:
+                    self._warn_location_name_deprecated()
                 _LOGGER.debug(
                     "(%s) [async_update_variable] New Attributes: %s",
                     self._attr_name,
@@ -373,6 +394,7 @@ class Variable(RestoreEntity, TrackerEntity):
         if ATTR_DELETE_IN_ZONES in kwargs and kwargs.get(ATTR_DELETE_IN_ZONES) is True:
             self._attr_in_zones = None
         if ATTR_LOCATION_NAME in kwargs:
+            self._warn_location_name_deprecated()
             self._set_location_name(kwargs.get(ATTR_LOCATION_NAME))
         if ATTR_BATTERY_LEVEL in kwargs:
             self._attr_battery_level = kwargs.get(ATTR_BATTERY_LEVEL)

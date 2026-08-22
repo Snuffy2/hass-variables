@@ -42,7 +42,9 @@ import voluptuous as vol
 
 from .const import (
     ATTR_ATTRIBUTES,
+    ATTR_DELETE_IN_ZONES,
     ATTR_DELETE_LOCATION_NAME,
+    ATTR_IN_ZONES,
     ATTR_REPLACE_ATTRIBUTES,
     ATTR_VALUE,
     CONF_ATTRIBUTES,
@@ -1119,6 +1121,12 @@ class VariableOptionsFlowHandler(OptionsFlow):
                     update_variable.update(
                         {ATTR_DELETE_LOCATION_NAME: user_input.get(ATTR_DELETE_LOCATION_NAME)}
                     )
+                if user_input.get(ATTR_IN_ZONES) is not None:
+                    update_variable.update({ATTR_IN_ZONES: user_input.get(ATTR_IN_ZONES)})
+                if user_input.get(ATTR_DELETE_IN_ZONES):
+                    update_variable.update(
+                        {ATTR_DELETE_IN_ZONES: user_input.get(ATTR_DELETE_IN_ZONES)}
+                    )
                 if user_input.get(ATTR_GPS_ACCURACY) is not None:
                     update_variable.update({ATTR_GPS_ACCURACY: user_input.get(ATTR_GPS_ACCURACY)})
                 if user_input.get(ATTR_BATTERY_LEVEL) is not None:
@@ -1169,6 +1177,7 @@ class VariableOptionsFlowHandler(OptionsFlow):
         lat = attr.pop(ATTR_LATITUDE, None)
         long = attr.pop(ATTR_LONGITUDE, None)
         loc = attr.pop(ATTR_LOCATION_NAME, None)
+        in_zones = attr.pop(ATTR_IN_ZONES, None)
         gpsacc = attr.pop(ATTR_GPS_ACCURACY, None)
         battlvl = attr.pop(ATTR_BATTERY_LEVEL, None)
         change_variable_value_schema = vol.Schema(
@@ -1213,6 +1222,24 @@ class VariableOptionsFlowHandler(OptionsFlow):
                 vol.Optional(
                     ATTR_DELETE_LOCATION_NAME,
                 ): selector.BooleanSelector(selector.BooleanSelectorConfig())
+            }
+        )
+        zone_selector = selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="zone", multiple=True)
+        )
+        if in_zones:
+            change_variable_value_schema = change_variable_value_schema.extend(
+                {vol.Optional(ATTR_IN_ZONES, default=in_zones): zone_selector}
+            )
+        else:
+            change_variable_value_schema = change_variable_value_schema.extend(
+                {vol.Optional(ATTR_IN_ZONES): zone_selector}
+            )
+        change_variable_value_schema = change_variable_value_schema.extend(
+            {
+                vol.Optional(ATTR_DELETE_IN_ZONES): selector.BooleanSelector(
+                    selector.BooleanSelectorConfig()
+                )
             }
         )
         if gpsacc is None:

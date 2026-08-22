@@ -95,26 +95,26 @@ update_device_tracker:
           mode: box
     in_zones:
       name: In Zones
-      description: "List of zone entity IDs the device is currently in (e.g. zone.home). Replaces location_name for zone-based tracking. Ignored if latitude and longitude are both set."
+      description: "List of zone entity IDs the device is currently in (e.g. zone.home). Replaces location_name for zone-based tracking. If both in_zones and coordinates are set, in_zones takes priority."
       example: "['zone.home']"
       selector:
         object:
     delete_in_zones:
       name: Delete In Zones
-      description: Clear the in_zones list so state falls back to lat/long or not_home
+      description: Clear the in_zones list so state falls back to latitude/longitude or not_home
       selector:
         constant:
           label: Will Delete
           value: true
     location_name:
       name: Location Name (deprecated)
-      description: "Deprecated: use in_zones instead. Will be removed when Home Assistant removes location_name support (planned 2027.7)."
+      description: "Deprecated: does not set state on Home Assistant 2026.6+. Use in_zones or coordinates instead. Kept as an extra attribute until Home Assistant removes location_name (planned 2027.7)."
       example: "School"
       selector:
         text:
     delete_location_name:
       name: Delete Location Name
-      description: Remove the Location Name so state will be based on Lat/Long
+      description: Remove the location_name extra attribute. Does not change state on Home Assistant 2026.6+.
       selector:
         constant:
           label: Will Delete
