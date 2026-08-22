@@ -2,7 +2,7 @@
 
 from homeassistant.const import Platform
 
-VERSION = "3.5.14"
+VERSION = "3.5.15"
 
 PLATFORM_NAME = "Variables+History"
 DOMAIN = "variable"
@@ -37,6 +37,7 @@ CONF_CLEAR_DEVICE_ID = "clear_device_id"
 ATTR_ATTRIBUTES = "attributes"
 ATTR_DELETE_IN_ZONES = "delete_in_zones"
 ATTR_DELETE_LOCATION_NAME = "delete_location_name"
+ATTR_IN_ZONES = "in_zones"
 ATTR_ENTITY = "entity"
 ATTR_NATIVE_UNIT_OF_MEASUREMENT = "native_unit_of_measurement"
 ATTR_SUGGESTED_UNIT_OF_MEASUREMENT = "suggested_unit_of_measurement"

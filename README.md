@@ -16,6 +16,8 @@
 
 A Home Assistant Integration to declare and set/update variables.
 
+Requires Home Assistant 2026.6 or later.
+
 ## Installation
 
 1. Ensure that [HACS](https://hacs.xyz/) is installed
@@ -80,15 +82,24 @@ A Home Assistant Integration to declare and set/update variables.
 | `Variable ID`           | `Yes`    |                | The desired id of the new device tracker (ex. `test_variable` would create an entity_id of `device_tracker.test_variable`)                                                                                                         |
 | `Name`                  | `No`     |                | Friendly name of the variable device tracker                                                                                                                                                                                       |
 | `Icon`                  | `No`     | `mdi:variable` | Icon of the Variable                                                                                                                                                                                                               |
-| `Initial Latitude`      | `Yes`    |                | Latitude                                                                                                                                                                                                                           |
-| `Initial Longitude`     | `Yes`    |                | Longitude                                                                                                                                                                                                                          |
-| `Initial Location Name` | `No`     |                | If set, will show this as the state                                                                                                                                                                                                |
+| `Initial Latitude`      | `Yes`    |                | Latitude. Home Assistant matches these coordinates against your zones to set state unless `in_zones` is set.                                                    |
+| `Initial Longitude`     | `Yes`    |                | Longitude. Used with latitude for zone matching.                                                                                                                |
+| `Initial Location Name` | `No`     |                | Extra attribute only; does **not** set entity state.                                                                                                            |
 | `Initial GPS Accuracy`  | `No`     |                | Accuracy in meters                                                                                                                                                                                                                 |
 | `Initial Battery Level` | `No`     |                | Battery level from 0-100%                                                                                                                                                                                                          |
 | `Initial Attributes`    | `No`     |                | Initial attributes of the variable                                                                                                                                                                                                 |
 | `Restore on Restart`    | `No`     | `True`         | If `True` will restore previous value on restart. If `False`, will reset to `Initial Latitude`, `Initial Longitude`, `Initial Location Name`, `Initial GPS Accuracy`, `Initial Battery Level`, and `Initial Attributes` on restart |
 | `Force Update`          | `No`     | `False`        | Variable's `last_updated` time will change with any service calls to update the variable even if the value does not change                                                                                                         |
 | `Exclude from Recorder` | `No`     | `False`        | Excludes attributes from Recorder while preserving state history. Enable for Variables with large attributes to prevent Recorder Errors.                                                                                          |
+
+**How device tracker state is set**
+
+Home Assistant does not let a device tracker use a free-form `location_name` as its state. State is computed as:
+
+1. **`in_zones`**: a list of zone entity IDs such as `zone.home` or `zone.work`. The first active zone becomes the state (`home` when that zone is the home zone).
+2. **Latitude / longitude**: if `in_zones` is not set, Home Assistant matches coordinates against your zones (`home`, `not_home`, or a zone name). If both `in_zones` and coordinates are set, **`in_zones` takes priority**.
+
+`location_name` is kept as an extra attribute for compatibility and does **not** change state. Custom place names that are not Home Assistant zones cannot be the entity state; create a zone for that place, or provide coordinates inside an existing zone.
 
 </details>
 
@@ -180,12 +191,12 @@ Used to update the value or attributes of a Device Tracker Variable
 | Name                   | Key                                     | Required | Default | Description                                                                                           |
 |------------------------|-----------------------------------------|----------|---------|-------------------------------------------------------------------------------------------------------|
 | `Targets`              | `target:`<br />&nbsp;&nbsp;`entity_id:` | `Yes`    |         | The entity_ids of one or more device tracker variables to update (ex. `device_tracker.test_variable`) |
-| `Latitude`             | `latitude`                              | `No`     |         | Latitude                                                                                              |
-| `Longitude`            | `longitude`                             | `No`     |         | Longitude                                                                                             |
-| `Location Name`        | `location_name`                         | `No`     |         | HA 2026.3.4–2026.5: free-form value sets state.<br />HA 2026.6+: `location_name` attribute; does not set state |
-| `Delete Location Name` | `delete_location_name`                  | `No`     |         | Removes location context (`boolean`). HA 2026.3.4–2026.5: removes legacy state so it can use Lat/Long.<br />HA 2026.6+: removes only the attribute; does not drive state |
-| `In Zones`             | `in_zones`                              | `No`     |         | HA 2026.6+ only: list of zone entity IDs that controls state. State can also be derived from coordinates |
-| `Delete In Zones`      | `delete_in_zones`                       | `No`     |         | HA 2026.6+ only: clears the `in_zones` list so state falls back to coordinates or `not_home` |
+| `Latitude`             | `latitude`                              | `No`     |         | Latitude. Used for zone matching when `in_zones` is not set.                                      |
+| `Longitude`            | `longitude`                             | `No`     |         | Longitude. Used with latitude for zone matching.                                                  |
+| `Location Name`        | `location_name`                         | `No`     |         | Extra attribute only; does **not** set state. Logs a deprecation warning.                         |
+| `Delete Location Name` | `delete_location_name`                  | `No`     |         | Removes the `location_name` attribute (`boolean`). Does not change state.                         |
+| `In Zones`             | `in_zones`                              | `No`     |         | List of zone entity IDs that sets state (e.g. `zone.home`). Takes priority over coordinates when set. |
+| `Delete In Zones`      | `delete_in_zones`                       | `No`     |         | Clears `in_zones` so state falls back to coordinates or `not_home`                                |
 | `GPS Accuracy`         | `gps_accuracy`                          | `No`     |         | Accuracy in meters                                                                                    |
 | `Battery Level`        | `battery_level`                         | `No`     |         | Battery level from 0-100%                                                                             |
 | `New Attributes`       | `attributes`                            | `No`     |         | What to update the attributes to                                                                      |

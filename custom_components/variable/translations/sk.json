@@ -55,7 +55,7 @@
           "icon": "Ikona",
           "latitude": "Počiatočná zemepisná šírka",
           "longitude": "Počiatočná zemepisná dĺžka",
-          "location_name": "Názov počiatočného miesta",
+          "location_name": "Názov počiatočného miesta (iba atribút; nenastavuje stav)",
           "gps_accuracy": "Počiatočná presnosť GPS",
           "battery_level": "Počiatočná úroveň nabitia batérie",
           "attributes": "Počiatočné atribúty",
@@ -126,13 +126,15 @@
         "data": {
           "latitude": "Zemepisná šírka",
           "longitude": "Zemepisná dĺžka",
-          "location_name": "Názov miesta",
+          "location_name": "Názov miesta (iba atribút; nenastavuje stav)",
           "delete_location_name": "Odstrániť názov miesta",
+          "in_zones": "V zónach",
+          "delete_in_zones": "Vymazať zóny",
           "gps_accuracy": "Presnosť GPS",
           "battery_level": "Úroveň batérie",
           "attributes": "Atribúty"
         },
-        "description": "**Aktualizuje sa nástroj na sledovanie zariadenia:&nbsp;{disp_name}**\n**Aktuálny stav:&nbsp;{dt_state}**"
+        "description": "**Aktualizuje sa nástroj na sledovanie zariadenia:&nbsp;{disp_name}**\n**Aktuálny stav:&nbsp;{dt_state}**\nStav vychádza zo súradníc alebo zón (In Zones), nie z názvu miesta."
       },
       "binary_sensor_options": {
         "title": "Premenné+história - binárny snímač",
@@ -151,7 +153,7 @@
         "data": {
           "latitude": "Zemepisná šírka (zvyčajne užitočné iba vtedy, ak je možnosť Obnoviť pri reštarte nastavená na hodnotu False)",
           "longitude": "Zemepisná dĺžka (zvyčajne užitočné iba vtedy, ak je možnosť Obnoviť pri reštarte nastavená na hodnotu False)",
-          "location_name": "Názov miesta (zvyčajne užitočné iba vtedy, ak je možnosť Obnoviť pri reštarte nastavená na hodnotu False)",
+          "location_name": "Názov miesta (iba atribút; zvyčajne užitočné iba vtedy, ak je možnosť Obnoviť pri reštarte nastavená na hodnotu False)",
           "gps_accuracy": "Presnosť GPS (zvyčajne užitočné iba vtedy, ak je možnosť Obnoviť pri reštarte nastavená na hodnotu False)",
           "battery_level": "Úroveň nabitia batérie (zvyčajne užitočné iba vtedy, ak je možnosť Obnoviť pri reštarte nastavená na hodnotu False)",
           "attributes": "Atribúty (zvyčajne užitočné iba vtedy, ak je možnosť Obnoviť pri reštarte nastavená na hodnotu False)",
