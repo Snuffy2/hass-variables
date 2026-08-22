@@ -25,6 +25,7 @@ from custom_components.variable.const import (
     ATTR_ATTRIBUTES,
     ATTR_NATIVE_UNIT_OF_MEASUREMENT,
     ATTR_REPLACE_ATTRIBUTES,
+    ATTR_SUGGESTED_UNIT_OF_MEASUREMENT,
     ATTR_VALUE_DELTA,
     CONF_ATTRIBUTES,
     CONF_ENTITY_PLATFORM,
@@ -976,3 +977,88 @@ def test_apply_missing_native_unit_from_config(
     assert CONF_UNIT_OF_MEASUREMENT not in extra_state_attributes
     if expected_native == UnitOfPower.KILO_WATT and config.get(CONF_DEVICE_CLASS):
         assert sensor._attr_suggested_unit_of_measurement == UnitOfPower.KILO_WATT
+
+
+@pytest.mark.parametrize(
+    ("unit_payload", "expected_native", "expected_suggested"),
+    [
+        pytest.param(
+            {CONF_UNIT_OF_MEASUREMENT: "unknown"},
+            None,
+            None,
+            id="unknown",
+        ),
+        pytest.param(
+            {CONF_UNIT_OF_MEASUREMENT: "unavailable"},
+            None,
+            None,
+            id="unavailable",
+        ),
+        pytest.param(
+            {CONF_UNIT_OF_MEASUREMENT: "None"},
+            None,
+            None,
+            id="none-selector",
+        ),
+        pytest.param(
+            {ATTR_SUGGESTED_UNIT_OF_MEASUREMENT: "unknown"},
+            None,
+            None,
+            id="suggested-unknown",
+        ),
+        pytest.param(
+            {CONF_UNIT_OF_MEASUREMENT: UnitOfPower.KILO_WATT},
+            UnitOfPower.KILO_WATT,
+            None,
+            id="valid-unit",
+        ),
+    ],
+)
+def test_update_attr_settings_normalizes_unit_sentinels(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+    unit_payload: dict[str, str],
+    expected_native: str | None,
+    expected_suggested: str | None,
+) -> None:
+    """Reject missing unit sentinels from attribute payloads.
+
+    Args:
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+        unit_payload (dict[str, str]): Special unit attributes to apply.
+        expected_native (str | None): Native unit expected after normalization.
+        expected_suggested (str | None): Suggested unit expected after normalization.
+    """
+    entry = config_entry_factory({CONF_VARIABLE_ID: "unit_sentinels", CONF_VALUE: 1})
+    sensor = Variable(hass, dict(entry.data), entry, entry.entry_id)
+
+    remaining = sensor._update_attr_settings({**unit_payload, "source": "kept"})
+
+    assert remaining is not None
+    assert remaining["source"] == "kept"
+    assert sensor._attr_native_unit_of_measurement == expected_native
+    assert sensor._attr_suggested_unit_of_measurement == expected_suggested
+
+
+def test_init_normalizes_configured_unit_sentinel(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Treat the UI None unit selector as a missing native unit.
+
+    Args:
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+    """
+    entry = config_entry_factory(
+        {
+            CONF_VARIABLE_ID: "ui_none_unit",
+            CONF_VALUE: 1,
+            CONF_UNIT_OF_MEASUREMENT: "None",
+        }
+    )
+    sensor = Variable(hass, dict(entry.data), entry, entry.entry_id)
+
+    assert sensor._attr_native_unit_of_measurement is None
+    assert sensor._attr_suggested_unit_of_measurement is None
