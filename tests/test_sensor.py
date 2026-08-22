@@ -30,6 +30,7 @@ from custom_components.variable.const import (
     CONF_ENTITY_PLATFORM,
     CONF_FORCE_UPDATE,
     CONF_RESTORE,
+    CONF_UPDATED,
     CONF_VALUE,
     CONF_VALUE_TYPE,
     CONF_VARIABLE_ID,
@@ -667,6 +668,7 @@ async def test_restore_keeps_native_unit_when_display_unit_differs(
             CONF_VALUE_TYPE: "number",
             CONF_YAML_VARIABLE: False,
             CONF_RESTORE: True,
+            CONF_UPDATED: False,
             CONF_FORCE_UPDATE: False,
             CONF_ATTRIBUTES: {
                 "state_class": SensorStateClass.MEASUREMENT,
@@ -727,7 +729,8 @@ async def test_restore_replaces_missing_native_unit_from_config_attributes(
             CONF_VALUE: 1,
             CONF_VALUE_TYPE: "number",
             CONF_YAML_VARIABLE: False,
-            CONF_RESTORE: False,
+            CONF_RESTORE: True,
+            CONF_UPDATED: False,
             CONF_FORCE_UPDATE: False,
             CONF_ATTRIBUTES: {
                 "state_class": SensorStateClass.MEASUREMENT,
@@ -747,6 +750,66 @@ async def test_restore_replaces_missing_native_unit_from_config_attributes(
     assert extra_attributes is not None
     assert CONF_UNIT_OF_MEASUREMENT not in extra_attributes
     assert NATIVE_UNIT_NONE_WARNING not in caplog.text
+
+
+async def test_restore_prefers_stored_native_unit_over_config(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+) -> None:
+    """Keep a restored native unit when configuration specifies a different unit.
+
+    Args:
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+    """
+    entity_id = "sensor.restored_unit_precedence"
+    mock_restore_cache_with_extra_data(
+        hass,
+        [
+            (
+                State(
+                    entity_id,
+                    "1",
+                    {
+                        CONF_DEVICE_CLASS: SensorDeviceClass.POWER,
+                        "state_class": SensorStateClass.MEASUREMENT,
+                        ATTR_UNIT_OF_MEASUREMENT: UnitOfPower.WATT,
+                    },
+                ),
+                {
+                    "native_value": "1",
+                    "native_unit_of_measurement": UnitOfPower.WATT,
+                },
+            )
+        ],
+    )
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.SENSOR,
+            CONF_VARIABLE_ID: "restored_unit_precedence",
+            CONF_VALUE: 0,
+            CONF_VALUE_TYPE: "number",
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: True,
+            CONF_UPDATED: False,
+            CONF_FORCE_UPDATE: False,
+            CONF_ATTRIBUTES: {
+                "state_class": SensorStateClass.MEASUREMENT,
+                CONF_DEVICE_CLASS: SensorDeviceClass.POWER,
+                CONF_UNIT_OF_MEASUREMENT: UnitOfPower.KILO_WATT,
+            },
+        }
+    )
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    sensor = _loaded_sensor(hass, entity_id)
+    assert sensor.native_unit_of_measurement == UnitOfPower.WATT
+    extra_attributes = sensor._attr_extra_state_attributes
+    assert extra_attributes is not None
+    assert CONF_UNIT_OF_MEASUREMENT not in extra_attributes
+    assert ATTR_UNIT_OF_MEASUREMENT not in extra_attributes
 
 
 async def test_update_sensor_promotes_unit_of_measurement_attribute(
@@ -846,6 +909,28 @@ async def test_update_sensor_promotes_unit_of_measurement_attribute(
             {},
             None,
             id="none-string",
+        ),
+        pytest.param(
+            {
+                CONF_VARIABLE_ID: "unit_fill",
+                CONF_VALUE: 1,
+                CONF_ATTRIBUTES: {CONF_UNIT_OF_MEASUREMENT: "unknown"},
+            },
+            None,
+            {},
+            None,
+            id="unknown-string",
+        ),
+        pytest.param(
+            {
+                CONF_VARIABLE_ID: "unit_fill",
+                CONF_VALUE: 1,
+                CONF_ATTRIBUTES: {CONF_UNIT_OF_MEASUREMENT: "unavailable"},
+            },
+            None,
+            {},
+            None,
+            id="unavailable-string",
         ),
         pytest.param(
             {

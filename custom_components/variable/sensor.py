@@ -70,6 +70,20 @@ VARIABLE_ATTR_SETTINGS = {
     ATTR_SUGGESTED_UNIT_OF_MEASUREMENT: "_attr_suggested_unit_of_measurement",
 }
 
+_MISSING_SENSOR_SENTINELS = frozenset({"", "none", "unknown", "unavailable"})
+
+
+def _is_missing_sensor_value(value: object) -> bool:
+    """Return whether a restored or configured value represents absence.
+
+    Args:
+        value (object): Native value or unit to inspect.
+
+    Returns:
+        bool: True when the value is missing or a Home Assistant unavailable sentinel.
+    """
+    return value is None or (isinstance(value, str) and value.lower() in _MISSING_SENSOR_SENTINELS)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -202,16 +216,14 @@ class Variable(RestoreSensor):
             _LOGGER.info("(%s) Restoring after Reboot", self._attr_name)
             sensor = await self.async_get_last_sensor_data()
             if sensor and hasattr(sensor, "native_value"):
-                if sensor.native_value is None or (
-                    isinstance(sensor.native_value, str)
-                    and sensor.native_value.lower()
-                    in [
-                        "",
-                        "none",
-                        "unknown",
-                        "unavailable",
-                    ]
-                ):
+                restored_unit = getattr(sensor, "native_unit_of_measurement", None)
+                if _is_missing_sensor_value(restored_unit):
+                    self._attr_native_unit_of_measurement = None
+                else:
+                    self._attr_native_unit_of_measurement = restored_unit
+                    if self._attr_device_class in UNIT_CONVERTERS:
+                        self._attr_suggested_unit_of_measurement = restored_unit
+                if _is_missing_sensor_value(sensor.native_value):
                     self._attr_native_value = None
                 else:
                     try:
@@ -294,8 +306,11 @@ class Variable(RestoreSensor):
                 not getattr(self, "_attr_extra_state_attributes", None)
                 or self._attr_extra_state_attributes == {}
             ) and self._config.get(CONF_ATTRIBUTES):
+                # Last sensor extra data already restored native unit. Re-applying
+                # configured special attributes would overwrite that restored unit.
                 self._attr_extra_state_attributes = self._update_attr_settings(
-                    self._config.get(CONF_ATTRIBUTES)
+                    self._config.get(CONF_ATTRIBUTES),
+                    just_pop=sensor is not None,
                 )
                 _LOGGER.debug(
                     "(%s) [restored] applied config attributes: %s",
@@ -344,7 +359,7 @@ class Variable(RestoreSensor):
                 unit = attributes.get(ATTR_NATIVE_UNIT_OF_MEASUREMENT)
         if unit is None:
             unit = self._config.get(CONF_UNIT_OF_MEASUREMENT)
-        if unit is None or (isinstance(unit, str) and unit.lower() in ("", "none")):
+        if _is_missing_sensor_value(unit):
             return
 
         self._attr_native_unit_of_measurement = unit
