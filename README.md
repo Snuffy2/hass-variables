@@ -18,6 +18,11 @@ A Home Assistant Integration to declare and set/update variables.
 
 Requires Home Assistant 2026.6 or later.
 
+## Breaking changes in 3.5.15
+
+- **Home Assistant 2026.6 or later is required.** Older cores are no longer supported.
+- Device tracker `location_name` no longer sets entity state. Use `latitude`/`longitude` so Home Assistant can match zones, or set `in_zones` to zone entity IDs such as `zone.home`. `location_name` is kept only as an extra attribute.
+
 ## Installation
 
 1. Ensure that [HACS](https://hacs.xyz/) is installed
