@@ -514,6 +514,65 @@ async def test_update_sensor_rejects_incompatible_typed_value(
     assert state.state == "2026-08-10"
 
 
+@pytest.mark.parametrize(
+    ("value_type", "entity_id", "variable_id", "quoted_value"),
+    [
+        pytest.param("string", "sensor.quoted_string", "quoted_string", "'87'", id="string"),
+        pytest.param("number", "sensor.quoted_number", "quoted_number", "'87'", id="number"),
+        pytest.param(
+            "string", "sensor.quoted_double", "quoted_double", '"87.5"', id="double-quoted"
+        ),
+    ],
+)
+async def test_update_sensor_unwraps_quoted_numeric_value(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+    value_type: str,
+    entity_id: str,
+    variable_id: str,
+    quoted_value: str,
+) -> None:
+    """Store quoted numeric service values as plain numbers for numeric_state.
+
+    Args:
+        hass (HomeAssistant): Home Assistant test instance.
+        config_entry_factory (ConfigEntryFactory): Factory for test configuration entries.
+        value_type (str): Configured Variable value type.
+        entity_id (str): Entity ID created from the variable id.
+        variable_id (str): Variable ID used to create the config entry.
+        quoted_value (str): Quoted numeric payload as supplied from the UI or YAML.
+    """
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: Platform.SENSOR,
+            CONF_VARIABLE_ID: variable_id,
+            CONF_VALUE: None,
+            CONF_VALUE_TYPE: value_type,
+            CONF_YAML_VARIABLE: False,
+            CONF_RESTORE: False,
+            CONF_FORCE_UPDATE: False,
+        }
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_UPDATE_SENSOR,
+        {
+            "entity_id": [entity_id],
+            CONF_VALUE: quoted_value,
+        },
+        blocking=True,
+    )
+
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.state == quoted_value.strip("\"'")
+    assert "'" not in state.state
+    assert '"' not in state.state
+
+
 async def test_increment_from_none_uses_zero_baseline(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,

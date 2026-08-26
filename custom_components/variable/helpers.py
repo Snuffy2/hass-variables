@@ -12,6 +12,13 @@ import homeassistant.util.dt as dt_util
 
 _LOGGER = logging.getLogger(__name__)
 
+_WRAPPING_QUOTE_PAIRS: dict[str, str] = {
+    "'": "'",
+    '"': '"',
+    "\u2018": "\u2019",
+    "\u201c": "\u201d",
+}
+
 
 class _AttributePathTypeError(TypeError, ValueError):
     """Report incompatible containers while retaining the legacy ValueError API."""
@@ -61,6 +68,24 @@ def _parse_attribute_path(path: str) -> list[str | int]:
     if buffer:
         tokens.append(buffer)
     return tokens
+
+
+def _unwrap_matching_quotes(value: str) -> str:
+    """Remove one layer of matching wrapping quotes from a string.
+
+    Args:
+        value (str): String that may be wrapped in ASCII or typographic quotes.
+
+    Returns:
+        str: The inner text when the first and last characters are a matching
+            quote pair; otherwise the original string.
+    """
+    if len(value) < 2:
+        return value
+    closing = _WRAPPING_QUOTE_PAIRS.get(value[0])
+    if closing is not None and value[-1] == closing:
+        return value[1:-1]
+    return value
 
 
 def set_nested_attribute(target: MutableMapping[str, Any], path: str, value: Any) -> None:
@@ -325,6 +350,7 @@ def value_to_type(
 
     Args:
         init_val (Any): Initial value supplied by YAML, a service, or a template.
+            One matching pair of wrapping quotes is stripped before conversion.
         dest_type (str | None): Requested Variable value type.
 
     Returns:
@@ -345,7 +371,12 @@ def value_to_type(
     if not isinstance(init_val, (str, int, float, datetime.date, datetime.datetime)):
         init_val = str(init_val)
 
+    # Strip one matching quote layer from UI/YAML values such as "'87'".
     if isinstance(init_val, str):
+        init_val = _unwrap_matching_quotes(init_val)
+        if init_val.lower() in ["", "none", "unknown", "unavailable"]:
+            _LOGGER.debug("[value_to_type] return value: %s, returning None", init_val)
+            return None
         return _string_to_type(init_val, dest_type)
     if isinstance(init_val, (int, float)):
         return _number_to_type(init_val, dest_type)

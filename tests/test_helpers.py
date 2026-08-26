@@ -281,6 +281,13 @@ def test_value_to_type_converts_wrapper_to_string() -> None:
         ),
         pytest.param("42", "number", 42, id="integer"),
         pytest.param("4.25", "number", 4.25, id="float"),
+        pytest.param("'87'", "number", 87, id="single-quoted-integer"),
+        pytest.param('"4.25"', "number", 4.25, id="double-quoted-float"),
+        pytest.param("'87'", None, "87", id="single-quoted-default-string"),
+        pytest.param("'87'", "string", "87", id="single-quoted-explicit-string"),
+        pytest.param("\u201887\u2019", "number", 87, id="typographic-single-quoted-integer"),
+        pytest.param("\u201c4.25\u201d", "number", 4.25, id="typographic-double-quoted-float"),
+        pytest.param("'2026-07-24'", "date", datetime.date(2026, 7, 24), id="single-quoted-date"),
     ],
 )
 def test_value_to_type_converts_strings(
@@ -294,6 +301,31 @@ def test_value_to_type_converts_strings(
         initial (str): String value to convert.
         destination (str | None): Requested destination type, or None for the default.
         expected (str | float | datetime.date | datetime.datetime): Converted value.
+    """
+    assert value_to_type(initial, destination) == expected
+
+
+@pytest.mark.parametrize(
+    ("initial", "destination", "expected"),
+    [
+        pytest.param("'hello'", "string", "hello", id="quoted-text"),
+        pytest.param("'87", "string", "'87", id="unmatched-opening-quote"),
+        pytest.param("''", "string", None, id="quoted-empty"),
+        pytest.param("'none'", "number", None, id="quoted-none"),
+        pytest.param("'unknown'", None, None, id="quoted-unknown"),
+    ],
+)
+def test_value_to_type_unwraps_wrapping_quotes(
+    initial: str,
+    destination: str | None,
+    expected: str | None,
+) -> None:
+    """Strip one matching quote layer before converting or treating as empty.
+
+    Args:
+        initial (str): Quoted or partially quoted string value.
+        destination (str | None): Requested destination type, or None for the default.
+        expected (str | None): Converted value after quote unwrapping.
     """
     assert value_to_type(initial, destination) == expected
 
@@ -313,6 +345,12 @@ def test_value_to_type_converts_strings(
             "number",
             "Cannot convert string to number",
             id="invalid-number",
+        ),
+        pytest.param(
+            "87'",
+            "number",
+            "Cannot convert string to number",
+            id="trailing-quote-only",
         ),
         pytest.param("value", "boolean", "Invalid dest_type", id="invalid-destination"),
     ],
