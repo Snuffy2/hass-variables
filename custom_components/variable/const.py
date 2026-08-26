@@ -2,7 +2,7 @@
 
 from homeassistant.const import Platform
 
-VERSION = "3.5.15"
+VERSION = "3.5.16"
 
 PLATFORM_NAME = "Variables+History"
 DOMAIN = "variable"

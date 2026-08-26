@@ -169,7 +169,7 @@ Used to update the value or attributes of a Sensor Variable
 | Name                 | Key                                     | Required | Default | Description                                                                           |
 |----------------------|-----------------------------------------|----------|---------|---------------------------------------------------------------------------------------|
 | `Targets`            | `target:`<br />&nbsp;&nbsp;`entity_id:` | `Yes`    |         | The entity_ids of one or more sensor variables to update (ex. `sensor.test_variable`) |
-| `New Value`          | `value`                                 | `No`     |         | Value/state to change the variable to                                                 |
+| `New Value`          | `value`                                 | `No`     |         | Value/state to change the variable to. One matching pair of wrapping quotes is stripped, so quoted templates still store a numeric state usable in `numeric_state` conditions |
 | `New Attributes`     | `attributes`                            | `No`     |         | What to update the attributes to                                                      |
 | `Replace Attributes` | `replace_attributes`                    | `No`     | `False` | Replace or merge current attributes (`False` = merge)                                 |
 
