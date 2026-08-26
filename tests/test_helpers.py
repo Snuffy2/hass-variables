@@ -293,14 +293,14 @@ def test_value_to_type_converts_wrapper_to_string() -> None:
 def test_value_to_type_converts_strings(
     initial: str,
     destination: str | None,
-    expected: str | float | datetime.date | datetime.datetime,
+    expected: str | int | float | datetime.date | datetime.datetime,
 ) -> None:
     """Convert valid strings to the requested public destination type.
 
     Args:
         initial (str): String value to convert.
         destination (str | None): Requested destination type, or None for the default.
-        expected (str | float | datetime.date | datetime.datetime): Converted value.
+        expected (str | int | float | datetime.date | datetime.datetime): Converted value.
     """
     assert value_to_type(initial, destination) == expected
 
