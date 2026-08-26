@@ -293,7 +293,7 @@ def test_value_to_type_converts_wrapper_to_string() -> None:
 def test_value_to_type_converts_strings(
     initial: str,
     destination: str | None,
-    expected: str | int | float | datetime.date | datetime.datetime,
+    expected: str | float | datetime.date | datetime.datetime,
 ) -> None:
     """Convert valid strings to the requested public destination type.
 
