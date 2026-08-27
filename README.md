@@ -10,9 +10,9 @@
 | custom\_components/variable/const.py           |       39 |        0 |        0 |        0 |    100% |           |
 | custom\_components/variable/device.py          |       59 |        0 |       22 |        1 |     99% | 144-\>140 |
 | custom\_components/variable/device\_tracker.py |      180 |       14 |       66 |        7 |     91% |111-115, 166, 222-223, 319-325, 335-\>353, 340-347, 361, 414-\>416 |
-| custom\_components/variable/helpers.py         |      169 |        1 |       98 |        2 |     99% |98-\>100, 356 |
+| custom\_components/variable/helpers.py         |      181 |        1 |      104 |        2 |     99% |123-\>125, 387 |
 | custom\_components/variable/sensor.py          |      274 |       42 |      100 |       14 |     83% |189, 229-230, 254-255, 281-314, 343-344, 371-\>373, 388-\>390, 438-444, 476-482, 490-\>508, 502, 530, 581-587, 600, 642, 647-655, 668 |
-| **TOTAL**                                      | **1724** |  **178** |  **706** |  **100** | **87%** |           |
+| **TOTAL**                                      | **1736** |  **178** |  **712** |  **100** | **87%** |           |
 
 
 ## Setup coverage badge
