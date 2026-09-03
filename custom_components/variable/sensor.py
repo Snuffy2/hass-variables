@@ -277,13 +277,7 @@ class Variable(RestoreSensor):
                 )
                 if self._config.get(CONF_UPDATED, True):
                     self._attr_extra_state_attributes.pop(CONF_UNIT_OF_MEASUREMENT, None)
-                if self._attr_device_info:
-                    device_registry = dr.async_get(self._hass)
-                    device = device_registry.async_get_device(
-                        identifiers=self._attr_device_info.get(
-                            "identifiers",
-                        )
-                    )
+                if (device := self.device_entry) is not None:
                     # Ensure static checker and runtime know _attr_name is a string.
                     # Avoid `assert` (flagged by bandit) and coerce to empty
                     # string if it's unexpectedly None or not a str.

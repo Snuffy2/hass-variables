@@ -124,7 +124,9 @@ async def test_device_linked_binary_sensor_name_is_not_prefixed_again_after_relo
     )
     assert await hass.config_entries.async_setup(device_entry.entry_id)
     await hass.async_block_till_done()
-    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, device_entry.entry_id)})
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, device_entry.entry_id), device_entry.entry_id
+    )
     assert device is not None
 
     friendly_name = f"Virtual Hub {entity_name}"

@@ -39,7 +39,12 @@ from custom_components.variable.const import (
     CONF_YAML_VARIABLE,
     DOMAIN,
 )
-from custom_components.variable.device import create_device, remove_device, update_device
+from custom_components.variable.device import (
+    _get_device_for_entry,
+    create_device,
+    remove_device,
+    update_device,
+)
 from tests.types import ConfigEntryFactory
 
 
@@ -64,7 +69,9 @@ async def test_create_device_reloads_only_linked_variable_entities(
     )
     assert await hass.config_entries.async_setup(device_entry.entry_id)
     await hass.async_block_till_done()
-    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, device_entry.entry_id)})
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, device_entry.entry_id), device_entry.entry_id
+    )
     assert device is not None
 
     linked_entry = config_entry_factory(
@@ -143,7 +150,9 @@ async def test_update_device_changes_all_registry_metadata(
 
     assert await update_device(hass, entry, metadata)
 
-    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, entry.entry_id), entry.entry_id
+    )
     assert device is not None
     assert device.manufacturer == metadata[ATTR_MANUFACTURER]
     assert device.model == metadata[ATTR_MODEL]
@@ -175,6 +184,39 @@ async def test_update_device_returns_false_when_registry_device_is_missing(
     assert not await update_device(hass, entry, {ATTR_MODEL: "Unapplied"})
 
 
+def test_get_device_for_entry_uses_legacy_lookup_before_home_assistant_2026_8(
+    hass: HomeAssistant,
+    config_entry_factory: ConfigEntryFactory,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Use the unscoped lookup only when the scoped API is unavailable.
+
+    Args:
+        hass (HomeAssistant): Home Assistant instance that hosts the registry.
+        config_entry_factory (ConfigEntryFactory): Factory that creates the device config entry.
+        monkeypatch (pytest.MonkeyPatch): Pytest fixture used to simulate Home Assistant 2026.6.
+    """
+    entry = config_entry_factory(
+        {
+            CONF_ENTITY_PLATFORM: CONF_DEVICE,
+            CONF_NAME: "Legacy Lookup Hub",
+            CONF_YAML_VARIABLE: False,
+        }
+    )
+    device_registry = dr.async_get(hass)
+    expected_device = device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, entry.entry_id)},
+        name="Legacy Lookup Hub",
+    )
+    legacy_lookup = Mock(wraps=device_registry.async_get_device)
+    monkeypatch.delattr(dr.DeviceRegistry, "async_get_device_by_identifier")
+    monkeypatch.setattr(dr.DeviceRegistry, "async_get_device", legacy_lookup)
+
+    assert _get_device_for_entry(device_registry, entry) is expected_device
+    legacy_lookup.assert_called_once_with(identifiers={(DOMAIN, entry.entry_id)})
+
+
 async def test_remove_device_reloads_only_attached_variable_entities(
     hass: HomeAssistant,
     config_entry_factory: ConfigEntryFactory,
@@ -197,7 +239,9 @@ async def test_remove_device_reloads_only_attached_variable_entities(
     assert await hass.config_entries.async_setup(device_entry.entry_id)
     await hass.async_block_till_done()
     device_registry = dr.async_get(hass)
-    device = device_registry.async_get_device(identifiers={(DOMAIN, device_entry.entry_id)})
+    device = device_registry.async_get_device_by_identifier(
+        (DOMAIN, device_entry.entry_id), device_entry.entry_id
+    )
     assert device is not None
 
     linked_entry = config_entry_factory(
@@ -228,7 +272,12 @@ async def test_remove_device_reloads_only_attached_variable_entities(
 
     assert await remove_device(hass, device_entry)
 
-    assert device_registry.async_get_device(identifiers={(DOMAIN, device_entry.entry_id)}) is None
+    assert (
+        device_registry.async_get_device_by_identifier(
+            (DOMAIN, device_entry.entry_id), device_entry.entry_id
+        )
+        is None
+    )
     schedule_reload.assert_called_once_with(linked_entry.entry_id)
 
 
@@ -276,7 +325,9 @@ async def test_setup_device_entry_creates_registry_device(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, entry.entry_id), entry.entry_id
+    )
     assert device is not None
     assert device.name == "Virtual Hub"
     assert device.manufacturer == "Variables"
@@ -315,7 +366,9 @@ async def test_clearing_variable_device_links_preserves_entities_when_device_rem
 
     device_registry = dr.async_get(hass)
     entity_registry = er.async_get(hass)
-    device = device_registry.async_get_device(identifiers={(DOMAIN, device_entry.entry_id)})
+    device = device_registry.async_get_device_by_identifier(
+        (DOMAIN, device_entry.entry_id), device_entry.entry_id
+    )
     assert device is not None
 
     entries = [
@@ -456,7 +509,12 @@ async def test_clearing_variable_device_links_preserves_entities_when_device_rem
     assert await hass.config_entries.async_remove(device_entry.entry_id)
     await hass.async_block_till_done()
 
-    assert device_registry.async_get_device(identifiers={(DOMAIN, device_entry.entry_id)}) is None
+    assert (
+        device_registry.async_get_device_by_identifier(
+            (DOMAIN, device_entry.entry_id), device_entry.entry_id
+        )
+        is None
+    )
     for entity_id, entry in zip(entity_ids, entries, strict=True):
         assert hass.states.get(entity_id) is not None
         registry_entry = entity_registry.async_get(entity_id)
