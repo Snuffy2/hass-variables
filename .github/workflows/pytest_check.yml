@@ -1,4 +1,4 @@
-name: pytest and coverage
+name: pytest check and post coverage
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions: {}
 
 jobs:
   tests:
-    name: pytest and coverage report
+    name: pytest check and post coverage
 
     if: >
       !(
@@ -25,8 +25,9 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: read
-      pull-requests: read
+      # Fork pull request tokens are downgraded to read-only by GitHub.
+      pull-requests: write
+      contents: write
 
     steps:
       - name: Checkout Repository
@@ -52,16 +53,17 @@ jobs:
       - name: Generate PR coverage comment
         if: github.event_name == 'pull_request'
         id: coverage_comment
-        uses: py-cov-action/python-coverage-comment-action@7188638f871f721a365d644f505d1ff3df20d683 # v3.40
+        uses: py-cov-action/python-coverage-comment-action@v4.3
         with:
           GITHUB_TOKEN: ${{ github.token }}
+          ACTIVITY: process_pr
           MINIMUM_GREEN: 90
           MINIMUM_ORANGE: 70
 
       - name: Store PR coverage comment
         if: >
           github.event_name == 'pull_request' &&
-          steps.coverage_comment.outputs.COMMENT_FILE_WRITTEN == 'true'
+          steps.coverage_comment.outputs.comment_file_written == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: python-coverage-comment-action
@@ -91,6 +93,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Download coverage database
         env:
@@ -102,8 +106,9 @@ jobs:
             --dir .
 
       - name: Publish coverage data
-        uses: py-cov-action/python-coverage-comment-action@7188638f871f721a365d644f505d1ff3df20d683 # v3.40
+        uses: py-cov-action/python-coverage-comment-action@v4.3
         with:
           GITHUB_TOKEN: ${{ github.token }}
+          ACTIVITY: save_coverage_data_files
           MINIMUM_GREEN: 90
           MINIMUM_ORANGE: 70
