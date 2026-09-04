@@ -1,15 +1,15 @@
-name: Post coverage Comment to PR
+name: pytest post coverage
 
 on:
   workflow_run:
-    workflows: ["pytest and coverage"]
+    workflows: ["pytest check and post coverage"]
     types: [completed]
 
 permissions: {}
 
 jobs:
   comment:
-    name: Post coverage Comment to PR
+    name: pytest post coverage
     runs-on: ubuntu-latest
 
     if: >
