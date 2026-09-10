@@ -38,6 +38,7 @@ from custom_components.variable.const import (
     DOMAIN,
     SERVICE_UPDATE_DEVICE_TRACKER,
 )
+from custom_components.variable.device import _get_device_for_entry
 from custom_components.variable.device_tracker import Variable
 from tests.types import ConfigEntryFactory
 
@@ -218,7 +219,7 @@ async def test_device_linked_tracker_name_is_not_prefixed_again_after_reload(
     )
     assert await hass.config_entries.async_setup(device_entry.entry_id)
     await hass.async_block_till_done()
-    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, device_entry.entry_id)})
+    device = _get_device_for_entry(dr.async_get(hass), device_entry)
     assert device is not None
 
     friendly_name = f"Virtual Hub {entity_name}"

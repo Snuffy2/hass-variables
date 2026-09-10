@@ -50,6 +50,7 @@ from custom_components.variable.const import (
     DOMAIN,
     SERVICE_UPDATE_DEVICE_TRACKER,
 )
+from custom_components.variable.device import _get_device_for_entry
 from tests.types import ConfigEntryFactory
 
 
@@ -542,7 +543,7 @@ async def test_single_page_flows_create_entries(
         assert registry_entry is not None
         assert registry_entry.config_entry_id == entry.entry_id
     else:
-        device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+        device = _get_device_for_entry(dr.async_get(hass), entry)
         assert device is not None
         assert device.name == "Virtual Hub"
         assert device.manufacturer == "Variables"
@@ -1473,7 +1474,7 @@ async def test_device_options_flow_updates_registry_metadata(
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.data[ATTR_MANUFACTURER] == "Updated"
     assert entry.data[ATTR_MODEL] == "Updated Model"
-    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    device = _get_device_for_entry(dr.async_get(hass), entry)
     assert device is not None
     assert device.manufacturer == "Updated"
     assert device.model == "Updated Model"
@@ -1503,7 +1504,7 @@ async def test_device_options_invalid_url_preserves_entry_and_registry(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     registry = dr.async_get(hass)
-    original_device = registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    original_device = _get_device_for_entry(registry, entry)
     assert original_device is not None
     original_data = dict(entry.data)
 
@@ -1523,7 +1524,7 @@ async def test_device_options_invalid_url_preserves_entry_and_registry(
     assert result["step_id"] == "device_options"
     assert result["errors"] == {"base": "invalid_url"}
     assert dict(entry.data) == original_data
-    current_device = registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    current_device = _get_device_for_entry(registry, entry)
     assert current_device is not None
     assert current_device.id == original_device.id
     assert current_device.manufacturer == "Original"

@@ -22,6 +22,28 @@ from .const import CONF_YAML_VARIABLE, DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 
+def _get_device_for_entry(
+    device_registry: dr.DeviceRegistry, entry: ConfigEntry
+) -> dr.DeviceEntry | None:
+    """Return the registry device owned by a Variable config entry.
+
+    Home Assistant 2026.8 added the config-entry-scoped lookup. Retain the
+    legacy lookup only for the integration's supported 2026.6 and 2026.7
+    releases, where identifiers were still globally unique.
+
+    Args:
+        device_registry (dr.DeviceRegistry): Registry containing Variable devices.
+        entry (ConfigEntry): Config entry that owns the requested device.
+
+    Returns:
+        dr.DeviceEntry | None: Matching device, if one exists.
+    """
+    identifier = (DOMAIN, entry.entry_id)
+    if scoped_lookup := getattr(device_registry, "async_get_device_by_identifier", None):
+        return scoped_lookup(identifier, entry.entry_id)
+    return device_registry.async_get_device(identifiers={identifier})
+
+
 async def create_device(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Create or update a registry device and reload affected Variable entities.
 
@@ -91,7 +113,7 @@ async def update_device(
         bool: True when the device was updated; False when no matching device exists.
     """
     device_registry = dr.async_get(hass)
-    device = device_registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    device = _get_device_for_entry(device_registry, entry)
     if device is None:
         _LOGGER.debug("No device found to update")
         return False
@@ -123,7 +145,7 @@ async def remove_device(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     device_registry = dr.async_get(hass)
     entity_registry = er.async_get(hass)
 
-    device = device_registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    device = _get_device_for_entry(device_registry, entry)
     _LOGGER.debug(
         "(%s) [remove_device] device id: %s",
         getattr(device, "name", ""),
