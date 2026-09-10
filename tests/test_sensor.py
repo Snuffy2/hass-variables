@@ -41,6 +41,7 @@ from custom_components.variable.const import (
     SERVICE_INCREMENT_SENSOR,
     SERVICE_UPDATE_SENSOR,
 )
+from custom_components.variable.device import _get_device_for_entry
 from custom_components.variable.sensor import Variable
 from tests.types import ConfigEntryFactory
 
@@ -231,9 +232,7 @@ async def test_device_linked_sensor_name_is_not_prefixed_again_after_reload(
     )
     assert await hass.config_entries.async_setup(device_entry.entry_id)
     await hass.async_block_till_done()
-    device = dr.async_get(hass).async_get_device_by_identifier(
-        (DOMAIN, device_entry.entry_id), device_entry.entry_id
-    )
+    device = _get_device_for_entry(dr.async_get(hass), device_entry)
     assert device is not None
 
     friendly_name = f"Virtual Hub {entity_name}"
