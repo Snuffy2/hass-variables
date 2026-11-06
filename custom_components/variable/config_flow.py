@@ -363,7 +363,9 @@ class VariableConfigFlow(ConfigFlow, domain=DOMAIN):
         # Show the form again, including any errors found with the input.
         return self.async_show_form(
             step_id="add_sensor",
-            data_schema=ADD_SENSOR_SCHEMA,
+            # HA aliases Voluptuous to Probatio at runtime; mypy cannot see that alias.
+            # Older HA annotations do not need the argument-type ignore.
+            data_schema=ADD_SENSOR_SCHEMA,  # type: ignore[arg-type, unused-ignore]
             errors=errors,
             description_placeholders={
                 "component_config_url": COMPONENT_CONFIG_URL,
@@ -451,7 +453,9 @@ class VariableConfigFlow(ConfigFlow, domain=DOMAIN):
         # Show the form again, including any errors found with the input.
         return self.async_show_form(
             step_id="sensor_page_2",
-            data_schema=sensor_page_2_schema,
+            # HA aliases Voluptuous to Probatio at runtime; mypy cannot see that alias.
+            # Older HA annotations do not need the argument-type ignore.
+            data_schema=sensor_page_2_schema,  # type: ignore[arg-type, unused-ignore]
             errors=errors,
             description_placeholders={
                 "device_class": str(self.add_sensor_input.get(CONF_DEVICE_CLASS, "None")),
@@ -621,7 +625,9 @@ class VariableConfigFlow(ConfigFlow, domain=DOMAIN):
         # Show the form again, including any errors found with the input.
         return self.async_show_form(
             step_id="add_binary_sensor",
-            data_schema=ADD_BINARY_SENSOR_SCHEMA,
+            # HA aliases Voluptuous to Probatio at runtime; mypy cannot see that alias.
+            # Older HA annotations do not need the argument-type ignore.
+            data_schema=ADD_BINARY_SENSOR_SCHEMA,  # type: ignore[arg-type, unused-ignore]
             errors=errors,
             description_placeholders={
                 "component_config_url": COMPONENT_CONFIG_URL,
@@ -657,7 +663,9 @@ class VariableConfigFlow(ConfigFlow, domain=DOMAIN):
         # Show the form again, including any errors found with the input.
         return self.async_show_form(
             step_id="add_device_tracker",
-            data_schema=ADD_DEVICE_TRACKER_SCHEMA,
+            # HA aliases Voluptuous to Probatio at runtime; mypy cannot see that alias.
+            # Older HA annotations do not need the argument-type ignore.
+            data_schema=ADD_DEVICE_TRACKER_SCHEMA,  # type: ignore[arg-type, unused-ignore]
             errors=errors,
             description_placeholders={
                 "component_config_url": COMPONENT_CONFIG_URL,
@@ -699,7 +707,9 @@ class VariableConfigFlow(ConfigFlow, domain=DOMAIN):
         # Show the form again, including any errors found with the input.
         return self.async_show_form(
             step_id="add_device",
-            data_schema=ADD_DEVICE_SCHEMA,
+            # HA aliases Voluptuous to Probatio at runtime; mypy cannot see that alias.
+            # Older HA annotations do not need the argument-type ignore.
+            data_schema=ADD_DEVICE_SCHEMA,  # type: ignore[arg-type, unused-ignore]
             errors=errors,
             description_placeholders={
                 "component_config_url": COMPONENT_CONFIG_URL,
@@ -845,7 +855,9 @@ class VariableOptionsFlowHandler(OptionsFlow):
 
         return self.async_show_form(
             step_id="change_sensor_value",
-            data_schema=change_sensor_value_schema,
+            # HA aliases Voluptuous to Probatio at runtime; mypy cannot see that alias.
+            # Older HA annotations do not need the argument-type ignore.
+            data_schema=change_sensor_value_schema,  # type: ignore[arg-type, unused-ignore]
             errors=errors,
             description_placeholders={"disp_name": str(disp_name)},
         )
@@ -1015,7 +1027,9 @@ class VariableOptionsFlowHandler(OptionsFlow):
 
         return self.async_show_form(
             step_id="change_binary_sensor_value",
-            data_schema=change_binary_sensor_value_schema,
+            # HA aliases Voluptuous to Probatio at runtime; mypy cannot see that alias.
+            # Older HA annotations do not need the argument-type ignore.
+            data_schema=change_binary_sensor_value_schema,  # type: ignore[arg-type, unused-ignore]
             errors=errors,
             description_placeholders={"disp_name": str(disp_name)},
         )
@@ -1156,7 +1170,9 @@ class VariableOptionsFlowHandler(OptionsFlow):
 
         return self.async_show_form(
             step_id="change_device_tracker_value",
-            data_schema=change_device_tracker_value_schema,
+            # HA aliases Voluptuous to Probatio at runtime; mypy cannot see that alias.
+            # Older HA annotations do not need the argument-type ignore.
+            data_schema=change_device_tracker_value_schema,  # type: ignore[arg-type, unused-ignore]
             errors=errors,
             description_placeholders={
                 "disp_name": str(disp_name),
@@ -1358,7 +1374,9 @@ class VariableOptionsFlowHandler(OptionsFlow):
 
         return self.async_show_form(
             step_id="sensor_options",
-            data_schema=sensor_options_page_1_schema,
+            # HA aliases Voluptuous to Probatio at runtime; mypy cannot see that alias.
+            # Older HA annotations do not need the argument-type ignore.
+            data_schema=sensor_options_page_1_schema,  # type: ignore[arg-type, unused-ignore]
             errors=errors,
             description_placeholders={
                 "component_config_url": str(COMPONENT_CONFIG_URL),
@@ -1507,7 +1525,9 @@ class VariableOptionsFlowHandler(OptionsFlow):
 
         return self.async_show_form(
             step_id="sensor_options_page_2",
-            data_schema=sensor_options_page_2_schema,
+            # HA aliases Voluptuous to Probatio at runtime; mypy cannot see that alias.
+            # Older HA annotations do not need the argument-type ignore.
+            data_schema=sensor_options_page_2_schema,  # type: ignore[arg-type, unused-ignore]
             errors=errors,
             description_placeholders={
                 "disp_name": str(disp_name),
@@ -1870,7 +1890,9 @@ class VariableOptionsFlowHandler(OptionsFlow):
 
         return self.async_show_form(
             step_id="binary_sensor_options",
-            data_schema=binary_sensor_options_schema,
+            # HA aliases Voluptuous to Probatio at runtime; mypy cannot see that alias.
+            # Older HA annotations do not need the argument-type ignore.
+            data_schema=binary_sensor_options_schema,  # type: ignore[arg-type, unused-ignore]
             errors=errors,
             description_placeholders={
                 "component_config_url": str(COMPONENT_CONFIG_URL),
@@ -2077,7 +2099,9 @@ class VariableOptionsFlowHandler(OptionsFlow):
 
         return self.async_show_form(
             step_id="device_tracker_options",
-            data_schema=device_tracker_options_schema,
+            # HA aliases Voluptuous to Probatio at runtime; mypy cannot see that alias.
+            # Older HA annotations do not need the argument-type ignore.
+            data_schema=device_tracker_options_schema,  # type: ignore[arg-type, unused-ignore]
             errors=errors,
             description_placeholders={
                 "component_config_url": str(COMPONENT_CONFIG_URL),
@@ -2143,7 +2167,9 @@ class VariableOptionsFlowHandler(OptionsFlow):
         _LOGGER.debug("[Device Options] self.config_entry.data: %s", self.config_entry.data)
         return self.async_show_form(
             step_id="device_options",
-            data_schema=device_options_schema,
+            # HA aliases Voluptuous to Probatio at runtime; mypy cannot see that alias.
+            # Older HA annotations do not need the argument-type ignore.
+            data_schema=device_options_schema,  # type: ignore[arg-type, unused-ignore]
             errors=errors,
             description_placeholders={
                 "component_config_url": str(COMPONENT_CONFIG_URL),
